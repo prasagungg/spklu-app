@@ -4,9 +4,10 @@ import '../models/nominal_option.dart';
 
 /// Data dummy untuk demo.
 ///
-/// Halaman pemilihan memakai daftar ini, bukan backend. Integrasi REST
-/// sudah tersedia lewat `ChargePointRepository` — tinggal ditukar di
-/// [ChargeBoxPage] bila mau menyalakannya lagi.
+/// [nominals] masih dipakai halaman Pilih Nominal — backend belum punya
+/// endpoint harga. [chargeBoxes] sudah tidak dipakai alur utama karena
+/// halaman pemilihan mengambil daftarnya dari `GET /list`; yang tersisa
+/// hanya pemakaiannya di test.
 class DemoData {
   const DemoData._();
 
