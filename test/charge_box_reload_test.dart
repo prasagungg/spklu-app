@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kossotrik/data/charge_point_repository.dart';
+import 'package:kossotrik/pages/charge_box_page.dart';
 import 'package:kossotrik/main.dart';
 import 'package:kossotrik/services/api_client.dart';
 import 'package:kossotrik/widgets/page_scaffold.dart';
@@ -48,7 +49,9 @@ void main() {
       client: ApiClient.withDio(Dio()..interceptors.add(counter)),
     );
 
-    await tester.pumpWidget(SPKLUApp(repository: repo));
+    await tester.pumpWidget(
+      SPKLUApp(repository: repo, home: const ChargeBoxPage()),
+    );
     await tester.pumpAndSettle();
 
     expect(counter.listCalls, greaterThanOrEqualTo(1),

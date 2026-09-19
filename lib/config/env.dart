@@ -1,9 +1,11 @@
+import 'host.dart';
+
 /// Konfigurasi runtime. Semua nilai bisa ditimpa saat build tanpa
 /// mengubah kode:
 ///
 /// ```sh
 /// flutter run \
-///   --dart-define=SPKLU_API_BASE_URL=http://10.0.2.2:8080/api \
+///   --dart-define=SPKLU_API_BASE_URL=10.0.2.2:8080 \
 ///   --dart-define=SPKLU_API_AUTH="Basic ZWRnZTplZGdlLWRldi1vbmx5"
 /// ```
 ///
@@ -11,10 +13,19 @@
 class Env {
   const Env._();
 
-  static const String apiBaseUrl = String.fromEnvironment(
+  static const String _rawBaseUrl = String.fromEnvironment(
     'SPKLU_API_BASE_URL',
     defaultValue: 'https://edge-controller-playground.lentera-app.id/api',
   );
+
+  /// Base URL yang sudah dibereskan: alamat tanpa skema dianggap
+  /// `http://`, dan garis miring di ujung dibuang. Jadi cukup mengetik
+  /// `192.168.1.10:8080`.
+  ///
+  /// Ini hanya nilai awal. Alamat yang benar-benar dipakai ada di
+  /// `ApiConfig.baseUrl`, karena operator bisa menggantinya dari
+  /// halaman Konfigurasi Server tanpa membangun ulang aplikasi.
+  static String get apiBaseUrl => Host.normalizeBaseUrl(_rawBaseUrl);
 
   /// Header Authorization. Kosong secara default karena endpoint
   /// playground menerima request tanpa auth; isi lewat --dart-define

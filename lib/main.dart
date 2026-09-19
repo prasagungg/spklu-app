@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_route_observer.dart';
+import 'config/api_config.dart';
 import 'data/charge_point_repository.dart';
 import 'data/charging_scope.dart';
-import 'pages/charge_box_page.dart';
+import 'pages/api_config_page.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Gambar latar sengaja dibiarkan menembus ke belakang status bar dan
@@ -25,14 +26,28 @@ void main() {
     ),
   );
 
+  // Alamat yang terakhir dipilih operator dipasang sebelum frame
+  // pertama, supaya halaman Konfigurasi Server membuka isian yang sudah
+  // benar dan tidak ada request yang sempat menembak alamat lama.
+  await ApiConfig.restore();
+
   runApp(const SPKLUApp());
 }
 
 class SPKLUApp extends StatelessWidget {
-  const SPKLUApp({super.key, this.repository});
+  const SPKLUApp({
+    super.key,
+    this.repository,
+    this.home = const ApiConfigPage(),
+  });
 
   /// Disuntik di test agar alur bisa dijalankan tanpa jaringan sungguhan.
   final ChargePointRepository? repository;
+
+  /// Halaman pertama. Produksi selalu mulai dari Konfigurasi Server;
+  /// test alur pengisian melewatinya dengan menunjuk langsung ke
+  /// halaman yang sedang diuji.
+  final Widget home;
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +66,7 @@ class SPKLUApp extends StatelessWidget {
         // Dipakai halaman Pilih Charge Box untuk memuat ulang /list
         // setiap kali pengguna kembali ke sana.
         navigatorObservers: [appRouteObserver],
-        home: const ChargeBoxPage(),
+        home: home,
       ),
     );
   }

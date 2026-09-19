@@ -17,6 +17,7 @@ import '../widgets/connector_sheet.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/state_view.dart';
 import '../widgets/status_chip.dart';
+import 'api_config_page.dart';
 import 'charging_status_page.dart';
 import 'nominal_page.dart';
 import 'session_verification_page.dart';
@@ -31,6 +32,10 @@ import 'session_verification_page.dart';
 /// Tombol refresh di header sudah dihapus, jadi muat ulang dilakukan
 /// lewat tarik-ke-bawah atau tombol pada tampilan kosong/gagal.
 class ChargeBoxPage extends StatefulWidget {
+  /// Key tombol menuju Konfigurasi Server; ikonnya tanpa teks, jadi
+  /// test butuh pegangan yang tidak menebak posisinya di pohon widget.
+  static const configKey = Key('buka-konfigurasi-server');
+
   const ChargeBoxPage({super.key, this.repository, this.chargeBoxes});
 
   /// Disuntik di test; produksi memakai instance default.
@@ -191,6 +196,19 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
     );
   }
 
+  /// Kembali ke halaman Konfigurasi Server.
+  ///
+  /// Memakai pushReplacement supaya halaman ini tidak menumpuk di bawah
+  /// config — tombol "Kembali ke Halaman Awal" di halaman-halaman
+  /// lanjutan memulangkan ke rute pertama, dan rute pertama harus tetap
+  /// daftar charge box, bukan layar konfigurasi.
+  void _openConfig() {
+    _refreshTimer?.cancel();
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const ApiConfigPage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PageScaffold(
@@ -198,6 +216,12 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
       subtitle: 'Pastikan sama dengan nomor tempat parkir',
       showStation: true,
       isHome: true,
+      // Alamat controller bisa diubah lagi tanpa menutup aplikasi.
+      headerAction: CircleIconButton(
+        key: ChargeBoxPage.configKey,
+        asset: 'assets/icons/ic_settings.svg',
+        onTap: _openConfig,
+      ),
       child: RefreshIndicator(
         onRefresh: _load,
         color: AppColors.primary,

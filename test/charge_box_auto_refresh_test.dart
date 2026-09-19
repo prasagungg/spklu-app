@@ -47,7 +47,9 @@ void main() {
       client: ApiClient.withDio(Dio()..interceptors.add(_Stub(() => _list(ids)))),
     );
 
-    await tester.pumpWidget(SPKLUApp(repository: repo));
+    await tester.pumpWidget(
+      SPKLUApp(repository: repo, home: const ChargeBoxPage()),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(ChargeBoxCard), findsOneWidget);
@@ -73,7 +75,9 @@ void main() {
       client: ApiClient.withDio(Dio()..interceptors.add(_Stub(() => _list(ids)))),
     );
 
-    await tester.pumpWidget(SPKLUApp(repository: repo));
+    await tester.pumpWidget(
+      SPKLUApp(repository: repo, home: const ChargeBoxPage()),
+    );
     await tester.pumpAndSettle();
     expect(find.byType(ChargeBoxCard), findsNWidgets(2));
 

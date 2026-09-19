@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 
 import '../config/env.dart';
+import '../config/host.dart';
 import 'api_exception.dart';
 import 'api_logger.dart';
 
@@ -27,6 +31,22 @@ class ApiClient {
   /// (upload multipart, download, dsb).
   Dio get raw => _dio;
 
+  /// Alamat backend yang sedang dipakai.
+  String get baseUrl => _dio.options.baseUrl;
+
+  /// Mengganti alamat backend saat aplikasi berjalan — dipakai halaman
+  /// Konfigurasi Server.
+  ///
+  /// Alamat dinormalisasi lebih dulu, jadi operator cukup mengetik IP
+  /// charger tanpa skema. Kebijakan sertifikat dihitung ulang setiap
+  /// kali supaya kelonggaran untuk alamat lokal tidak ikut terbawa
+  /// ketika alamatnya diganti ke host publik.
+  set baseUrl(String value) {
+    final normalized = Host.normalizeBaseUrl(value);
+    _dio.options.baseUrl = normalized;
+    _applyCertificatePolicy(_dio, normalized);
+  }
+
   static Dio _build() {
     final dio = Dio(
       BaseOptions(
@@ -50,7 +70,33 @@ class ApiClient {
       dio.interceptors.add(ApiLogger());
     }
 
+    _applyCertificatePolicy(dio, Env.apiBaseUrl);
+
     return dio;
+  }
+
+  /// Edge controller di jaringan lokal biasanya memakai sertifikat
+  /// self-signed. Pengecualiannya dibatasi ke alamat privat saja — host
+  /// publik tetap diverifikasi penuh, jadi ini tidak melemahkan koneksi
+  /// ke environment sungguhan.
+  ///
+  /// Alamat tanpa TLS tidak terpengaruh sama sekali: `http://` tidak
+  /// pernah sampai ke pemeriksaan sertifikat.
+  static void _applyCertificatePolicy(Dio dio, String baseUrl) {
+    if (!Host.isPrivate(baseUrl)) {
+      // Adapter bawaan: verifikasi sertifikat seperti biasa.
+      dio.httpClientAdapter = IOHttpClientAdapter();
+      return;
+    }
+
+    dio.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () => HttpClient()
+        ..badCertificateCallback = (cert, host, port) =>
+            Host.isPrivateHost(host),
+    );
+    debugPrint(
+      '[API] Sertifikat self-signed diterima untuk host lokal ($baseUrl)',
+    );
   }
 
   /// Pasang interceptor tambahan, mis. penyisip token setelah login.

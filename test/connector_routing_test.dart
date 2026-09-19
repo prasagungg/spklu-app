@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kossotrik/data/charge_point_repository.dart';
+import 'package:kossotrik/pages/charge_box_page.dart';
 import 'package:kossotrik/main.dart';
 import 'package:kossotrik/services/api_client.dart';
 
@@ -71,7 +72,9 @@ Future<void> _tapConnector(WidgetTester tester, String status) async {
   final repo = ChargePointRepository(
     client: ApiClient.withDio(Dio()..interceptors.add(_Stub(status))),
   );
-  await tester.pumpWidget(SPKLUApp(repository: repo));
+  await tester.pumpWidget(
+    SPKLUApp(repository: repo, home: const ChargeBoxPage()),
+  );
   await tester.pumpAndSettle();
 
   await tester.tap(find.text('01'));

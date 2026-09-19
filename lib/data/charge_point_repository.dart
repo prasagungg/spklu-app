@@ -35,6 +35,12 @@ class ChargePointRepository {
 
   final ApiClient _client;
 
+  /// Client yang dipakai repository ini. Dibuka supaya halaman
+  /// Konfigurasi Server mengganti alamat pada client yang benar-benar
+  /// menembak backend, bukan pada instance bersama yang kebetulan sama
+  /// di produksi tetapi berbeda saat client disuntik.
+  ApiClient get client => _client;
+
   /// `GET /list`
   ///
   /// Mengembalikan daftar kosong bila `data.chargePoints` kosong —
