@@ -1,88 +1,99 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kossotrik/models/charge_box.dart';
-import 'package:kossotrik/models/connector.dart';
+import 'package:kossotrik/models/session_info.dart';
 
-/// Payload nyata yang tertangkap dari `GET /list` saat SIM-456
-/// konektor 2 sedang mengisi.
-const _liveChargePoint = {
-  'id': 'SIM-456',
-  'vendor': 'Icon Digital',
-  'model': 'OCPP Simulator',
-  'serialNumber': 'SIM-456',
-  'firmwareVersion': 'sim-1.0.0',
-  'connectedAt': '2026-09-17T20:13:35.93237262+07:00',
-  'lastHeartbeat': null,
-  'connectors': [
-    {'id': 1, 'status': 'Preparing', 'errorCode': 'NoError', 'session': null},
-    {
-      'id': 2,
-      'status': 'Charging',
-      'errorCode': 'NoError',
-      'session': {
-        'chargePointId': 'SIM-456',
-        'connectorId': 2,
-        'transactionId': 1789648926,
-        'idTag': 'REMOTE',
-        'state': 'charging',
-        'connectorStatus': 'Charging',
-        'percent': 20.1,
-        'energyWh': 24,
-        'powerW': 12330,
-        'durationSeconds': 6,
-        'stoppedAt': null,
-        'updatedAt': '2026-09-17T20:13:51.943093729+07:00',
-      },
-    },
-  ],
+/// Payload nyata `GET /progress` saat sesi sedang berjalan.
+///
+/// Sejak daftar charge box pindah ke `POST /list-chargerbox`, bentuk
+/// ini hanya datang dari `/progress` — daftar tidak lagi membawa sesi
+/// yang sedang berjalan.
+const _charging = {
+  'chargePointId': 'CB-SMR-01',
+  'connectorId': 2,
+  'transactionId': 1789648926,
+  'idTag': 'REMOTE',
+  'state': 'charging',
+  'connectorStatus': 'Charging',
+  'percent': 20.1,
+  'energyWh': 24,
+  'powerW': 12330,
+  'durationSeconds': 6,
+  'stoppedAt': null,
+  'updatedAt': '2026-09-17T20:13:51.943093729+07:00',
+};
+
+/// Sesi yang sudah berhenti: `powerW` null dan muncul `stopReason`.
+const _finished = {
+  'chargePointId': 'CB-SMR-01',
+  'connectorId': 2,
+  'transactionId': 1789648926,
+  'state': 'finished',
+  'connectorStatus': 'Preparing',
+  'percent': 55.5,
+  'energyWh': 207,
+  'powerW': null,
+  'durationSeconds': 59,
+  'stopReason': 'Remote',
+  'stoppedAt': '2026-09-17T20:58:35.135618667+07:00',
 };
 
 void main() {
-  final box = ChargeBox.fromJson(
-    Map<String, dynamic>.from(_liveChargePoint),
-    number: 2,
-  );
-  final idle = box.connectors[0];
-  final charging = box.connectors[1];
-
-  test('konektor tanpa sesi tidak melaporkan energi', () {
-    expect(idle.hasActiveSession, isFalse);
-    expect(idle.sessionEnergyKwh, isNull);
-    // "Preparing" bukan "Available", tapi tetap bisa ditekan — untuk
-    // melanjutkan ke layar mulai mengisi.
-    expect(idle.status, ConnectorStatus.preparing);
-    expect(idle.isAvailable, isFalse);
-    expect(idle.isSelectable, isTrue);
-  });
-
   test('sesi berjalan diurai lengkap dari payload nyata', () {
-    final session = charging.session!;
+    final session = SessionInfo.fromJson(Map<String, dynamic>.from(_charging));
 
     expect(session.transactionId, 1789648926);
-    expect(session.idTag, 'REMOTE');
     expect(session.state, 'charging');
     expect(session.isCharging, isTrue);
     expect(session.isFinished, isFalse);
     expect(session.percent, 20.1);
-    expect(session.durationSeconds, 6);
+    expect(session.powerKw, closeTo(12.33, 0.001));
+    expect(session.duration, const Duration(seconds: 6));
     expect(session.updatedAt, isNotNull);
   });
 
   test('meter Wh dikonversi ke kWh untuk ditampilkan', () {
-    expect(charging.session!.energyWh, 24);
-    expect(charging.sessionEnergyKwh, 0.024);
-    expect(charging.session!.powerKw, 12.33);
+    final session = SessionInfo.fromJson(Map<String, dynamic>.from(_charging));
+
+    expect(session.energyWh, 24);
+    expect(session.energyKwh, closeTo(0.024, 0.0001));
   });
 
-  test('estimasi sisa waktu dihitung dari persen dan durasi', () {
-    // 6 detik untuk 20,1% -> sisa 79,9% butuh ~24 detik -> dibulatkan 1 menit.
-    expect(charging.estimatedMinutes, 1);
-    expect(idle.estimatedMinutes, isNull);
+  test('energyKwh dari backend dipakai apa adanya bila ada', () {
+    final session = SessionInfo.fromJson({
+      ...Map<String, dynamic>.from(_charging),
+      'energyKwh': 6.4,
+    });
+
+    expect(session.energyKwh, 6.4);
   });
 
-  test('charge box tetap bisa ditekan untuk melanjutkan sesi', () {
-    // Konektor 1 "Preparing", konektor 2 "Charging" — dua-duanya punya
-    // tujuan sendiri, jadi kartunya tidak dimatikan.
-    expect(box.isAvailable, isTrue);
-    expect(box.connectorLabel, '2 Konektor');
+  test('sesi selesai: powerW null tidak membuat parsing gagal', () {
+    final session = SessionInfo.fromJson(Map<String, dynamic>.from(_finished));
+
+    expect(session.powerW, 0);
+    expect(session.state, 'finished');
+    expect(session.isFinished, isTrue);
+    expect(session.stopReason, 'Remote');
+    expect(session.stoppedAt, isNotNull);
+  });
+
+  /// `stoppedAt` yang terisi sudah cukup, sekalipun `state` belum
+  /// berubah — halaman status memakainya untuk berhenti menghitung.
+  test('stoppedAt yang terisi sudah berarti selesai', () {
+    final session = SessionInfo.fromJson({
+      ...Map<String, dynamic>.from(_charging),
+      'stoppedAt': '2026-09-17T20:58:35.135618667+07:00',
+    });
+
+    expect(session.isFinished, isTrue);
+  });
+
+  test('field yang hilang tidak membuat parsing gagal', () {
+    final session = SessionInfo.fromJson(const {});
+
+    expect(session.chargePointId, isEmpty);
+    expect(session.energyWh, 0);
+    expect(session.energyKwh, 0);
+    expect(session.percent, 0);
+    expect(session.isFinished, isFalse);
   });
 }

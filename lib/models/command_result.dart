@@ -9,7 +9,7 @@
 ///
 /// Perhatikan `state` bernilai "starting", bukan "charging": controller
 /// baru meneruskan perintah ke charger. Konfirmasi bahwa pengisian
-/// benar-benar jalan datang dari `session` pada `GET /list`.
+/// benar-benar jalan datang dari `GET /progress`.
 class CommandResult {
   const CommandResult({
     required this.chargePointId,

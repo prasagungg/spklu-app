@@ -10,8 +10,12 @@ import '../widgets/page_scaffold.dart';
 import '../widgets/primary_button.dart';
 import 'charge_box_page.dart';
 
-/// Halaman pembuka: alamat edge controller diisi di sini sebelum
-/// aplikasi menyentuh backend.
+/// Alamat edge controller diatur di sini.
+///
+/// Dibuka lewat ikon roda gigi di header halaman Pilih Charge Box —
+/// bukan sebagai layar pembuka. Aplikasi langsung masuk ke daftar
+/// charge box memakai alamat yang tersimpan; halaman ini hanya
+/// diperlukan saat alamatnya berubah.
 ///
 /// Controller kerap berpindah IP dan dipasang di jaringan lokal tanpa
 /// nama domain, jadi alamatnya harus bisa diatur di lapangan. Yang
@@ -51,8 +55,9 @@ class _ApiConfigPageState extends State<ApiConfigPage> {
   /// Memasang alamat, memastikan bisa dihubungi, lalu masuk ke daftar
   /// charge box.
   ///
-  /// Ujinya memakai `GET /list` — endpoint yang juga dipakai halaman
-  /// berikutnya, jadi kalau lolos di sini halaman itu pasti jalan.
+  /// Ujinya memakai `POST /list-chargerbox` — endpoint yang juga
+  /// dipakai halaman berikutnya, jadi kalau lolos di sini halaman itu
+  /// pasti jalan.
   Future<void> _connect() async {
     if (!_canSubmit) return;
 
@@ -65,7 +70,9 @@ class _ApiConfigPageState extends State<ApiConfigPage> {
     });
 
     ApiConfig.apply(_typed, client: repository?.client);
-    debugPrint('[CONFIG] Menguji koneksi ke ${ApiConfig.baseUrl}/list');
+    debugPrint(
+      '[CONFIG] Menguji koneksi ke ${ApiConfig.baseUrl}/list-chargerbox',
+    );
 
     // Tanpa scope (mode offline untuk test) tidak ada yang bisa diuji.
     if (repository != null) {
@@ -119,7 +126,8 @@ class _ApiConfigPageState extends State<ApiConfigPage> {
       title: 'Konfigurasi Server',
       subtitle: 'Masukkan alamat edge controller yang akan dipakai '
           'aplikasi ini.',
-      // Halaman paling awal — tidak ada tempat untuk pulang.
+      // Dicapai lewat pushReplacement, jadi halaman ini satu-satunya di
+      // tumpukan — tidak ada tempat untuk pulang.
       isHome: true,
       backgroundColor: AppColors.pageBackgroundPlain,
       bottomBar: BottomActionBar(
@@ -227,8 +235,8 @@ class _AddressField extends StatelessWidget {
 /// Menampilkan alamat yang benar-benar akan ditembak.
 ///
 /// Yang diketik hampir tidak pernah sama dengan yang dipakai — skema
-/// ditambahkan, garis miring dibuang, dan path `/list` menempel di
-/// belakang. Menampilkannya membuat salah ketik ketahuan sebelum
+/// ditambahkan, garis miring dibuang, dan path `/list-chargerbox`
+/// menempel di belakang. Menampilkannya membuat salah ketik ketahuan sebelum
 /// tombol ditekan, termasuk saat `/api` lupa disertakan.
 class _ResolvedHint extends StatelessWidget {
   const _ResolvedHint({required this.typed});
@@ -245,7 +253,7 @@ class _ResolvedHint extends StatelessWidget {
     }
 
     return Text(
-      'Akan memanggil ${Host.normalizeBaseUrl(typed)}/list',
+      'Akan memanggil ${Host.normalizeBaseUrl(typed)}/list-chargerbox',
       style: AppTheme.pageSubtitle,
     );
   }

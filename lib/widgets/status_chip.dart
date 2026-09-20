@@ -26,12 +26,18 @@ class StatusChip extends StatelessWidget {
         foreground = AppColors.inUseFg,
         fontSize = 12;
 
-  /// Kabel sudah tercolok tapi belum mulai mengisi — sudah diklaim,
-  /// jadi tidak bisa dipilih.
+  /// Sudah dibayar, menunggu konektor dihubungkan ke kendaraan.
   const StatusChip.preparing({super.key})
-      : label = 'Sudah Terhubung',
+      : label = 'Menunggu Konektor',
         background = AppColors.inUseBg,
         foreground = AppColors.inUseFg,
+        fontSize = 12;
+
+  /// Pengisian sudah selesai, konektor belum dilepas.
+  const StatusChip.finished({super.key})
+      : label = 'Selesai',
+        background = AppColors.availableBg,
+        foreground = AppColors.availableFg,
         fontSize = 12;
 
   /// Di kartu charge box chip ini sedikit lebih kecil (10px).

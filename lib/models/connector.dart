@@ -1,118 +1,127 @@
-import 'session_info.dart';
+import 'backend_status.dart';
 
-/// Status konektor yang dipakai UI.
+/// Status konektor yang dipakai UI, sejalan dengan angka `status` dari
+/// backend (lihat [BackendStatus]).
 ///
-/// - [available]   "Available" — bebas, bisa langsung dipakai.
-/// - [preparing]   "Preparing" — kabel baru dicolok, belum mengisi.
-///                 Masih boleh dipilih; justru inilah kondisi yang
-///                 dibutuhkan `/start`.
-/// - [inUse]       "Charging" dan turunannya — sedang mengisi daya.
-/// - [unavailable] Rusak, dipesan, atau dimatikan.
-enum ConnectorStatus { available, preparing, inUse, unavailable }
+/// - [available]   Bebas, bisa langsung dibeli.
+/// - [preparing]   Sudah dibayar, menunggu konektor dihubungkan.
+/// - [inUse]       Sedang mengisi daya.
+/// - [finished]    Pengisian sudah selesai, konektor belum dilepas.
+/// - [unavailable] Angka status di luar keempatnya.
+///
+/// Semua kecuali [available] berarti konektornya sudah diklaim orang
+/// lain, jadi pengguna harus membuktikan kepemilikan sesi lebih dulu.
+enum ConnectorStatus { available, preparing, inUse, finished, unavailable }
 
+/// Satu konektor pada charge box, dari `POST /list-chargerbox`.
+///
+/// ```json
+/// {
+///   "connectorId": "1",
+///   "chargeBoxId": "CB-SMR-01",
+///   "status": 1,
+///   "namaKonektor": "Gun 1",
+///   "typeConnector": "CCS2",
+///   "connectorTypeCurrent": "DC",
+///   "estimationAvailable": null
+/// }
+/// ```
 class Connector {
   const Connector({
     required this.id,
     required this.status,
+    this.statusCode,
     this.displayName,
-    this.rawStatus = '',
-    this.errorCode = 'NoError',
+    this.typeConnector = '',
+    this.currentType = '',
     this.estimatedMinutes,
-    this.session,
   });
 
+  /// Nomor konektor. Backend mengirimnya sebagai teks (`"1"`), tetapi
+  /// `/start`, `/stop`, dan `/progress` menerimanya sebagai angka, jadi
+  /// diurai di sini sekali saja.
   final int id;
+
   final ConnectorStatus status;
 
-  /// Nama tampilan. Backend belum mengirim tipe/daya konektor, jadi
-  /// hanya terisi pada data dummy.
+  /// Angka `status` apa adanya dari backend — disimpan supaya bisa
+  /// ditampilkan saat konektornya tidak bisa dipakai.
+  final int? statusCode;
+
+  /// `namaKonektor`, mis. "Gun 1".
   final String? displayName;
 
-  /// Status mentah dari OCPP, mis. "Available", "Charging", "Faulted".
-  /// Disimpan supaya pesan error bisa menyebut kondisi sebenarnya.
-  final String rawStatus;
-  final String errorCode;
+  /// `typeConnector`, mis. "CCS2".
+  final String typeConnector;
 
-  /// Hanya terisi bila backend mengirim estimasi di `session`.
+  /// `connectorTypeCurrent`, mis. "DC" atau "AC".
+  final String currentType;
+
+  /// `estimationAvailable` — perkiraan menit sampai konektor bebas.
+  /// Null bila backend tidak mengirimnya.
   final int? estimatedMinutes;
 
-  /// Sesi yang sedang berjalan pada konektor ini. Null berarti tidak
-  /// ada pengisian.
-  final SessionInfo? session;
-
   factory Connector.fromJson(Map<String, dynamic> json) {
-    final rawStatus = json['status'] as String? ?? 'Unknown';
-    final errorCode = json['errorCode'] as String? ?? 'NoError';
+    final statusCode = BackendStatus.parse(json['status']);
 
     return Connector(
-      id: (json['id'] as num?)?.toInt() ?? 0,
-      rawStatus: rawStatus,
-      errorCode: errorCode,
-      status: _mapStatus(rawStatus, errorCode),
-      estimatedMinutes: _estimatedMinutes(json['session']),
-      session: json['session'] is Map<String, dynamic>
-          ? SessionInfo.fromJson(json['session'] as Map<String, dynamic>)
-          : null,
+      id: BackendStatus.parse(json['connectorId']) ?? 0,
+      statusCode: statusCode,
+      status: mapStatus(statusCode),
+      displayName: json['namaKonektor'] as String?,
+      typeConnector: json['typeConnector'] as String? ?? '',
+      currentType: json['connectorTypeCurrent'] as String? ?? '',
+      estimatedMinutes: BackendStatus.parse(json['estimationAvailable']),
     );
   }
 
-  /// Pemetaan status OCPP 1.6 ke kelompok UI.
-  static ConnectorStatus _mapStatus(String rawStatus, String errorCode) {
-    // Error apa pun membuat konektor tidak bisa dipakai, sekalipun
-    // status-nya masih "Available".
-    if (errorCode != 'NoError') return ConnectorStatus.unavailable;
-
-    return switch (rawStatus) {
-      'Available' => ConnectorStatus.available,
-      'Preparing' => ConnectorStatus.preparing,
-      'Charging' || 'SuspendedEV' || 'SuspendedEVSE' || 'Finishing' =>
-        ConnectorStatus.inUse,
-      // Reserved, Unavailable, Faulted, dan status tak dikenal.
-      _ => ConnectorStatus.unavailable,
-    };
-  }
-
-  /// Perkiraan sisa waktu dari persentase dan lama pengisian berjalan.
-  /// Null bila belum cukup data untuk menghitung.
-  static int? _estimatedMinutes(dynamic raw) {
-    if (raw is! Map) return null;
-    final percent = (raw['percent'] as num?)?.toDouble();
-    final elapsed = (raw['durationSeconds'] as num?)?.toDouble();
-    if (percent == null || elapsed == null || percent <= 0 || percent >= 100) {
-      return null;
-    }
-    final remaining = elapsed * (100 - percent) / percent;
-    return (remaining / 60).ceil();
-  }
+  /// Satu-satunya tempat angka status konektor diterjemahkan.
+  ///
+  /// Status yang hilang diperlakukan seperti bebas — lihat
+  /// [BackendStatus.isUsable].
+  static ConnectorStatus mapStatus(int? code) => switch (code) {
+        null || BackendStatus.available => ConnectorStatus.available,
+        BackendStatus.awaitingConnector => ConnectorStatus.preparing,
+        BackendStatus.charging => ConnectorStatus.inUse,
+        BackendStatus.finished => ConnectorStatus.finished,
+        _ => ConnectorStatus.unavailable,
+      };
 
   /// Bebas sepenuhnya, belum ada kabel tercolok.
   bool get isAvailable => status == ConnectorStatus.available;
 
-  /// Kabel sudah tercolok tapi belum mengisi.
+  /// Sudah dibayar, menunggu konektor dihubungkan.
   bool get isPreparing => status == ConnectorStatus.preparing;
 
   /// Sedang mengisi daya.
   bool get isInUse => status == ConnectorStatus.inUse;
 
-  /// Boleh ditekan pengguna. "Available" dan "Preparing" sama-sama
-  /// memulai alur pembelian; "Charging" membuka layar pemantauan.
-  /// Hanya konektor rusak atau dimatikan yang tidak bisa ditekan.
-  bool get isSelectable => isAvailable || isPreparing || isInUse;
+  /// Pengisian sudah selesai.
+  bool get isFinished => status == ConnectorStatus.finished;
 
-  /// Status OCPP mentah yang berarti kabel sudah tercolok ke kendaraan.
+  /// Boleh ditekan pengguna. Keempat keadaan yang dikenal bisa ditekan
+  /// — yang selain [available] mengharuskan verifikasi kode sesi lebih
+  /// dulu. Hanya status yang tidak dikenal yang mati.
+  bool get isSelectable => status != ConnectorStatus.unavailable;
+
+  /// Salinan dengan status hasil `POST /status-konektor`.
   ///
-  /// "Preparing" muncul begitu konektor terpasang tetapi sesi belum
-  /// dimulai — inilah saat `/start` boleh dikirim. "Charging" berarti
-  /// sesi sudah berjalan.
-  static const pluggedInStatuses = {'Preparing', 'Charging'};
-
-  bool get isPluggedIn => pluggedInStatuses.contains(rawStatus);
-
-  bool get hasActiveSession => session != null;
-
-  /// Energi yang sudah tersalur pada sesi berjalan, dalam kWh.
-  double? get sessionEnergyKwh => session?.energyKwh;
+  /// Daftar charge box tidak memperlihatkan status sebenarnya, jadi
+  /// nilai dari daftar ditimpa begitu jawabannya datang.
+  Connector withStatusCode(int? code) => Connector(
+        id: id,
+        status: mapStatus(code),
+        statusCode: code,
+        displayName: displayName,
+        typeConnector: typeConnector,
+        currentType: currentType,
+        estimatedMinutes: estimatedMinutes,
+      );
 
   /// Jatuh ke nomor konektor bila backend tidak mengirim namanya.
   String get name => displayName ?? 'Konektor $id';
+
+  /// "CCS2 · DC". Kosong bila backend tidak mengirim keduanya.
+  String get typeLabel =>
+      [typeConnector, currentType].where((p) => p.isNotEmpty).join(' · ');
 }

@@ -55,9 +55,10 @@ void main() {
 
       expect(find.text('Daftar Konektor'), findsOneWidget);
       expect(find.text('04 · CS DC Charger'), findsOneWidget);
-      expect(find.text('CCS2 - 200 kW DC'), findsNWidgets(2));
-      expect(find.text('Tersedia'), findsOneWidget);
-      expect(find.text('Sedang Digunakan'), findsOneWidget);
+      expect(find.text('Gun 1'), findsOneWidget);
+      expect(find.text('Gun 2'), findsOneWidget);
+      expect(find.text('CCS2 · DC'), findsNWidgets(2));
+      expect(find.text('Tersedia'), findsNWidgets(2));
       expect(find.text('Est. 15 menit'), findsOneWidget);
     });
   });
@@ -76,12 +77,12 @@ void main() {
       expect(DemoData.chargeBoxes.last.badge, '06');
     });
 
-    test('charge box DC punya dua konektor dengan status berbeda', () {
+    test('charge box DC punya dua konektor bernama Gun 1 dan Gun 2', () {
       final dc = DemoData.chargeBoxes[3];
 
       expect(dc.connectorLabel, '2 Konektor');
       expect(dc.connectors[0].status, ConnectorStatus.available);
-      expect(dc.connectors[1].status, ConnectorStatus.inUse);
+      expect(dc.connectors[1].status, ConnectorStatus.available);
       expect(dc.connectors[1].estimatedMinutes, 15);
       expect(dc.isAvailable, isTrue);
     });

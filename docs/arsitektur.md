@@ -80,27 +80,31 @@ diketahui dengan menanyai berkala. Jedanya ada di `Env`:
 
 | Layar | Endpoint | Jeda | Alasan |
 |---|---|---|---|
-| Pilih Charge Box | `GET /list` | 2 detik | Charger bisa tersambung atau terputus kapan saja |
-| Hubungkan Konektor | `GET /list` | 2 detik | Pengguna sedang berdiri di depan charger menunggu |
 | Sedang Mengisi | `GET /progress` | 1 detik | Angka kWh harus terlihat bergerak |
 
-Aturan yang dipakai konsisten di ketiganya:
+Hanya satu layar yang mem-polling. Daftar charge box dulu menyegarkan
+diri tiap dua detik dan halaman Hubungkan Konektor mem-polling menunggu
+kabel tercolok; keduanya dihapus.
 
-- Satu permintaan berjalan dalam satu waktu (`_polling` / `_checking`
-  sebagai penjaga), supaya permintaan tidak menumpuk saat jaringan
-  lambat.
+Status konektor sekarang ditanyakan **sekali saat dilihat**, bukan
+berkala: `POST /status-konektor` dipanggil ketika bottom sheet daftar
+konektor terbuka. Daftar charge box dimuat ulang lewat tarik-ke-bawah
+atau saat pengguna kembali ke halaman itu.
+
+Aturan yang dipakai:
+
+- Satu permintaan berjalan dalam satu waktu (`_polling` sebagai
+  penjaga), supaya permintaan tidak menumpuk saat jaringan lambat.
 - Kegagalan polling **tidak** memunculkan error. Sesi tetap berjalan di
   charger; angka terakhir dibiarkan dan percobaan berikutnya menyusul.
 - Timer dibatalkan di `dispose()`.
-- Halaman daftar juga memeriksa `ModalRoute.of(context)?.isCurrent`
-  sebelum menembak, supaya tidak berisik saat tertutup halaman lain.
 
 ## Muat ulang saat kembali ke daftar
 
 `appRouteObserver` (sebuah `RouteObserver`) dipasang di
 `navigatorObservers`. Halaman Pilih Charge Box berlangganan lewat
-`RouteAware`, lalu memuat ulang `/list` pada `didPopNext()` — yaitu saat
-rute di atasnya ditutup.
+`RouteAware`, lalu memuat ulang daftarnya pada `didPopNext()` — yaitu
+saat rute di atasnya ditutup.
 
 Bottom sheet "Daftar Konektor" juga terhitung rute di atas, jadi
 menutupnya ikut memicu muat ulang. Itu disengaja: begitu sheet hilang,
@@ -137,6 +141,12 @@ disembunyikan, bukan diisi nol.
 **Kebijakan sertifikat dihitung ulang tiap ganti alamat.** Lihat
 [konfigurasi.md](konfigurasi.md#sertifikat-tls).
 
+**Arti angka `status` ditafsirkan di satu berkas.**
+`lib/models/backend_status.dart` memegang kosakata angkanya — 1 bebas,
+2 menunggu konektor, 3 mengisi, 4 selesai — supaya perubahan berikutnya
+cukup diikuti di satu tempat. `Connector.mapStatus` satu-satunya yang
+menerjemahkannya ke `ConnectorStatus`.
+
 ## Data dummy
 
 `data/demo_data.dart` masih menyediakan daftar nominal yang dipakai
@@ -144,7 +154,38 @@ halaman Pilih Nominal — backend belum punya endpoint harga.
 `DemoData.chargeBoxes` sudah tidak dipakai alur utama dan hanya tersisa
 untuk test.
 
-Hal lain yang masih dibangkitkan lokal: nomor referensi transaksi, kode
-sesi (`ChargingSession.demo`), dan pembayaran kartu e-Money yang memakai
-tombol "Bayar (Simulasi)" karena tap kartu sungguhan butuh perangkat
-NFC.
+Hal lain yang masih dibangkitkan lokal: nomor referensi transaksi dan
+kode sesi (`ChargingSession.demo`).
+
+## Pembayaran kartu
+
+Halaman pembayaran menunggu kartu e-Money ditempelkan ke pembaca NFC;
+tap kartu itulah yang memajukan alur. Tidak ada tombol bayar.
+
+**Yang bisa dan tidak bisa dilakukan.** Pembacanya hanya mendeteksi
+kartu dan membaca nomor serinya. Saldo kartu uang elektronik Indonesia
+— Flazz, BRIZZI, e-Money, TapCash — tersimpan di sektor yang terkunci
+kunci milik penerbit dan hanya bisa dibaca atau didebit lewat SAM
+(Secure Access Module) bersertifikat. Aplikasi Android biasa tidak bisa
+melakukannya, dan tidak ada pustaka yang mengubah kenyataan itu.
+
+Jadi tap berfungsi sebagai **pemicu**, bukan transaksi. Pemotongan saldo
+sungguhan harus lewat reader atau backend pembayaran bersertifikat;
+tempat memasang panggilannya sudah ditandai di
+`CardPaymentPage._onCardTapped`, setelah kartu terbaca dan sebelum
+halaman berpindah.
+
+**Abstraksi dan penyuntikan.** `CardReader` (`services/card_reader.dart`)
+memisahkan "menunggu kartu" dari NFC-nya, dengan `NfcCardReader` sebagai
+implementasi produksi. `CardReaderScope` menyalurkannya, dipasang di
+atas `MaterialApp` dengan alasan yang sama seperti `ChargingScope`.
+Tanpa abstraksi ini seluruh alur pembayaran tidak bisa diuji, karena
+lingkungan test tidak punya NFC.
+
+Tiga keadaan yang ditangani halaman: pembaca siap (menunggu kartu), NFC
+mati (arahan menyalakannya plus tombol Periksa Lagi), dan perangkat
+tanpa NFC (arahan menghubungi petugas). Tanpa penanganan ini, perangkat
+tanpa NFC akan menggantung selamanya di layar "Menunggu Kartu".
+
+Kartu yang masih menempel dilaporkan Android berkali-kali, jadi
+`_accepted` memastikan hanya tap pertama yang mendorong halaman.

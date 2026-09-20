@@ -2,13 +2,17 @@
 
 ## Alamat server
 
-Alamat edge controller diatur dari dalam aplikasi, bukan saat build.
-Halaman pertama yang muncul adalah **Konfigurasi Server**
-(`lib/pages/api_config_page.dart`).
+Alamat edge controller diatur dari dalam aplikasi, bukan saat build,
+lewat halaman **Konfigurasi Server** (`lib/pages/api_config_page.dart`).
 
 Alasannya: controller kerap dipasang di jaringan lokal, berpindah IP,
 dan tidak punya nama domain. Membangun ulang APK setiap kali alamatnya
 berubah tidak masuk akal di lapangan.
+
+Halaman ini **bukan** layar pembuka. Aplikasi langsung masuk ke daftar
+charge box memakai alamat tersimpan; halaman konfigurasi dibuka lewat
+ikon roda gigi di header daftar itu, dan hanya diperlukan saat
+alamatnya berubah.
 
 Yang terjadi di halaman itu:
 
@@ -16,10 +20,10 @@ Yang terjadi di halaman itu:
    disimpan operator, atau nilai bawaan `SPKLU_API_BASE_URL` bila belum
    pernah ada.
 2. Di bawah kolom ada pratinjau alamat yang benar-benar akan ditembak,
-   misalnya `Akan memanggil http://192.168.1.10:8080/list`. Ini membuat
+   misalnya `Akan memanggil http://192.168.1.10:8080/list-chargerbox`. Ini membuat
    salah ketik ketahuan sebelum tombol ditekan — termasuk saat prefiks
    path seperti `/api` lupa disertakan.
-3. **Hubungkan** memasang alamat, mengujinya dengan `GET /list`, lalu
+3. **Hubungkan** memasang alamat, mengujinya dengan `POST /list-chargerbox`, lalu
    masuk ke daftar charge box. Alamat yang gagal dihubungi **tidak**
    disimpan, supaya salah ketik tidak ikut teringat.
 4. **Lanjut Tanpa Uji** langsung masuk. Berguna bila controller sedang
@@ -30,8 +34,8 @@ Alamat yang tersimpan bertahan setelah aplikasi ditutup
 (`shared_preferences`, kunci `spklu_api_base_url`). Kegagalan menyimpan
 tidak menghalangi operator masuk — alamatnya tetap aktif untuk sesi itu.
 
-Untuk menggantinya kemudian, tekan ikon roda gigi di header halaman
-Pilih Charge Box.
+Bila belum pernah ada yang disimpan, yang dipakai adalah nilai
+`SPKLU_API_BASE_URL`.
 
 ## Menulis alamat
 
@@ -64,6 +68,27 @@ Kalau nanti `networkSecurityConfig` ditambahkan untuk keperluan lain,
 ingat bahwa berkas itu **mengalahkan** `usesCleartextTraffic` — HTTP ke
 IP lokal akan ikut mati kecuali domainnya didaftarkan sebagai
 pengecualian.
+
+## NFC
+
+Halaman pembayaran membaca kartu e-Money lewat NFC. Izin dan fiturnya
+sudah dipasang di `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.NFC"/>
+<uses-feature android:name="android.hardware.nfc" android:required="false"/>
+```
+
+`required="false"` disengaja supaya aplikasi tetap bisa dipasang di
+perangkat tanpa NFC — halaman pembayaran menjelaskan keadaannya sendiri
+alih-alih menggantung di "Menunggu Kartu".
+
+NFC tidak butuh izin runtime, jadi tidak ada dialog yang perlu diminta.
+Kalau pengguna mematikan NFC dari pengaturan, halaman pembayaran
+menampilkan arahan menyalakannya beserta tombol Periksa Lagi.
+
+Yang **tidak** bisa dilakukan: membaca atau memotong saldo kartu. Lihat
+[arsitektur.md](arsitektur.md#pembayaran-kartu).
 
 ## Sertifikat TLS
 
@@ -104,7 +129,9 @@ Nilai build. Semuanya opsional.
 ```sh
 flutter run \
   --dart-define=SPKLU_API_BASE_URL=10.0.2.2:8080 \
-  --dart-define=SPKLU_API_AUTH="Basic ZWRnZTplZGdlLWRldi1vbmx5" \
+  --dart-define=SPKLU_ID=SPKLU-SMR \
+  --dart-define=SPKLU_CLIENT_ID=edge \
+  --dart-define=SPKLU_SECRET_KEY=… \
   --dart-define=SPKLU_SESSION_PIN=42 \
   --dart-define=SPKLU_API_LOG=false
 ```
@@ -113,11 +140,48 @@ flutter run \
 |---|---|---|
 | `SPKLU_API_BASE_URL` | `https://edge-controller-playground.lentera-app.id/api` | Alamat awal di kolom Konfigurasi Server. Bukan alamat final — operator bisa menggantinya. |
 | `SPKLU_API_AUTH` | kosong | Isi header `Authorization`. Kosong berarti header-nya tidak dikirim; endpoint playground menerima request tanpa auth. |
+| `SPKLU_ID` | `SPKLU-SMR` | Lokasi SPKLU tempat unit dipasang, dikirim sebagai `idSpklu` pada `POST /list-chargerbox`. |
+| `SPKLU_CLIENT_ID` | `edge` | Isi header `client-id` pada setiap request. |
+| `SPKLU_SECRET_KEY` | kunci environment pengembangan | Kunci penanda tangan request. Environment sungguhan **wajib** menimpanya agar kuncinya tidak ikut tertulis di kode. |
 | `SPKLU_SESSION_PIN` | `00` | Kode yang diterima halaman Verifikasi Sesi. Masih nilai tetap karena backend belum menyediakan cara memverifikasi kode sesi milik pengguna. |
+| `SPKLU_DEBUG_PANEL` | menyala di debug, mati di release | Inspektur jaringan di dalam aplikasi. Lihat [Inspektur jaringan](#inspektur-jaringan). |
 | `SPKLU_API_LOG` | `true` | Menulis request/response ke konsol. Otomatis mati di build release apa pun nilainya. |
 
 Header `Authorization` juga bisa diganti saat runtime lewat
 `ApiClient.instance.authorization = '…'`, misalnya setelah login.
+
+## Inspektur jaringan
+
+Daftar panggilan REST yang bisa diperiksa langsung dari aplikasi —
+seperti tab Network di peramban. Dibuat karena `ApiLogger` hanya
+mencetak ke konsol, yang tidak terlihat saat aplikasi dipakai dari APK
+di perangkat.
+
+**Membukanya:** tekan lama logo di header halaman mana pun. Sengaja
+tanpa penanda — petugas tahu caranya, pengguna tidak akan menemukannya
+secara tak sengaja.
+
+Isinya per panggilan: method dan path, status berwarna (hijau berhasil,
+merah gagal, abu masih berjalan), waktu mulai, durasi, dan `responseCode`
+dari amplop backend. Membukanya menampilkan alamat lengkap, seluruh
+header request termasuk tanda tangan, body request, dan body response.
+Ada kolom penyaring dan tombol salin agar satu entri bisa ditempelkan ke
+tiket atau chat.
+
+Panggilan yang dibalas HTTP 200 tetapi `responseCode`-nya bukan `00`
+ditandai merah — kegagalan seperti itu mudah terlewat kalau hanya status
+HTTP yang dilihat.
+
+Riwayatnya hanya di memori, dibatasi 100 entri terbaru, dan hilang
+begitu aplikasi ditutup.
+
+**Bawaannya menyala di build debug dan mati di release.** Isinya memuat
+header dan body apa adanya, jadi di kiosk yang dipakai umum ia sebaiknya
+tetap mati. Untuk uji lapangan memakai APK release:
+
+```sh
+flutter build apk --dart-define=SPKLU_DEBUG_PANEL=true
+```
 
 ## Nilai tetap di `Env`
 

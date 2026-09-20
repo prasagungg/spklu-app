@@ -4,26 +4,29 @@ import 'package:kossotrik/models/charge_box.dart';
 import 'package:kossotrik/pages/charge_box_page.dart';
 import 'package:kossotrik/theme/app_theme.dart';
 
-/// Persis bentuk /list yang dikeluhkan: dua charge box, yang pertama
-/// hanya punya konektor "Preparing".
+import 'fixtures.dart';
+
+/// Dua charge box: yang pertama satu konektor, yang kedua dua.
 final _boxes = [
-  ChargeBox.fromJson(const {
-    'id': 'SIM-123',
-    'connectors': [
-      {'id': 1, 'status': 'Preparing', 'errorCode': 'NoError'},
-    ],
-  }, number: 1),
-  ChargeBox.fromJson(const {
-    'id': 'SIM-456',
-    'connectors': [
-      {'id': 1, 'status': 'Preparing', 'errorCode': 'NoError'},
-      {'id': 2, 'status': 'Available', 'errorCode': 'NoError'},
-    ],
-  }, number: 2),
+  ChargeBox.fromJson(
+    chargeBoxJson(id: 'CB-SMR-01', nama: 'CB-SMR-01'),
+    number: 1,
+  ),
+  ChargeBox.fromJson(
+    chargeBoxJson(
+      id: 'CB-SMR-02',
+      nama: 'CB-SMR-02',
+      connectors: [
+        connectorJson(id: '1', chargeBoxId: 'CB-SMR-02'),
+        connectorJson(id: '2', chargeBoxId: 'CB-SMR-02', nama: 'Gun 2'),
+      ],
+    ),
+    number: 2,
+  ),
 ];
 
 void main() {
-  testWidgets('dua charge box dari /list keduanya tampil', (tester) async {
+  testWidgets('dua charge box dari daftar keduanya tampil', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.build(),
@@ -35,7 +38,7 @@ void main() {
     expect(find.byType(ChargeBoxCard), findsNWidgets(2));
     expect(find.text('01'), findsOneWidget);
     expect(find.text('02'), findsOneWidget);
-    expect(find.text('SIM-123'), findsOneWidget);
-    expect(find.text('SIM-456'), findsOneWidget);
+    expect(find.text('CB-SMR-01'), findsOneWidget);
+    expect(find.text('CB-SMR-02'), findsOneWidget);
   });
 }

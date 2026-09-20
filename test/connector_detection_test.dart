@@ -1,83 +1,173 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kossotrik/models/backend_status.dart';
 import 'package:kossotrik/models/charge_box.dart';
 import 'package:kossotrik/models/connector.dart';
 
-Connector _connector(String status) => ChargeBox.fromJson({
-      'id': 'SIM-456',
-      'connectors': [
-        {'id': 1, 'status': status, 'errorCode': 'NoError', 'session': null},
-      ],
-    }, number: 1).connectors.single;
+import 'fixtures.dart';
+
+Connector _connector({int status = 1, Object? estimasi}) => ChargeBox.fromJson(
+      chargeBoxJson(
+        connectors: [connectorJson(status: status, estimasi: estimasi)],
+      ),
+      number: 1,
+    ).connectors.single;
 
 void main() {
-  group('status konektor dari /list', () {
-    test('Available: bebas, belum tercolok, bisa dipakai', () {
-      final c = _connector('Available');
+  group('status konektor dari /list-chargerbox', () {
+    test('status 1 berarti bisa dipakai', () {
+      final c = _connector();
+
       expect(c.status, ConnectorStatus.available);
       expect(c.isAvailable, isTrue);
       expect(c.isSelectable, isTrue);
-      expect(c.isPluggedIn, isFalse);
+      expect(c.statusCode, 1);
     });
 
-    test('Preparing: baru dicolok, ditekan untuk lanjut mulai mengisi', () {
-      final c = _connector('Preparing');
+    test('status 2 berarti menunggu konektor dihubungkan', () {
+      final c = _connector(status: 2);
+
       expect(c.status, ConnectorStatus.preparing);
       expect(c.isPreparing, isTrue);
-      expect(c.isPluggedIn, isTrue);
-      expect(c.isSelectable, isTrue);
-      // Bukan "Available" — tujuannya berbeda.
+      // Sudah diklaim orang lain, tapi tetap bisa ditekan — lewat
+      // verifikasi kode sesi.
       expect(c.isAvailable, isFalse);
+      expect(c.isSelectable, isTrue);
     });
 
-    test('Charging: ditekan untuk membuka layar pemantauan', () {
-      final c = _connector('Charging');
+    test('status 3 berarti sedang mengisi', () {
+      final c = _connector(status: 3);
+
       expect(c.status, ConnectorStatus.inUse);
       expect(c.isInUse, isTrue);
-      expect(c.isPluggedIn, isTrue);
-      expect(c.isSelectable, isTrue);
       expect(c.isAvailable, isFalse);
+      expect(c.isSelectable, isTrue);
     });
 
-    test('status lain tidak dianggap tercolok', () {
-      for (final status in ['Finishing', 'Faulted', 'Unavailable', 'Reserved']) {
-        expect(_connector(status).isPluggedIn, isFalse, reason: status);
+    test('status 4 berarti pengisian selesai', () {
+      final c = _connector(status: 4);
+
+      expect(c.status, ConnectorStatus.finished);
+      expect(c.isFinished, isTrue);
+      expect(c.isAvailable, isFalse);
+      expect(c.isSelectable, isTrue);
+    });
+
+    test('angka di luar keempatnya tidak bisa ditekan', () {
+      for (final status in [0, 5, 9, 99]) {
+        final c = _connector(status: status);
+        expect(c.status, ConnectorStatus.unavailable, reason: '$status');
+        expect(c.isSelectable, isFalse, reason: '$status');
       }
     });
 
-    test('hanya konektor rusak atau dimatikan yang tidak bisa ditekan', () {
-      for (final status in ['Faulted', 'Unavailable', 'Reserved']) {
-        expect(_connector(status).isSelectable, isFalse, reason: status);
-      }
+    test('status yang hilang diperlakukan seperti bebas', () {
+      expect(Connector.mapStatus(null), ConnectorStatus.available);
     });
 
-    test('kartu hanya dimatikan bila semua konektornya rusak/dimatikan', () {
-      final unusable = ChargeBox.fromJson({
-        'id': 'SIM-789',
-        'connectors': [
-          {'id': 1, 'status': 'Faulted', 'errorCode': 'GroundFailure'},
-          {'id': 2, 'status': 'Unavailable', 'errorCode': 'NoError'},
-        ],
-      }, number: 1);
-      expect(unusable.isAvailable, isFalse);
+    test('nomor konektor dari teks diurai jadi angka', () {
+      final box = ChargeBox.fromJson(
+        chargeBoxJson(
+          connectors: [
+            connectorJson(id: '1'),
+            connectorJson(id: '2', nama: 'Gun 2'),
+          ],
+        ),
+        number: 1,
+      );
 
-      // Satu-satunya konektor "Preparing" — kartunya tetap bisa
-      // ditekan untuk melanjutkan ke layar mulai mengisi.
-      final preparingOnly = ChargeBox.fromJson({
-        'id': 'SIM-123',
-        'connectors': [
-          {'id': 1, 'status': 'Preparing', 'errorCode': 'NoError'},
-        ],
-      }, number: 1);
-      expect(preparingOnly.isAvailable, isTrue);
+      // /start, /stop, dan /progress menerimanya sebagai angka.
+      expect(box.connectors.map((c) => c.id), [1, 2]);
+    });
 
-      // errorCode tetap mengalahkan status apa pun.
-      final faulted = ChargeBox.fromJson({
-        'id': 'SIM-999',
+    test('nama, tipe, dan jenis arus dibaca dari backend', () {
+      final c = _connector();
+
+      expect(c.name, 'Gun 1');
+      expect(c.typeConnector, 'CCS2');
+      expect(c.currentType, 'DC');
+      expect(c.typeLabel, 'CCS2 · DC');
+    });
+
+    test('tanpa nama, jatuh ke nomor konektor', () {
+      final c = ChargeBox.fromJson({
+        'chargeBoxId': 'CB-SMR-01',
         'connectors': [
-          {'id': 1, 'status': 'Preparing', 'errorCode': 'GroundFailure'},
+          {'connectorId': '3', 'status': 1},
         ],
-      }, number: 1);
-      expect(faulted.isAvailable, isFalse);
+      }, number: 1).connectors.single;
+
+      expect(c.name, 'Konektor 3');
+      expect(c.typeLabel, isEmpty);
+    });
+
+    test('estimationAvailable jadi perkiraan menit bila ada', () {
+      expect(_connector(estimasi: 15).estimatedMinutes, 15);
+      expect(_connector(estimasi: '20').estimatedMinutes, 20);
+      expect(_connector().estimatedMinutes, isNull);
+    });
+  });
+
+  group('ketersediaan charge box', () {
+    test('kartu mati bila semua status konektornya tak dikenal', () {
+      final box = ChargeBox.fromJson(
+        chargeBoxJson(
+          connectors: [
+            connectorJson(id: '1', status: 0),
+            connectorJson(id: '2', status: 9),
+          ],
+        ),
+        number: 1,
+      );
+
+      expect(box.isAvailable, isFalse);
+    });
+
+    test('satu konektor yang dikenal sudah cukup', () {
+      final box = ChargeBox.fromJson(
+        chargeBoxJson(
+          connectors: [
+            connectorJson(id: '1', status: 0),
+            connectorJson(id: '2', status: 1),
+          ],
+        ),
+        number: 1,
+      );
+
+      expect(box.isAvailable, isTrue);
+    });
+
+    /// Kartu tetap bisa ditekan saat konektornya sedang melayani sesi —
+    /// pemilik sesi harus bisa masuk lagi lewat verifikasi kode.
+    test('konektor yang sedang mengisi tidak mematikan kartunya', () {
+      final box = ChargeBox.fromJson(
+        chargeBoxJson(connectors: [connectorJson(status: 3)]),
+        number: 1,
+      );
+
+      expect(box.isAvailable, isTrue);
+    });
+
+    test('nama dan merek dibaca dari backend', () {
+      final box = ChargeBox.fromJson(chargeBoxJson(), number: 4);
+
+      expect(box.id, 'CB-SMR-01');
+      expect(box.name, 'Kempower Satellite 200 kW');
+      expect(box.merek, 'Kempower');
+      expect(box.badge, '04');
+      expect(box.connectorLabel, '1 Konektor');
+    });
+  });
+
+  group('BackendStatus', () {
+    test('status yang hilang dianggap bisa dipakai', () {
+      expect(BackendStatus.isUsable(null), isTrue);
+    });
+
+    test('angka dibaca dari number maupun teks', () {
+      expect(BackendStatus.parse(1), 1);
+      expect(BackendStatus.parse('2'), 2);
+      expect(BackendStatus.parse('bukan angka'), isNull);
+      expect(BackendStatus.parse(null), isNull);
     });
   });
 }

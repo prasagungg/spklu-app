@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../config/env.dart';
 import '../data/charge_point_repository.dart';
 import '../data/charging_scope.dart';
 import '../models/charging_session.dart';
@@ -18,13 +17,17 @@ import 'charging_status_page.dart';
 /// Frame Figma 73:3470 "Hubungkan Konektor" dan 73:3597 "Konektor
 /// Terhubung" — dua state dari layar yang sama.
 ///
-/// Deteksi konektor nyata: halaman ini mem-polling `GET /list` sampai
-/// status konektor yang dipilih berubah dari "Available" menjadi
-/// "Preparing" — tanda kabel sudah tercolok ke kendaraan. Baru setelah
-/// itu `/start` boleh dikirim.
+/// BELUM ADA DETEKSI KONEKTOR SUNGGUHAN. Sebelumnya halaman ini
+/// mem-polling `GET /list` sampai status konektor berubah menjadi
+/// "Preparing" — tanda kabel tercolok ke kendaraan. `POST
+/// /list-chargerbox` tidak membawa status OCPP itu, dan endpoint
+/// pengecekan penggantinya belum tersedia.
 ///
-/// Tanpa [ChargingScope] (mode offline untuk test), deteksi itu
-/// disimulasikan dengan jeda [_simulationDelay].
+/// Sampai endpoint itu ada, tombol "Mulai Pengisian" diaktifkan setelah
+/// jeda [_simulationDelay] — perilaku yang selama ini hanya dipakai
+/// mode offline. Alurnya tetap utuh, tetapi tidak ada jaminan kabel
+/// benar-benar sudah terpasang; charger yang menolak `/start` akan
+/// terlihat sebagai pesan error dari [startErrorMessage].
 class ConnectConnectorPage extends StatefulWidget {
   const ConnectConnectorPage({super.key, required this.session});
 
@@ -43,9 +46,6 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
   Duration _remaining = _limit;
   bool _connected = false;
   bool _starting = false;
-  bool _checking = false;
-
-  ChargingScope? _scope;
 
   @override
   void initState() {
@@ -59,51 +59,15 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
       }
       setState(() => _remaining -= const Duration(seconds: 1));
     });
-  }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _scope ??= ChargingScope.maybeOf(context);
-    _detection ??= _scope == null
-        ? Timer(_simulationDelay, _markPluggedIn)
-        : Timer.periodic(Env.connectorPollInterval, (_) => _pollConnector());
-  }
-
-  /// Membaca `/list` dan menunggu konektor yang dipilih meninggalkan
-  /// status "Available".
-  ///
-  /// Kegagalan polling diabaikan: pengguna masih memasang kabel, dan
-  /// percobaan berikutnya menyusul dua detik kemudian.
-  Future<void> _pollConnector() async {
-    if (_checking || _connected || !mounted) return;
-    _checking = true;
-    try {
-      final box = await _scope!.repository.fetchChargeBox(
-        widget.session.chargeBox.id,
-      );
-      if (box == null || !mounted) return;
-
-      for (final connector in box.connectors) {
-        if (connector.id != widget.session.connector.id) continue;
-        debugPrint(
-          '[FLOW] Status konektor ${connector.id}: ${connector.rawStatus}',
-        );
-        if (connector.isPluggedIn) _markPluggedIn();
-        break;
-      }
-    } on Object catch (_) {
-      // Dicoba lagi pada polling berikutnya.
-    } finally {
-      _checking = false;
-    }
+    _detection = Timer(_simulationDelay, _markPluggedIn);
   }
 
   void _markPluggedIn() {
     if (!mounted || _connected) return;
     _detection?.cancel();
     debugPrint(
-      '[FLOW] Konektor terpasang — tombol "Mulai Pengisian" aktif',
+      '[FLOW] Jeda deteksi habis — tombol "Mulai Pengisian" diaktifkan',
     );
     setState(() => _connected = true);
   }
@@ -146,8 +110,8 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
           targetKwh: widget.session.nominal?.kwh,
         );
         // Controller hanya meneruskan perintah; konfirmasi pengisian
-        // benar-benar jalan datang dari `session` pada GET /list yang
-        // dipantau halaman status.
+        // benar-benar jalan datang dari GET /progress yang dipantau
+        // halaman status.
         debugPrint('Perintah start diterima: $result');
       } on ApiException catch (e) {
         if (!mounted) return;

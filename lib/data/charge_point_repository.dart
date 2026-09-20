@@ -1,8 +1,11 @@
 import 'package:dio/dio.dart';
 
+import '../config/env.dart';
 import '../models/charge_box.dart';
+import '../models/backend_status.dart';
 import '../models/command_result.dart';
 import '../models/session_info.dart';
+import '../models/spklu.dart';
 import '../services/api_client.dart';
 import '../services/api_exception.dart';
 
@@ -41,34 +44,35 @@ class ChargePointRepository {
   /// di produksi tetapi berbeda saat client disuntik.
   ApiClient get client => _client;
 
-  /// `GET /list`
+  /// `POST /list-chargerbox`
   ///
-  /// Mengembalikan daftar kosong bila `data.chargePoints` kosong —
-  /// itu kondisi normal (tidak ada charger yang sedang terhubung),
-  /// bukan error.
-  Future<List<ChargeBox>> fetchChargeBoxes({CancelToken? cancelToken}) async {
-    final json = await _client.get<Map<String, dynamic>>(
-      '/list',
+  /// Isi dan charge box di satu lokasi SPKLU. Lokasinya disebut lewat
+  /// body `{"idSpklu": …}`; bawaannya [Env.idSpklu], yaitu lokasi
+  /// tempat unit ini dipasang.
+  ///
+  /// Mengembalikan SPKLU kosong bila backend membalas tanpa `data`.
+  Future<Spklu> fetchSpklu({String? idSpklu, CancelToken? cancelToken}) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/list-chargerbox',
+      body: {'idSpklu': idSpklu ?? Env.idSpklu},
       cancelToken: cancelToken,
     );
     final data = _unwrap(json);
 
-    if (data == null) return const [];
-
-    final chargePoints = data['chargePoints'];
-    if (chargePoints is! List) return const [];
-
-    final items = chargePoints.whereType<Map<String, dynamic>>().toList();
-
-    return [
-      for (var i = 0; i < items.length; i++)
-        ChargeBox.fromJson(items[i], number: i + 1),
-    ];
+    return data == null ? const Spklu.empty() : Spklu.fromJson(data);
   }
 
-  /// Versi [fetchChargeBoxes] untuk satu charger — dipakai halaman
-  /// status untuk memantau sesi yang sedang berjalan. Mengembalikan
-  /// null bila charger itu tidak lagi ada di daftar.
+  /// Charge box di lokasi ini saja.
+  ///
+  /// Mengembalikan daftar kosong bila `chargeBoxes` kosong — itu
+  /// kondisi normal (tidak ada charger yang terpasang), bukan error.
+  Future<List<ChargeBox>> fetchChargeBoxes({CancelToken? cancelToken}) async {
+    final spklu = await fetchSpklu(cancelToken: cancelToken);
+    return spklu.chargeBoxes;
+  }
+
+  /// Versi [fetchChargeBoxes] untuk satu charge box. Mengembalikan null
+  /// bila charge box itu tidak lagi ada di daftar.
   Future<ChargeBox?> fetchChargeBox(
     String chargePointId, {
     CancelToken? cancelToken,
@@ -78,6 +82,51 @@ class ChargePointRepository {
       if (box.id == chargePointId) return box;
     }
     return null;
+  }
+
+  /// `POST /status-konektor`
+  ///
+  /// Status sebenarnya satu konektor. Daftar charge box tidak
+  /// memperlihatkannya — statusnya baru ketahuan setelah ditanyakan,
+  /// jadi ini dipanggil ketika pengguna membuka daftar konektor sebuah
+  /// charge box, bukan berkala.
+  ///
+  /// ```json
+  /// { "spkluId": "SPKLU-SMR", "chargeBoxId": "CB-SMR-01",
+  ///   "connectorId": "1" }
+  /// ```
+  ///
+  /// Balasannya memuat `connectorStatus` dengan kosakata angka yang
+  /// sama seperti daftar — lihat [BackendStatus]:
+  ///
+  /// ```json
+  /// { "spkluId": "SPKLU-SMR", "chargeBoxId": "CB-SMR-01",
+  ///   "chargeBoxName": "Kempower Satellite 200 kW",
+  ///   "connectorName": "Gun 1", "connectorId": "1",
+  ///   "connectorStatus": 1 }
+  /// ```
+  ///
+  /// Konektor yang tidak dikenal dibalas 404. Mengembalikan null bila
+  /// backend tidak mengirim `data`.
+  Future<int?> fetchConnectorStatus({
+    required String chargeBoxId,
+    required int connectorId,
+    String? idSpklu,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/status-konektor',
+      body: {
+        'spkluId': idSpklu ?? Env.idSpklu,
+        'chargeBoxId': chargeBoxId,
+        // Backend memakai teks untuk nomor konektor, seperti di daftar.
+        'connectorId': connectorId.toString(),
+      },
+      cancelToken: cancelToken,
+    );
+    final data = _unwrap(json);
+
+    return BackendStatus.parse(data?['connectorStatus']);
   }
 
   /// `GET /progress?chargePointId=…&connectorId=…`

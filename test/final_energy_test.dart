@@ -1,10 +1,12 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kossotrik/data/charge_point_repository.dart';
-import 'package:kossotrik/pages/charge_box_page.dart';
 import 'package:kossotrik/main.dart';
+import 'package:kossotrik/pages/charge_box_page.dart';
 import 'package:kossotrik/services/api_client.dart';
+
+import 'fake_card_reader.dart';
+import 'fixtures.dart';
 
 class _Stub extends Interceptor {
   _Stub(this.progress);
@@ -17,9 +19,11 @@ class _Stub extends Interceptor {
       Response<Map<String, dynamic>>(
         requestOptions: options,
         data: switch (options.path) {
-          '/list' => _list,
+          '/list-chargerbox' => listResponse([
+              chargeBoxJson(id: 'CB-SMR-01', nama: 'CB-SMR-01'),
+            ]),
           '/progress' => progress(),
-          _ => _ok,
+          _ => okResponse,
         },
         statusCode: 200,
       ),
@@ -27,52 +31,10 @@ class _Stub extends Interceptor {
   }
 }
 
-const _ok = {'responseCode': '00', 'responseMessage': 'Success'};
-
-const _list = {
-  'responseCode': '00',
-  'responseMessage': 'Success',
-  'data': {
-    'chargePoints': [
-      {
-        'id': 'SIM-456',
-        'connectors': [
-          {'id': 1, 'status': 'Charging', 'errorCode': 'NoError',
-            'session': {
-              'chargePointId': 'SIM-456',
-              'connectorId': 1,
-              'transactionId': 42,
-              'state': 'charging',
-              'energyWh': 3,
-              'powerW': 12000,
-              'percent': 10.0,
-              'durationSeconds': 5,
-            }},
-        ],
-      },
-    ],
-  },
-};
-
-Map<String, dynamic> _progress(String state, int energyWh) => {
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {
-        'chargePointId': 'SIM-456',
-        'connectorId': 1,
-        'transactionId': 42,
-        'state': state,
-        'connectorStatus': state == 'finished' ? 'Preparing' : 'Charging',
-        'percent': 10.0,
-        'energyWh': energyWh,
-        'powerW': state == 'finished' ? null : 12000,
-        'durationSeconds': 5,
-        'stopReason': state == 'finished' ? 'Remote' : null,
-        'stoppedAt': state == 'finished'
-            ? '2026-09-17T20:58:35.135618667+07:00'
-            : null,
-      },
-    };
+Future<void> _settle(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 600));
+}
 
 void main() {
   testWidgets('kWh akhir diambil dari /progress terakhir, bukan saat ditekan',
@@ -84,48 +46,52 @@ void main() {
 
     final repo = ChargePointRepository(
       client: ApiClient.withDio(
-        Dio()..interceptors.add(_Stub(() => _progress(state, energyWh))),
+        Dio()
+          ..interceptors.add(
+            _Stub(() => progressResponse(state: state, energyWh: energyWh)),
+          ),
       ),
     );
+    final reader = FakeCardReader();
 
-    await tester.pumpWidget(
-      SPKLUApp(repository: repo, home: const ChargeBoxPage()),
-    );
+    await tester.pumpWidget(SPKLUApp(repository: repo, cardReader: reader));
     await tester.pumpAndSettle();
 
-    // Konektor sedang mengisi -> langsung ke layar pemantauan.
+    // Alur pembelian sampai layar pemantauan.
     await tester.tap(find.text('01'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Konektor 1'));
-    for (var i = 0; i < 6; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.text('Gun 1'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lanjutkan'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Konfirmasi & Bayar'));
+    await _settle(tester);
 
-    // Konektor sedang mengisi -> harus verifikasi kode sesi dulu.
-    expect(find.text('Verifikasi Sesi'), findsOneWidget);
-    for (final digit in '00'.split('')) {
-      final key = find.widgetWithText(InkWell, digit).last;
-      await tester.ensureVisible(key);
-      await tester.pump();
-      await tester.tap(key);
-      await tester.pump();
-    }
-    await tester.tap(find.text('Verifikasi'));
-    for (var i = 0; i < 6; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
+    reader.tap();
+    await _settle(tester);
+    await tester.tap(find.text('Mulai Pengisian'));
+    await _settle(tester);
+
+    // Jeda deteksi konektor.
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+    await tester.tap(find.text('Mulai Pengisian').last);
+    // /start berjalan async, jadi perlu beberapa pump agar futurenya
+    // sempat selesai sebelum transisi halaman dihitung.
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
     }
     await tester.pump(const Duration(milliseconds: 600));
 
     expect(find.text('Sedang Mengisi'), findsOneWidget);
-    // Angkanya langsung terisi dari sesi yang sudah dibawa /list —
-    // tidak sempat menampilkan 0 kWh sambil menunggu polling pertama.
+
+    // Polling pertama membawa 3 Wh.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
     expect(find.text('0,003 kWh'), findsOneWidget);
-    expect(find.text('0,000 kWh'), findsNothing);
 
     await tester.tap(find.text('Akhiri Pengisian'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 600));
+    await _settle(tester);
     await tester.tap(find.text('Ya, Akhiri Pengisian'));
 
     // Charger berhenti dan melaporkan angka akhir yang lebih besar.
@@ -144,5 +110,9 @@ void main() {
     // 17 Wh, bukan 3 Wh yang terbaca saat tombol ditekan.
     expect(find.text('0,017 kWh'), findsOneWidget);
     expect(find.text('0,003 kWh'), findsNothing);
+
+    await tester.tap(find.text('Kembali ke Halaman Awal'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ChargeBoxPage), findsOneWidget);
   });
 }

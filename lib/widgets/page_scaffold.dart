@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../config/env.dart';
+import '../pages/api_log_page.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import 'asset_slot.dart';
@@ -9,6 +11,10 @@ import 'status_chip.dart';
 /// Kerangka halaman sesuai Figma: background full-bleed 50% opacity,
 /// mobile header berisi logo, lalu blok judul + subjudul opsional.
 class PageScaffold extends StatelessWidget {
+  /// Area logo di header, dipakai test untuk memicu tekan lama yang
+  /// membuka inspektur jaringan.
+  static const logKey = Key('buka-log-api');
+
   const PageScaffold({
     super.key,
     required this.child,
@@ -172,7 +178,17 @@ class _MobileHeader extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
-            const LogoImage(height: 44),
+            // Tekan lama logo membuka inspektur jaringan. Sengaja tanpa
+            // penanda: petugas tahu cara membukanya, pengguna tidak
+            // akan menemukannya secara tak sengaja.
+            GestureDetector(
+              key: PageScaffold.logKey,
+              behavior: HitTestBehavior.opaque,
+              onLongPress: Env.enableDebugPanel
+                  ? () => ApiLogPage.open(context)
+                  : null,
+              child: const LogoImage(height: 44),
+            ),
             const Spacer(),
             ?action,
           ],

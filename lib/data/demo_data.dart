@@ -6,7 +6,7 @@ import '../models/nominal_option.dart';
 ///
 /// [nominals] masih dipakai halaman Pilih Nominal — backend belum punya
 /// endpoint harga. [chargeBoxes] sudah tidak dipakai alur utama karena
-/// halaman pemilihan mengambil daftarnya dari `GET /list`; yang tersisa
+/// halaman pemilihan mengambil daftarnya dari `POST /list-chargerbox`; yang tersisa
 /// hanya pemakaiannya di test.
 class DemoData {
   const DemoData._();
@@ -14,31 +14,43 @@ class DemoData {
   static const List<Connector> _acConnectors = [
     Connector(
       id: 1,
-      displayName: 'Type 2 - 22 kW AC',
+      displayName: 'Gun 1',
+      typeConnector: 'Type 2',
+      currentType: 'AC',
       status: ConnectorStatus.available,
+      statusCode: 1,
     ),
   ];
 
   static const List<Connector> _acConnectorsBusy = [
     Connector(
       id: 1,
-      displayName: 'Type 2 - 22 kW AC',
+      displayName: 'Gun 1',
+      typeConnector: 'Type 2',
+      currentType: 'AC',
+      // 0 bukan salah satu dari empat status yang dikenal, jadi
+      // konektornya mati.
       status: ConnectorStatus.unavailable,
-      rawStatus: 'Unavailable',
+      statusCode: 0,
     ),
   ];
 
   static const List<Connector> _dcConnectors = [
     Connector(
       id: 1,
-      displayName: 'CCS2 - 200 kW DC',
+      displayName: 'Gun 1',
+      typeConnector: 'CCS2',
+      currentType: 'DC',
       status: ConnectorStatus.available,
+      statusCode: 1,
     ),
     Connector(
       id: 2,
-      displayName: 'CCS2 - 200 kW DC',
-      status: ConnectorStatus.inUse,
-      rawStatus: 'Charging',
+      displayName: 'Gun 2',
+      typeConnector: 'CCS2',
+      currentType: 'DC',
+      status: ConnectorStatus.available,
+      statusCode: 1,
       estimatedMinutes: 15,
     ),
   ];
@@ -46,39 +58,51 @@ class DemoData {
   static const List<ChargeBox> chargeBoxes = [
     ChargeBox(
       number: 1,
-      id: 'SIM-001',
+      id: 'CB-SMR-01',
       displayName: 'CS AC Charger',
+      merek: 'Kempower',
+      statusCode: 1,
       connectors: _acConnectors,
     ),
     ChargeBox(
       number: 2,
-      id: 'SIM-002',
+      id: 'CB-SMR-02',
       displayName: 'CS AC Charger',
+      merek: 'Kempower',
+      statusCode: 1,
       connectors: _acConnectors,
     ),
     // Nomor 03 sengaja tidak tersedia, mengikuti desain Figma.
     ChargeBox(
       number: 3,
-      id: 'SIM-003',
+      id: 'CB-SMR-03',
       displayName: 'CS AC Charger',
+      merek: 'Kempower',
+      statusCode: 1,
       connectors: _acConnectorsBusy,
     ),
     ChargeBox(
       number: 4,
-      id: 'SIM-004',
+      id: 'CB-SMR-04',
       displayName: 'CS DC Charger',
+      merek: 'Kempower',
+      statusCode: 1,
       connectors: _dcConnectors,
     ),
     ChargeBox(
       number: 5,
-      id: 'SIM-005',
+      id: 'CB-SMR-05',
       displayName: 'CS DC Charger',
+      merek: 'Kempower',
+      statusCode: 1,
       connectors: _dcConnectors,
     ),
     ChargeBox(
       number: 6,
-      id: 'SIM-006',
+      id: 'CB-SMR-06',
       displayName: 'CS DC Charger',
+      merek: 'Kempower',
+      statusCode: 1,
       connectors: _dcConnectors,
     ),
   ];

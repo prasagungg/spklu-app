@@ -37,7 +37,7 @@ void main() {
   });
 
   test('breadcrumb menggabungkan badge, nama box, dan konektor', () {
-    expect(_session().breadcrumb, '04 • CS DC Charger • CCS2 - 200 kW DC');
+    expect(_session().breadcrumb, '04 • CS DC Charger • Gun 1');
   });
 
   test('tanggal transaksi diformat untuk ditampilkan', () {

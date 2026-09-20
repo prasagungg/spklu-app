@@ -1,9 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kossotrik/config/env.dart';
 import 'package:kossotrik/data/charge_point_repository.dart';
-import 'package:kossotrik/pages/charge_box_page.dart';
 import 'package:kossotrik/main.dart';
 import 'package:kossotrik/services/api_client.dart';
+
+import 'fake_card_reader.dart';
+import 'fixtures.dart';
 
 /// Merekam setiap request dan menjawabnya lewat [responder], sehingga
 /// test bisa mengubah jawaban `/list` di tengah alur.
@@ -29,58 +32,55 @@ class _Recorder extends Interceptor {
       requests.where((r) => r.path == path).toList();
 }
 
-/// Bentuk `/list` dengan status konektor 1 yang bisa diatur test.
+/// Bentuk `POST /list-chargerbox` dengan satu charge box dua konektor.
 ///
-/// Konektor 2 sengaja dibuat "Charging" supaya label "Tersedia" pada
-/// bottom sheet hanya menunjuk satu konektor — kalau dua-duanya bebas,
-/// tap-nya jadi ambigu dan bisa memilih konektor yang salah.
-Map<String, dynamic> _list(String connector1Status) => {
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {
-        'chargePoints': [
-          {
-            'id': 'SIM-456',
-            'vendor': 'Icon Digital',
-            'model': 'OCPP Simulator',
-            'connectors': [
-              {'id': 1, 'status': connector1Status, 'errorCode': 'NoError'},
-              {'id': 2, 'status': 'Charging', 'errorCode': 'NoError'},
-            ],
-          },
+/// Konektor kedua sengaja dimatikan supaya hanya satu yang bisa
+/// ditekan — kalau dua-duanya hidup, tap-nya jadi ambigu dan bisa
+/// memilih konektor yang salah.
+Map<String, dynamic> _list() => listResponse([
+      chargeBoxJson(
+        id: 'CB-SMR-01',
+        nama: 'CB-SMR-01',
+        connectors: [
+          connectorJson(id: '1'),
+          connectorJson(id: '2', nama: 'Gun 2', status: 0),
         ],
-      },
-    };
+      ),
+    ]);
 
-const _ok = {'responseCode': '00', 'responseMessage': 'Success'};
+const _ok = okResponse;
 
 void main() {
   testWidgets('menekan Mulai Pengisian benar-benar mengirim POST /start',
       (tester) async {
-    // Konektor 1 mulai "Available"; nanti diubah ke "Preparing" untuk
-    // meniru kabel yang dicolokkan ke kendaraan.
-    var connectorStatus = 'Available';
     final recorder = _Recorder(
-      (path) => path == '/list' ? _list(connectorStatus) : _ok,
+      (path) => path == '/list-chargerbox' ? _list() : _ok,
     );
     final repo = ChargePointRepository(
       client: ApiClient.withDio(Dio()..interceptors.add(recorder)),
     );
 
+    final reader = FakeCardReader();
+
+
     await tester.pumpWidget(
-      SPKLUApp(repository: repo, home: const ChargeBoxPage()),
+      SPKLUApp(repository: repo, cardReader: reader),
     );
     await tester.pumpAndSettle();
 
-    // Daftar charge box datang dari /list.
-    expect(recorder.to('/list'), isNotEmpty);
-    expect(find.text('SIM-456'), findsOneWidget);
+    // Daftar charge box datang dari POST /list-chargerbox.
+    expect(recorder.to('/list-chargerbox'), isNotEmpty);
+    expect(
+      recorder.to('/list-chargerbox').single.data,
+      {'idSpklu': Env.idSpklu},
+    );
+    expect(find.text('CB-SMR-01'), findsOneWidget);
 
     await tester.tap(find.text('01'));
     await tester.pumpAndSettle();
 
-    // Pilih konektor pertama yang tersedia.
-    await tester.tap(find.text('Tersedia').first);
+    // Pilih konektor yang hidup.
+    await tester.tap(find.text('Gun 1'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Lanjutkan'));
@@ -89,7 +89,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    await tester.tap(find.text('Bayar (Simulasi)'));
+    // Kartu e-Money ditempelkan menggantikan tombol bayar.
+    reader.tap();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -100,22 +101,11 @@ void main() {
     expect(find.text('Hubungkan Konektor'), findsOneWidget);
     expect(recorder.to('/start'), isEmpty);
 
-    // Selama konektor masih "Available", polling berjalan tapi tombol
-    // tetap nonaktif dan /start tidak pernah terkirim.
-    await tester.pump(const Duration(seconds: 6));
-    await tester.pump();
-    expect(find.text('Hubungkan Konektor'), findsOneWidget);
+    // Sebelum jeda deteksi habis, tombolnya belum aktif dan /start
+    // belum terkirim.
     expect(recorder.to('/start'), isEmpty);
-    expect(
-      recorder.to('/list').length,
-      greaterThan(1),
-      reason: 'halaman ini harus mem-polling /list',
-    );
 
-    // Kabel dicolokkan: charger melaporkan "Preparing".
-    connectorStatus = 'Preparing';
-    await tester.pump(const Duration(seconds: 2));
-    await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
     await tester.pump();
     expect(find.text('Konektor Terhubung'), findsOneWidget);
 
@@ -128,7 +118,7 @@ void main() {
     expect(starts.single.method, 'POST');
     // targetKwh diambil dari nominal Rp50.000 yang terpilih (19,5 kWh).
     expect(starts.single.data, {
-      'chargePointId': 'SIM-456',
+      'chargePointId': 'CB-SMR-01',
       'connectorId': 1,
       'targetKwh': 19.5,
     });
@@ -140,18 +130,17 @@ void main() {
 
   testWidgets('halaman status mem-polling /progress dan pindah saat selesai',
       (tester) async {
-    var connectorStatus = 'Available';
     var progressState = 'charging';
     var energyWh = 0;
 
     final recorder = _Recorder((path) {
-      if (path == '/list') return _list(connectorStatus);
+      if (path == '/list-chargerbox') return _list();
       if (path == '/progress') {
         return {
           'responseCode': '00',
           'responseMessage': 'Success',
           'data': {
-            'chargePointId': 'SIM-456',
+            'chargePointId': 'CB-SMR-01',
             'connectorId': 1,
             'transactionId': 7,
             'state': progressState,
@@ -174,31 +163,33 @@ void main() {
       client: ApiClient.withDio(Dio()..interceptors.add(recorder)),
     );
 
+    final reader = FakeCardReader();
+
+
     await tester.pumpWidget(
-      SPKLUApp(repository: repo, home: const ChargeBoxPage()),
+      SPKLUApp(repository: repo, cardReader: reader),
     );
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('01'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Tersedia'));
+    await tester.tap(find.text('Gun 1'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Konfirmasi & Bayar'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.text('Bayar (Simulasi)'));
+    // Kartu e-Money ditempelkan menggantikan tombol bayar.
+    reader.tap();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.text('Mulai Pengisian'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    // Kabel dicolokkan. Polling berjalan async, jadi perlu beberapa
-    // pump agar futurenya sempat selesai.
-    connectorStatus = 'Preparing';
-    await tester.pump(const Duration(seconds: 2));
+    // Jeda deteksi habis dan tombolnya aktif.
+    await tester.pump(const Duration(seconds: 3));
     for (var i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
@@ -222,7 +213,7 @@ void main() {
     expect(recorder.to('/progress'), isNotEmpty);
     expect(
       recorder.to('/progress').first.queryParameters,
-      {'chargePointId': 'SIM-456', 'connectorId': 1},
+      {'chargePointId': 'CB-SMR-01', 'connectorId': 1},
     );
 
     // Charger berhenti sendiri: state jadi "finished".
@@ -239,15 +230,14 @@ void main() {
 
   testWidgets('Akhiri Pengisian mengirim /stop dengan connectorId',
       (tester) async {
-    var connectorStatus = 'Available';
     final recorder = _Recorder((path) {
-      if (path == '/list') return _list(connectorStatus);
+      if (path == '/list-chargerbox') return _list();
       if (path == '/progress') {
         return {
           'responseCode': '00',
           'responseMessage': 'Success',
           'data': {
-            'chargePointId': 'SIM-456',
+            'chargePointId': 'CB-SMR-01',
             'connectorId': 1,
             'transactionId': 7,
             'state': 'charging',
@@ -266,28 +256,31 @@ void main() {
       client: ApiClient.withDio(Dio()..interceptors.add(recorder)),
     );
 
+    final reader = FakeCardReader();
+
+
     await tester.pumpWidget(
-      SPKLUApp(repository: repo, home: const ChargeBoxPage()),
+      SPKLUApp(repository: repo, cardReader: reader),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('01'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Tersedia'));
+    await tester.tap(find.text('Gun 1'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Konfirmasi & Bayar'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.text('Bayar (Simulasi)'));
+    // Kartu e-Money ditempelkan menggantikan tombol bayar.
+    reader.tap();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.text('Mulai Pengisian'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    connectorStatus = 'Preparing';
-    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(seconds: 3));
     for (var i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
@@ -310,7 +303,7 @@ void main() {
 
     final stops = recorder.to('/stop');
     expect(stops, hasLength(1));
-    expect(stops.single.data, {'chargePointId': 'SIM-456', 'connectorId': 1});
+    expect(stops.single.data, {'chargePointId': 'CB-SMR-01', 'connectorId': 1});
 
     // Setelah /stop, aplikasi membaca /progress sampai "finished"
     // sebelum menampilkan rincian akhir.

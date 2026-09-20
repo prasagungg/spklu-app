@@ -35,6 +35,8 @@ dependencies:
   flutter_svg: ^2.0.10
   dio: ^5.11.1
   shared_preferences: ^2.5.5
+  nfc_manager: ^4.2.1
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:

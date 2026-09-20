@@ -1,4 +1,4 @@
-/// Isi `session` pada konektor dari `GET /list`.
+/// Kemajuan satu sesi pengisian, dari `GET /progress`.
 ///
 /// Contoh nyata dari edge controller:
 /// Bentuk yang sama juga dikembalikan `GET /progress`.

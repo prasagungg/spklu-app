@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../data/charging_scope.dart';
 import '../models/charge_box.dart';
 import '../models/connector.dart';
 import '../theme/app_colors.dart';
@@ -18,10 +21,75 @@ Future<Connector?> showConnectorSheet(BuildContext context, ChargeBox box) {
   );
 }
 
-class _ConnectorSheet extends StatelessWidget {
+/// Isi bottom sheet.
+///
+/// Status konektor tidak terlihat dari daftar charge box, jadi begitu
+/// sheet ini terbuka tiap konektornya ditanyakan sekali lewat
+/// `POST /status-konektor`. Tidak ada polling: statusnya cukup diperiksa
+/// saat pengguna membukanya.
+///
+/// Tanpa [ChargingScope] — mode offline untuk test — status dari daftar
+/// dipakai apa adanya.
+class _ConnectorSheet extends StatefulWidget {
   const _ConnectorSheet({required this.chargeBox});
 
   final ChargeBox chargeBox;
+
+  @override
+  State<_ConnectorSheet> createState() => _ConnectorSheetState();
+}
+
+class _ConnectorSheetState extends State<_ConnectorSheet> {
+  late List<Connector> _connectors = widget.chargeBox.connectors;
+  bool _checking = false;
+  bool _checked = false;
+
+  ChargeBox get chargeBox => widget.chargeBox;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_checked) return;
+    _checked = true;
+    unawaited(_checkStatuses());
+  }
+
+  /// Menanyakan status tiap konektor sekali, berbarengan.
+  ///
+  /// Konektor yang gagal ditanyakan memakai status dari daftar — lebih
+  /// baik daripada mengosongkan sheet karena satu permintaan meleset.
+  Future<void> _checkStatuses() async {
+    final repository = ChargingScope.maybeOf(context)?.repository;
+    if (repository == null) return;
+
+    setState(() => _checking = true);
+
+    final updated = await Future.wait([
+      for (final connector in _connectors)
+        repository
+            .fetchConnectorStatus(
+              chargeBoxId: chargeBox.id,
+              connectorId: connector.id,
+            )
+            .then(connector.withStatusCode)
+            .catchError((Object e) {
+              debugPrint(
+                '[FLOW] Status konektor ${connector.id} gagal diperiksa: $e',
+              );
+              return connector;
+            }),
+    ]);
+
+    if (!mounted) return;
+    debugPrint(
+      '[FLOW] Status konektor ${chargeBox.id}: '
+      '${updated.map((c) => '${c.id}=${c.statusCode}').join(', ')}',
+    );
+    setState(() {
+      _connectors = updated;
+      _checking = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,13 +134,16 @@ class _ConnectorSheet extends StatelessWidget {
             child: ListView.separated(
               shrinkWrap: true,
               padding: const EdgeInsets.all(16),
-              itemCount: chargeBox.connectors.length,
+              itemCount: _connectors.length,
               separatorBuilder: (_, _) => const SizedBox(height: 16),
               itemBuilder: (context, index) {
-                final connector = chargeBox.connectors[index];
+                final connector = _connectors[index];
                 return _ConnectorCard(
                   connector: connector,
-                  onTap: connector.isSelectable
+                  checking: _checking,
+                  // Selama status sebenarnya belum datang, konektornya
+                  // belum boleh dipilih — tujuannya ditentukan status.
+                  onTap: !_checking && connector.isSelectable
                       ? () => Navigator.of(context).pop(connector)
                       : null,
                 );
@@ -103,9 +174,14 @@ class _ConnectorSheet extends StatelessWidget {
 
 /// Kartu 70:2488 — border #E4EFF7, radius 16, padding 12.
 class _ConnectorCard extends StatelessWidget {
-  const _ConnectorCard({required this.connector, this.onTap});
+  const _ConnectorCard({
+    required this.connector,
+    required this.checking,
+    this.onTap,
+  });
 
   final Connector connector;
+  final bool checking;
   final VoidCallback? onTap;
 
   @override
@@ -148,8 +224,19 @@ class _ConnectorCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(connector.name, style: AppTheme.cardTitle),
+                      // "CCS2 · DC" — backend kini mengirim tipe dan
+                      // jenis arusnya, jadi tidak perlu ditebak lagi.
+                      if (connector.typeLabel.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          connector.typeLabel,
+                          style: AppTheme.cardCaption.copyWith(
+                            color: AppColors.description,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 6),
-                      _StatusRow(connector: connector),
+                      _StatusRow(connector: connector, checking: checking),
                     ],
                   ),
                 ),
@@ -165,22 +252,34 @@ class _ConnectorCard extends StatelessWidget {
 /// Baris status: chip sesuai kondisi konektor, plus estimasi selesai
 /// bila backend mengirimnya.
 class _StatusRow extends StatelessWidget {
-  const _StatusRow({required this.connector});
+  const _StatusRow({required this.connector, required this.checking});
 
   final Connector connector;
+  final bool checking;
 
   @override
   Widget build(BuildContext context) {
+    if (checking) {
+      return const Align(
+        alignment: Alignment.centerLeft,
+        child: StatusChip(
+          label: 'Memeriksa…',
+          background: AppColors.infoTileBg,
+          foreground: AppColors.description,
+        ),
+      );
+    }
+
     final chip = switch (connector.status) {
       ConnectorStatus.available => const StatusChip.available(),
       ConnectorStatus.preparing => const StatusChip.preparing(),
       ConnectorStatus.inUse => const StatusChip.inUse(),
-      // Reserved / Unavailable / Faulted — status OCPP mentahnya
-      // ditampilkan supaya teknisi tahu penyebabnya.
-      ConnectorStatus.unavailable => StatusChip(
-        label: connector.errorCode != 'NoError'
-            ? connector.errorCode
-            : connector.rawStatus,
+      ConnectorStatus.finished => const StatusChip.finished(),
+      // Angka di luar keempat status yang dikenal. Angka mentahnya
+      // tercatat di log untuk teknisi; pengguna cukup tahu konektornya
+      // tidak bisa dipakai.
+      ConnectorStatus.unavailable => const StatusChip(
+        label: 'Tidak Tersedia',
         background: AppColors.unavailableBg,
         foreground: AppColors.unavailableFg,
       ),

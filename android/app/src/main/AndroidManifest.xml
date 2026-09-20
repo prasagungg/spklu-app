@@ -2,6 +2,13 @@
     <!-- Dibutuhkan untuk memanggil REST API SPKLU. -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Membaca kartu e-Money di halaman pembayaran. -->
+    <uses-permission android:name="android.permission.NFC"/>
+    <!-- required="false" supaya aplikasi tetap bisa dipasang di
+         perangkat tanpa NFC; halaman pembayaran menjelaskan keadaannya
+         sendiri bila pembacanya tidak ada. -->
+    <uses-feature android:name="android.hardware.nfc" android:required="false"/>
+
     <application
         android:label="SPKLU"
         android:name="${applicationName}"

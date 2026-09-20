@@ -54,14 +54,9 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
   /// hanya menambal mode offline.
   double get _energyKwh => _progress?.energyKwh ?? _simulatedKwh;
 
-  @override
-  void initState() {
-    super.initState();
-    // Saat halaman ini dibuka dari konektor yang sudah mengisi, `/list`
-    // sudah membawa sesinya. Dipakai sebagai nilai awal supaya layar
-    // tidak sempat menampilkan 0 kWh sebelum polling pertama selesai.
-    _progress = widget.session.connector.session;
-  }
+  // Nilai awal sengaja kosong: `POST /list-chargerbox` tidak membawa
+  // sesi yang sedang berjalan, jadi angka pertama baru datang dari
+  // polling `/progress`.
 
   @override
   void didChangeDependencies() {

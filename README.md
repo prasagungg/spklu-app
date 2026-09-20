@@ -10,7 +10,7 @@ meminta dan menampilkan. Target platformnya Android.
 | | |
 |---|---|
 | Framework | Flutter (Dart SDK `^3.11.5`) |
-| Dependensi | `dio`, `flutter_svg`, `shared_preferences` |
+| Dependensi | `dio`, `flutter_svg`, `shared_preferences`, `nfc_manager`, `crypto` |
 | Bahasa antarmuka | Indonesia |
 | Sumber desain | Figma "SPKLU Offline Mode" |
 
@@ -21,12 +21,13 @@ flutter pub get
 flutter run
 ```
 
-Alamat backend **tidak perlu** ditentukan saat build. Aplikasi membuka
-halaman **Konfigurasi Server** lebih dulu; alamatnya diketik di sana dan
-diingat sampai diganti lagi. Cukup mengetik IP — `192.168.1.10:8080`
-otomatis menjadi `http://192.168.1.10:8080`.
+Alamat backend **tidak perlu** ditentukan saat build. Aplikasi langsung
+membuka daftar charge box memakai alamat yang tersimpan. Untuk
+menggantinya, tekan ikon roda gigi di header halaman itu — halaman
+**Konfigurasi Server** terbuka di sana. Cukup mengetik IP —
+`192.168.1.10:8080` otomatis menjadi `http://192.168.1.10:8080`.
 
-Untuk mengganti nilai bawaan yang muncul di kolom itu:
+Untuk mengganti alamat bawaan saat belum pernah ada yang disimpan:
 
 ```sh
 flutter run --dart-define=SPKLU_API_BASE_URL=10.0.2.2:8080
@@ -37,7 +38,7 @@ Daftar lengkap `--dart-define` ada di [docs/konfigurasi.md](docs/konfigurasi.md)
 ## Periksa
 
 ```sh
-flutter test     # 106 test
+flutter test     # 168 test
 dart analyze lib test
 ```
 
@@ -46,13 +47,21 @@ dart analyze lib test
 ```
 lib/
   config/    Env (nilai build), ApiConfig (alamat aktif), Host (normalisasi alamat)
-  services/  ApiClient (Dio), ApiException, ApiLogger
-  data/      ChargePointRepository, ChargingScope, formatters, demo data
-  models/    ChargeBox, Connector, SessionInfo, CommandResult, ChargingSession
+  services/  ApiClient (Dio), ApiException, ApiLogger, CardReader (NFC)
+  data/      ChargePointRepository, ChargingScope, CardReaderScope, formatters
+  models/    Spklu, ChargeBox, Connector, SessionInfo, CommandResult, ChargingSession
   pages/     satu berkas per layar Figma
   widgets/   komponen bersama (PageScaffold, tombol, kartu, chip)
   theme/     AppColors & AppTheme — token warna dan teks
 ```
+
+## Melihat lalu lintas API
+
+Tekan lama logo di header halaman mana pun untuk membuka inspektur
+jaringan — daftar panggilan REST beserta header dan isinya, seperti tab
+Network di peramban. Menyala di build debug; untuk APK release nyalakan
+dengan `--dart-define=SPKLU_DEBUG_PANEL=true`. Rinciannya di
+[docs/konfigurasi.md](docs/konfigurasi.md#inspektur-jaringan).
 
 ## Dokumentasi
 

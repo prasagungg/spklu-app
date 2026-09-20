@@ -7,7 +7,9 @@ import 'package:flutter/foundation.dart';
 import '../config/env.dart';
 import '../config/host.dart';
 import 'api_exception.dart';
+import 'api_log_store.dart';
 import 'api_logger.dart';
+import 'signature_interceptor.dart';
 
 /// Pembungkus tunggal di atas Dio.
 ///
@@ -65,6 +67,16 @@ class ApiClient {
         validateStatus: (status) => status != null && status < 400,
       ),
     );
+
+    // Ditambahkan sebelum logger supaya body yang tercatat adalah body
+    // yang sudah diserialisasi — persis yang ditandatangani dan dikirim.
+    dio.interceptors.add(SignatureInterceptor());
+
+    // Dipasang setelah penanda tangan supaya yang tercatat adalah
+    // header dan body yang benar-benar dikirim.
+    if (Env.enableDebugPanel) {
+      dio.interceptors.add(ApiLogRecorder());
+    }
 
     if (kDebugMode && Env.enableApiLog) {
       dio.interceptors.add(ApiLogger());

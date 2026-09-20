@@ -1,9 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kossotrik/config/env.dart';
 import 'package:kossotrik/data/charge_point_repository.dart';
-import 'package:kossotrik/models/connector.dart';
 import 'package:kossotrik/services/api_client.dart';
 import 'package:kossotrik/services/api_exception.dart';
+
+import 'fixtures.dart';
 
 /// Interceptor yang menjawab request tanpa menyentuh jaringan.
 class _StubAdapter extends Interceptor {
@@ -44,7 +46,7 @@ class _StubAdapter extends Interceptor {
   }
 }
 
-const _ok = {'responseCode': '00', 'responseMessage': 'Success'};
+const _ok = okResponse;
 
 ChargePointRepository _repositoryReturning(Map<String, dynamic> body) {
   final dio = Dio()..interceptors.add(_StubAdapter(body));
@@ -52,58 +54,77 @@ ChargePointRepository _repositoryReturning(Map<String, dynamic> body) {
 }
 
 void main() {
-  test('memetakan dua charge point beserta konektornya', () async {
-    final boxes = await _repositoryReturning({
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {
-        'chargePoints': [
-          {
-            'id': 'SIM-123',
-            'vendor': 'Icon Digital',
-            'model': 'OCPP Simulator',
-            'serialNumber': 'SIM-123',
-            'firmwareVersion': 'sim-1.0.0',
-            'connectedAt': '2026-09-17T18:41:23.507741+07:00',
-            'lastHeartbeat': null,
-            'connectors': [
-              {'id': 1, 'status': 'Available', 'errorCode': 'NoError', 'session': null},
-            ],
-          },
-          {
-            'id': 'SIM-456',
-            'vendor': 'Icon Digital',
-            'model': 'OCPP Simulator',
-            'serialNumber': 'SIM-456',
-            'firmwareVersion': 'sim-1.0.0',
-            'connectedAt': '2026-09-17T18:41:26.039254+07:00',
-            'lastHeartbeat': null,
-            'connectors': [
-              {'id': 1, 'status': 'Available', 'errorCode': 'NoError', 'session': null},
-              {'id': 2, 'status': 'Available', 'errorCode': 'NoError', 'session': null},
-            ],
-          },
-        ],
-      },
-    }).fetchChargeBoxes();
+  test('memetakan dua charge box beserta konektornya', () async {
+    final boxes = await _repositoryReturning(
+      listResponse([
+        chargeBoxJson(
+          id: 'CB-SMR-01',
+          nama: 'Kempower Satellite 200 kW',
+          connectors: [connectorJson(id: '1', chargeBoxId: 'CB-SMR-01')],
+        ),
+        chargeBoxJson(
+          id: 'CB-SMR-02',
+          nama: 'Kempower Satellite 400 kW',
+          connectors: [
+            connectorJson(id: '1', chargeBoxId: 'CB-SMR-02'),
+            connectorJson(id: '2', chargeBoxId: 'CB-SMR-02', nama: 'Gun 2'),
+          ],
+        ),
+      ]),
+    ).fetchChargeBoxes();
 
     expect(boxes, hasLength(2));
     expect(boxes[0].badge, '01');
-    expect(boxes[0].name, 'SIM-123');
+    expect(boxes[0].id, 'CB-SMR-01');
+    expect(boxes[0].name, 'Kempower Satellite 200 kW');
+    expect(boxes[0].merek, 'Kempower');
     expect(boxes[0].connectorLabel, '1 Konektor');
     expect(boxes[0].isAvailable, isTrue);
     expect(boxes[1].badge, '02');
     expect(boxes[1].connectorLabel, '2 Konektor');
-    expect(boxes[1].connectedAt, isNotNull);
-    expect(boxes[1].lastHeartbeat, isNull);
+    expect(boxes[1].connectors.map((c) => c.name), ['Gun 1', 'Gun 2']);
   });
 
-  test('chargePoints kosong menghasilkan daftar kosong, bukan error', () async {
-    final boxes = await _repositoryReturning({
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {'chargePoints': <dynamic>[]},
-    }).fetchChargeBoxes();
+  test('keterangan lokasi ikut diurai', () async {
+    final spklu = await _repositoryReturning(listResponse()).fetchSpklu();
+
+    expect(spklu.id, 'SPKLU-SMR');
+    expect(spklu.nama, 'PLN Charging Station Sisingamangaraja');
+    expect(spklu.alamat, contains('Sisingamangaraja'));
+    expect(spklu.daya, '200 kW');
+    expect(spklu.statusCode, 1);
+  });
+
+  test('daftar diminta lewat POST /list-chargerbox dengan idSpklu',
+      () async {
+    final captured = <RequestOptions>[];
+    final dio = Dio()
+      ..interceptors.add(_StubAdapter(listResponse(), captured: captured));
+
+    await ChargePointRepository(client: ApiClient.withDio(dio))
+        .fetchChargeBoxes();
+
+    expect(captured.single.method, 'POST');
+    expect(captured.single.path, '/list-chargerbox');
+    expect(captured.single.data, {'idSpklu': Env.idSpklu});
+  });
+
+  test('idSpklu bisa ditentukan pemanggil', () async {
+    final captured = <RequestOptions>[];
+    final dio = Dio()
+      ..interceptors.add(_StubAdapter(listResponse(), captured: captured));
+
+    await ChargePointRepository(client: ApiClient.withDio(dio))
+        .fetchSpklu(idSpklu: 'SPKLU-LAIN');
+
+    expect(captured.single.data, {'idSpklu': 'SPKLU-LAIN'});
+  });
+
+  test('chargeBoxes kosong menghasilkan daftar kosong, bukan error',
+      () async {
+    final boxes = await _repositoryReturning(
+      listResponse(const []),
+    ).fetchChargeBoxes();
 
     expect(boxes, isEmpty);
   });
@@ -137,32 +158,55 @@ void main() {
     );
   });
 
-  test('status OCPP dipetakan ke tiga kelompok UI', () async {
-    final boxes = await _repositoryReturning({
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {
-        'chargePoints': [
-          {
-            'id': 'SIM-789',
-            'connectors': [
-              {'id': 1, 'status': 'Charging', 'errorCode': 'NoError'},
-              {'id': 2, 'status': 'Faulted', 'errorCode': 'GroundFailure'},
-              {'id': 3, 'status': 'Available', 'errorCode': 'OverCurrentFailure'},
-            ],
-          },
-        ],
-      },
-    }).fetchChargeBoxes();
+  test('fetchChargeBox memilih charge box yang diminta', () async {
+    final repo = _repositoryReturning(
+      listResponse([
+        chargeBoxJson(id: 'CB-SMR-01'),
+        chargeBoxJson(id: 'CB-SMR-02'),
+      ]),
+    );
 
-    final connectors = boxes.single.connectors;
-    expect(connectors[0].status, ConnectorStatus.inUse);
-    expect(connectors[1].status, ConnectorStatus.unavailable);
-    // Error code apa pun mengalahkan status "Available".
-    expect(connectors[2].status, ConnectorStatus.unavailable);
-    // Konektor 1 sedang mengisi — kartunya tetap bisa ditekan untuk
-    // membuka layar pemantauan.
-    expect(boxes.single.isAvailable, isTrue);
+    expect((await repo.fetchChargeBox('CB-SMR-02'))?.id, 'CB-SMR-02');
+    expect(await repo.fetchChargeBox('CB-TIDAK-ADA'), isNull);
+  });
+
+  group('status konektor', () {
+    test('ditanyakan lewat POST /status-konektor', () async {
+      final captured = <RequestOptions>[];
+      final dio = Dio()
+        ..interceptors.add(
+          _StubAdapter(connectorStatusResponse(status: 3), captured: captured),
+        );
+
+      final status = await ChargePointRepository(client: ApiClient.withDio(dio))
+          .fetchConnectorStatus(chargeBoxId: 'CB-SMR-01', connectorId: 1);
+
+      expect(status, 3);
+      expect(captured.single.method, 'POST');
+      expect(captured.single.path, '/status-konektor');
+      expect(captured.single.data, {
+        'spkluId': Env.idSpklu,
+        'chargeBoxId': 'CB-SMR-01',
+        // Backend memakai teks untuk nomor konektor.
+        'connectorId': '1',
+      });
+    });
+
+    test('tanpa data mengembalikan null, bukan melempar', () async {
+      final repo = _repositoryReturning(const {
+        'responseCode': '00',
+        'responseMessage': 'Success',
+        'data': null,
+      });
+
+      expect(
+        await repo.fetchConnectorStatus(
+          chargeBoxId: 'CB-SMR-01',
+          connectorId: 1,
+        ),
+        isNull,
+      );
+    });
   });
 
   group('start & stop', () {

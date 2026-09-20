@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kossotrik/data/card_reader_scope.dart';
 import 'package:kossotrik/data/demo_data.dart';
 import 'package:kossotrik/pages/charge_box_page.dart';
 import 'package:kossotrik/theme/app_theme.dart';
 import 'package:kossotrik/widgets/page_scaffold.dart';
 import 'package:kossotrik/widgets/primary_button.dart';
+
+import 'fake_card_reader.dart';
 
 /// Halaman dengan hitung mundur dan spinner memakai timer berulang,
 /// sehingga pumpAndSettle tidak akan pernah selesai. Dipakai pump
@@ -14,18 +17,32 @@ Future<void> settle(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 400));
 }
 
+/// Membangun alur dari halaman Pilih Charge Box dan mengembalikan
+/// pembaca kartu palsunya, supaya test bisa meniru kartu ditempelkan.
+///
+/// Tanpa ChargingScope, alur berjalan offline: /start dan /stop
+/// dilewati dan energi disimulasikan lokal.
+Future<FakeCardReader> pumpFlow(WidgetTester tester) async {
+  final reader = FakeCardReader();
+
+  await tester.pumpWidget(
+    CardReaderScope(
+      reader: reader,
+      child: MaterialApp(
+        theme: AppTheme.build(),
+        home: ChargeBoxPage(chargeBoxes: DemoData.chargeBoxes),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+
+  return reader;
+}
+
 void main() {
   testWidgets('alur lengkap: charge box sampai pengisian selesai',
       (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.build(),
-        // Tanpa ChargingScope, alur berjalan offline: /start dan /stop
-        // dilewati dan energi disimulasikan lokal.
-        home: ChargeBoxPage(chargeBoxes: DemoData.chargeBoxes),
-      ),
-    );
-    await tester.pumpAndSettle();
+    final reader = await pumpFlow(tester);
 
     // 1. Pilih Charge Box — pilih nomor 04 (DC, dua konektor).
     expect(find.text('Pilih Charge Box'), findsOneWidget);
@@ -34,7 +51,7 @@ void main() {
 
     // 2. Daftar Konektor — pilih konektor yang tersedia.
     expect(find.text('Daftar Konektor'), findsOneWidget);
-    await tester.tap(find.text('Tersedia'));
+    await tester.tap(find.text('Gun 1'));
     await tester.pumpAndSettle();
 
     // 3. Pilih Nominal — Rp50.000 sudah terpilih sejak awal.
@@ -50,11 +67,13 @@ void main() {
     await tester.tap(find.text('Konfirmasi & Bayar'));
     await settle(tester);
 
-    // 5. Pembayaran Kartu — statis, dimajukan lewat tombol simulasi.
+    // 5. Pembayaran Kartu — tidak ada tombol bayar; yang memajukan
+    // alur adalah kartu e-Money yang ditempelkan.
     expect(find.text('Pembayaran'), findsOneWidget);
     expect(find.text('Menunggu Kartu'), findsOneWidget);
     expect(find.text('Kode Sesi'), findsOneWidget);
-    await tester.tap(find.text('Bayar (Simulasi)'));
+    // Kartu e-Money ditempelkan — inilah yang memajukan alur sekarang.
+    reader.tap();
     await settle(tester);
 
     // 6. Pembayaran Berhasil.
@@ -121,25 +140,18 @@ void main() {
   });
 
   testWidgets('Lanjut Pengisian membatalkan penghentian sesi', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.build(),
-        // Tanpa ChargingScope, alur berjalan offline: /start dan /stop
-        // dilewati dan energi disimulasikan lokal.
-        home: ChargeBoxPage(chargeBoxes: DemoData.chargeBoxes),
-      ),
-    );
-    await tester.pumpAndSettle();
+    final reader = await pumpFlow(tester);
 
     await tester.tap(find.text('04'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Tersedia'));
+    await tester.tap(find.text('Gun 1'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Konfirmasi & Bayar'));
     await settle(tester);
-    await tester.tap(find.text('Bayar (Simulasi)'));
+    // Kartu e-Money ditempelkan — inilah yang memajukan alur sekarang.
+    reader.tap();
     await settle(tester);
     await tester.tap(find.text('Mulai Pengisian'));
     await settle(tester);
@@ -164,25 +176,18 @@ void main() {
 
   testWidgets('tombol Mulai Pengisian nonaktif sebelum konektor terdeteksi',
       (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.build(),
-        // Tanpa ChargingScope, alur berjalan offline: /start dan /stop
-        // dilewati dan energi disimulasikan lokal.
-        home: ChargeBoxPage(chargeBoxes: DemoData.chargeBoxes),
-      ),
-    );
-    await tester.pumpAndSettle();
+    final reader = await pumpFlow(tester);
 
     await tester.tap(find.text('04'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Tersedia'));
+    await tester.tap(find.text('Gun 1'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Konfirmasi & Bayar'));
     await settle(tester);
-    await tester.tap(find.text('Bayar (Simulasi)'));
+    // Kartu e-Money ditempelkan — inilah yang memajukan alur sekarang.
+    reader.tap();
     await settle(tester);
     await tester.tap(find.text('Mulai Pengisian'));
     await settle(tester);
@@ -205,15 +210,7 @@ void main() {
 
   testWidgets('setiap halaman selain halaman awal punya tombol Home',
       (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.build(),
-        // Tanpa ChargingScope, alur berjalan offline: /start dan /stop
-        // dilewati dan energi disimulasikan lokal.
-        home: ChargeBoxPage(chargeBoxes: DemoData.chargeBoxes),
-      ),
-    );
-    await tester.pumpAndSettle();
+    final reader = await pumpFlow(tester);
 
     // Halaman awal tidak perlu tombol pulang.
     expect(find.text('Pilih Charge Box'), findsOneWidget);
@@ -226,7 +223,7 @@ void main() {
 
     await tester.tap(find.text('04'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Tersedia'));
+    await tester.tap(find.text('Gun 1'));
     await tester.pumpAndSettle();
     await expectHome('Pilih Nominal');
 
@@ -238,7 +235,8 @@ void main() {
     await settle(tester);
     await expectHome('Pembayaran');
 
-    await tester.tap(find.text('Bayar (Simulasi)'));
+    // Kartu e-Money ditempelkan — inilah yang memajukan alur sekarang.
+    reader.tap();
     await settle(tester);
     await expectHome('Pembayaran Berhasil');
 
@@ -263,19 +261,11 @@ void main() {
 
   testWidgets('tombol Home mengembalikan ke halaman awal dari mana pun',
       (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.build(),
-        // Tanpa ChargingScope, alur berjalan offline: /start dan /stop
-        // dilewati dan energi disimulasikan lokal.
-        home: ChargeBoxPage(chargeBoxes: DemoData.chargeBoxes),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await pumpFlow(tester);
 
     await tester.tap(find.text('04'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Tersedia'));
+    await tester.tap(find.text('Gun 1'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();

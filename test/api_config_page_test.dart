@@ -11,8 +11,10 @@ import 'package:kossotrik/services/api_client.dart';
 import 'package:kossotrik/widgets/primary_button.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Menjawab `/list` dengan [status] HTTP yang diminta, supaya uji
-/// koneksi di halaman konfigurasi bisa dibuat berhasil atau gagal.
+import 'fixtures.dart';
+
+/// Menjawab `POST /list-chargerbox`, supaya uji koneksi di halaman
+/// konfigurasi bisa dibuat berhasil atau gagal.
 class _Stub extends Interceptor {
   _Stub({this.fail = false});
 
@@ -37,11 +39,7 @@ class _Stub extends Interceptor {
       Response<Map<String, dynamic>>(
         requestOptions: options,
         statusCode: 200,
-        data: const {
-          'responseCode': '00',
-          'responseMessage': 'Success',
-          'data': {'chargePoints': <Map<String, dynamic>>[]},
-        },
+        data: listResponse(const []),
       ),
     );
   }
@@ -88,7 +86,7 @@ void main() {
     await tester.pump();
 
     expect(
-      find.text('Akan memanggil http://192.168.1.10:8080/list'),
+      find.text('Akan memanggil http://192.168.1.10:8080/list-chargerbox'),
       findsOneWidget,
     );
   });

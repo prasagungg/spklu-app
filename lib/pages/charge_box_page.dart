@@ -1,9 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../app_route_observer.dart';
-import '../config/env.dart';
 import '../data/charge_point_repository.dart';
 import '../data/charging_scope.dart';
 import '../models/charge_box.dart';
@@ -19,18 +16,22 @@ import '../widgets/state_view.dart';
 import '../widgets/status_chip.dart';
 import 'api_config_page.dart';
 import 'charging_status_page.dart';
+import 'connect_connector_page.dart';
 import 'nominal_page.dart';
 import 'session_verification_page.dart';
 
 /// Frame Figma 70:1901 — "Pilih Charge Box".
 ///
-/// Daftarnya diambil dari `GET /list`. Id charge point dari sini
-/// dipakai apa adanya oleh `/start` dan `/stop`, jadi daftar ini harus
-/// datang dari backend — bukan data dummy — agar kedua perintah itu
-/// mengenai charger yang benar.
+/// Daftarnya diambil dari `POST /list-chargerbox`. Id charge box dari
+/// sini dipakai apa adanya oleh `/start` dan `/stop`, jadi daftar ini
+/// harus datang dari backend — bukan data dummy — agar kedua perintah
+/// itu mengenai charge box yang benar.
 ///
-/// Tombol refresh di header sudah dihapus, jadi muat ulang dilakukan
-/// lewat tarik-ke-bawah atau tombol pada tampilan kosong/gagal.
+/// Daftarnya tidak disegarkan berkala. Pemeriksaan status konektor
+/// nanti dilakukan di halaman lain, jadi halaman ini tidak perlu
+/// menembak backend terus-menerus. Muat ulang dilakukan lewat
+/// tarik-ke-bawah, tombol pada tampilan kosong/gagal, atau otomatis
+/// saat pengguna kembali ke sini dari halaman lain.
 class ChargeBoxPage extends StatefulWidget {
   /// Key tombol menuju Konfigurasi Server; ikonnya tanpa teks, jadi
   /// test butuh pegangan yang tidak menebak posisinya di pohon widget.
@@ -52,7 +53,6 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
   List<ChargeBox>? _boxes;
   Object? _error;
   bool _loading = false;
-  Timer? _refreshTimer;
 
   ChargePointRepository? get _repository =>
       widget.repository ?? ChargingScope.maybeOf(context)?.repository;
@@ -63,20 +63,12 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
 
     if (_boxes == null && _error == null && !_loading) _load();
 
-    // Daftar disegarkan berkala selama halaman ini terlihat, karena
-    // charger bisa tersambung atau terputus kapan saja.
-    _refreshTimer ??= Timer.periodic(
-      Env.listRefreshInterval,
-      (_) => _refreshIfVisible(),
-    );
-
     final route = ModalRoute.of(context);
     if (route is PageRoute) appRouteObserver.subscribe(this, route);
   }
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
     appRouteObserver.unsubscribe(this);
     super.dispose();
   }
@@ -89,18 +81,12 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
   /// hilang, halaman ini terlihat lagi dan datanya harus segar.
   @override
   void didPopNext() {
-    debugPrint('[FLOW] Kembali ke Pilih Charge Box — memuat ulang /list');
-    _load();
-  }
-
-  void _refreshIfVisible() {
-    // Jangan menembak backend saat halaman ini tertutup halaman lain.
-    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+    debugPrint('[FLOW] Kembali ke Pilih Charge Box — memuat ulang daftar');
     _load();
   }
 
   /// Memuat daftar. Data lama dipertahankan selama pemuatan berlangsung
-  /// supaya penyegaran berkala tidak membuat layar berkedip ke spinner.
+  /// supaya muat ulang tidak membuat layar berkedip ke spinner.
   Future<void> _load() async {
     if (_loading) return;
 
@@ -157,25 +143,31 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
       if (verified != true || !mounted) return;
     }
 
-    // Tujuannya ditentukan status konektor. "Preparing" diperlakukan
-    // sama seperti "Available" — belum ada transaksi, jadi pengguna
-    // tetap membeli dulu. Hanya konektor yang sudah mengisi yang
-    // melanjutkan ke layar pemantauan.
+    // Tujuannya ditentukan status konektor: yang masih bebas memulai
+    // pembelian, sisanya melanjutkan sesi yang sudah dibayar orang.
+    //
+    // "Selesai" ikut ke layar pemantauan karena `/progress` yang jadi
+    // penentu: begitu ia melaporkan `finished`, halaman itu langsung
+    // berpindah ke rincian akhir dengan angka energi yang benar.
     final destination = switch (connector.status) {
-      ConnectorStatus.available || ConnectorStatus.preparing => NominalPage(
+      ConnectorStatus.available => NominalPage(
           chargeBox: box,
           connector: connector,
         ),
-      ConnectorStatus.inUse => ChargingStatusPage(
+      ConnectorStatus.preparing => ConnectConnectorPage(
           session: _resume(box, connector),
         ),
-      // Konektor rusak tidak bisa ditekan, jadi cabang ini tak terpakai.
+      ConnectorStatus.inUse || ConnectorStatus.finished => ChargingStatusPage(
+          session: _resume(box, connector),
+        ),
+      // Status tak dikenal tidak bisa ditekan, jadi cabang ini tak
+      // terpakai.
       ConnectorStatus.unavailable => null,
     };
     if (destination == null) return;
 
     debugPrint(
-      '[FLOW] Konektor ${connector.id} berstatus ${connector.rawStatus} — '
+      '[FLOW] Konektor ${connector.id} berstatus ${connector.statusCode} — '
       'menuju ${destination.runtimeType}',
     );
 
@@ -191,7 +183,6 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
     return ChargingSession.resumed(
       chargeBox: box,
       connector: connector,
-      transactionId: connector.session?.transactionId,
       now: DateTime.now(),
     );
   }
@@ -203,7 +194,6 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
   /// lanjutan memulangkan ke rute pertama, dan rute pertama harus tetap
   /// daftar charge box, bukan layar konfigurasi.
   void _openConfig() {
-    _refreshTimer?.cancel();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => const ApiConfigPage()),
     );
@@ -243,8 +233,8 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
       return StateView(
         icon: Icons.ev_station_outlined,
         title: 'Belum ada charge box',
-        message: 'Tidak ada charger yang sedang terhubung ke controller. '
-            'Daftar diperbarui otomatis.',
+        message: 'Tidak ada charge box yang terdaftar di lokasi ini. '
+            'Tarik ke bawah untuk memuat ulang.',
         onRetry: _load,
       );
     }

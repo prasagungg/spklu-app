@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 
 import 'app_route_observer.dart';
 import 'config/api_config.dart';
+import 'data/card_reader_scope.dart';
 import 'data/charge_point_repository.dart';
 import 'data/charging_scope.dart';
-import 'pages/api_config_page.dart';
+import 'pages/charge_box_page.dart';
+import 'services/card_reader.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
@@ -27,27 +29,22 @@ Future<void> main() async {
   );
 
   // Alamat yang terakhir dipilih operator dipasang sebelum frame
-  // pertama, supaya halaman Konfigurasi Server membuka isian yang sudah
-  // benar dan tidak ada request yang sempat menembak alamat lama.
+  // pertama. Halaman pertama langsung menembak /list, jadi alamatnya
+  // harus sudah benar sebelum ada request yang berangkat.
   await ApiConfig.restore();
 
   runApp(const SPKLUApp());
 }
 
 class SPKLUApp extends StatelessWidget {
-  const SPKLUApp({
-    super.key,
-    this.repository,
-    this.home = const ApiConfigPage(),
-  });
+  const SPKLUApp({super.key, this.repository, this.cardReader});
 
   /// Disuntik di test agar alur bisa dijalankan tanpa jaringan sungguhan.
   final ChargePointRepository? repository;
 
-  /// Halaman pertama. Produksi selalu mulai dari Konfigurasi Server;
-  /// test alur pengisian melewatinya dengan menunjuk langsung ke
-  /// halaman yang sedang diuji.
-  final Widget home;
+  /// Disuntik di test agar alur pembayaran bisa dijalankan tanpa
+  /// perangkat NFC. Produksi memakai [NfcCardReader].
+  final CardReader? cardReader;
 
   @override
   Widget build(BuildContext context) {
@@ -57,16 +54,22 @@ class SPKLUApp extends StatelessWidget {
     // bawah Navigator, bukan sebagai turunannya, sehingga
     // ChargingScope.maybeOf() mengembalikan null di halaman-halaman itu
     // dan /start maupun /stop tidak pernah terkirim.
+    //
+    // CardReaderScope dipasang di tempat yang sama dan karena alasan
+    // yang sama: halaman pembayaran juga dicapai lewat Navigator.push.
     return ChargingScope(
       repository: repository,
-      child: MaterialApp(
-        title: 'SPKLU',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.build(),
-        // Dipakai halaman Pilih Charge Box untuk memuat ulang /list
-        // setiap kali pengguna kembali ke sana.
-        navigatorObservers: [appRouteObserver],
-        home: home,
+      child: CardReaderScope(
+        reader: cardReader,
+        child: MaterialApp(
+          title: 'SPKLU',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.build(),
+          // Dipakai halaman Pilih Charge Box untuk memuat ulang /list
+          // setiap kali pengguna kembali ke sana.
+          navigatorObservers: [appRouteObserver],
+          home: const ChargeBoxPage(),
+        ),
       ),
     );
   }
