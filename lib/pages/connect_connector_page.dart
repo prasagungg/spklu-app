@@ -113,16 +113,15 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
     if (scope != null) {
       setState(() => _starting = true);
       try {
-        final result = await scope.repository.startCharging(
-          chargePointId: widget.session.chargeBox.id,
-          connectorId: widget.session.connector.id,
-          // kWh yang dibeli pengguna pada halaman Pilih Nominal.
-          targetKwh: widget.session.price?.kwh,
+        // Charge box, konektor, dan kWh-nya sudah melekat pada order,
+        // jadi cukup orderId.
+        await scope.repository.startCharging(
+          orderId: widget.session.orderId,
         );
         // Controller hanya meneruskan perintah; konfirmasi pengisian
-        // benar-benar jalan datang dari GET /progress yang dipantau
+        // benar-benar jalan datang dari ongoing-kwh yang dipantau
         // halaman status.
-        debugPrint('Perintah start diterima: $result');
+        debugPrint('[FLOW] Perintah start terkirim');
 
         // Konektornya sekarang sedang dipakai, bukan sekadar dipesan —
         // kembalinya pengguna ke daftar tidak boleh melepasnya.

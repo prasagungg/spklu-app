@@ -27,7 +27,8 @@ class _Stub extends Interceptor {
           '/count-kwh' => countKwhResponse(),
           '/transaction/push-order' => pushOrderResponse(),
           '/transaction/inquiry-billing' => inquiryBillingResponse(),
-          '/progress' => progress(),
+          '/transaction/payment-billing' => paymentBillingResponse(),
+          '/transaction/charging/ongoing-kwh' => progress(),
           _ => okResponse,
         },
         statusCode: 200,
@@ -44,16 +45,16 @@ Future<void> _settle(WidgetTester tester) async {
 void main() {
   testWidgets('kWh akhir diambil dari /progress terakhir, bukan saat ditekan',
       (tester) async {
-    // Saat tombol ditekan energinya 3 Wh; charger masih menyalurkan
-    // daya sampai akhirnya berhenti di 17 Wh.
-    var state = 'charging';
-    var energyWh = 3;
+    // Saat tombol ditekan energinya 0,003 kWh; charger masih
+    // menyalurkan daya sampai akhirnya berhenti di 0,017 kWh.
+    var status = 3;
+    var charged = 0.003;
 
     final repo = ChargePointRepository(
       client: ApiClient.withDio(
         Dio()
           ..interceptors.add(
-            _Stub(() => progressResponse(state: state, energyWh: energyWh)),
+            _Stub(() => ongoingKwhResponse(status: status, charged: charged)),
           ),
       ),
     );
@@ -108,8 +109,8 @@ void main() {
     await tester.tap(find.text('Ya, Akhiri Pengisian'));
 
     // Charger berhenti dan melaporkan angka akhir yang lebih besar.
-    state = 'finished';
-    energyWh = 17;
+    status = 4;
+    charged = 0.017;
 
     for (var attempt = 0; attempt < 6; attempt++) {
       await tester.pump(const Duration(seconds: 1));

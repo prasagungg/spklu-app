@@ -164,6 +164,24 @@ Map<String, dynamic> inquiryBillingResponse({
       },
     };
 
+/// Amplop `POST /transaction/payment-billing`.
+///
+/// Bentuknya sama dengan inquiry, ditambah `bankLog` sebagai bukti
+/// transaksinya.
+Map<String, dynamic> paymentBillingResponse({
+  String orderId = 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
+  int totalAmount = 25400,
+  String bankLog = '1231408098812345678100500',
+}) {
+  final body = inquiryBillingResponse(
+    orderId: orderId,
+    totalAmount: totalAmount,
+  );
+  (body['data'] as Map<String, dynamic>)['bankLog'] = bankLog;
+
+  return body;
+}
+
 /// Amplop `POST /booked-connector`.
 ///
 /// [accepted] mengisi field `status`: konektornya bersedia atau tidak.
@@ -203,31 +221,36 @@ Map<String, dynamic> cancellationResponse({
       },
     };
 
-/// Amplop `GET /progress` untuk sesi yang sedang berjalan.
-Map<String, dynamic> progressResponse({
-  String chargeBoxId = 'CB-SMR-01',
-  int connectorId = 1,
-  String state = 'charging',
-  int energyWh = 500,
-  int powerW = 12000,
+/// Amplop `POST /transaction/charging/ongoing-kwh`.
+Map<String, dynamic> ongoingKwhResponse({
+  String orderId = 'ORDER-1',
+  num orderKwh = 10,
+  num charged = 0,
+  num? remaining,
+  int status = 2,
+  num power = 0,
+  int chargeDurationS = 0,
 }) =>
     {
       'responseCode': '00',
       'responseMessage': 'Success',
       'data': {
-        'chargePointId': chargeBoxId,
-        'connectorId': connectorId,
-        'transactionId': 42,
-        'idTag': 'REMOTE',
-        'state': state,
-        'connectorStatus': state == 'charging' ? 'Charging' : 'Preparing',
-        'percent': 30.0,
-        'energyWh': energyWh,
-        'powerW': powerW,
-        'durationSeconds': 60,
-        if (state == 'finished') 'stopReason': 'Remote',
-        if (state == 'finished')
-          'stoppedAt': '2026-09-17T20:58:35.135618667+07:00',
+        'orderId': orderId,
+        'chargeBoxName': 'Kempower Satellite 200 kW',
+        'chargeBoxId': 'CB-SMR-01',
+        'connectorName': 'Gun 1',
+        'orderKwh': orderKwh,
+        'charged': charged,
+        'remaining': remaining ?? (orderKwh - charged),
+        'status': status,
+        'lastSoc': null,
+        'firstSoc': null,
+        'power': power,
+        'chargeDurationS': chargeDurationS,
+        'chargeDurationM': chargeDurationS ~/ 60,
+        'estRemainingTime': 0,
+        'powerActiveImport': 0,
+        'estimatedCharged': 0,
       },
     };
 

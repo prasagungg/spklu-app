@@ -5,10 +5,9 @@ import '../models/charge_box.dart';
 import '../models/backend_status.dart';
 import '../models/billing.dart';
 import '../models/booking.dart';
-import '../models/command_result.dart';
+import '../models/charging_progress.dart';
 import '../models/kwh_price.dart';
 import '../models/order.dart';
-import '../models/session_info.dart';
 import '../models/spklu.dart';
 import '../services/api_client.dart';
 import '../services/api_exception.dart';
@@ -230,6 +229,47 @@ class ChargePointRepository {
     return BillingInquiry.fromJson(_unwrap(json));
   }
 
+  /// `POST /transaction/payment-billing`
+  ///
+  /// Membayar tagihan yang sudah ditanyakan.
+  ///
+  /// ```json
+  /// { "orderId": "…", "amount": 145670,
+  ///   "cardNumber": "0123456789012345",
+  ///   "bankLog": "1231408098812345678100500" }
+  /// ```
+  ///
+  /// [amount] **harus sama persis dengan `totalAmount` dari inquiry** —
+  /// nilai lain, termasuk total order, dibalas
+  /// [ResponseCode.amountMismatch].
+  ///
+  /// [bankLog] wajib; tanpa itu dibalas [ResponseCode.missingField].
+  /// Bawaannya [Env.bankLog], masih tetap karena mesin kartunya belum
+  /// ada.
+  ///
+  /// Aman dipanggil berulang: pembayaran kedua untuk order yang sama
+  /// dibalas sukses.
+  Future<BillingInquiry> payBilling({
+    required String orderId,
+    required int amount,
+    String? cardNumber,
+    String? bankLog,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/transaction/payment-billing',
+      body: {
+        'orderId': orderId,
+        'amount': amount,
+        'cardNumber': cardNumber ?? Env.cardNumber,
+        'bankLog': bankLog ?? Env.bankLog,
+      },
+      cancelToken: cancelToken,
+    );
+
+    return BillingInquiry.fromJson(_unwrap(json));
+  }
+
   /// `POST /booked-connector`
   ///
   /// Mengunci konektor atas nama pengguna yang sedang memakai unit ini,
@@ -300,86 +340,61 @@ class ChargePointRepository {
     return CancellationResult.fromJson(_unwrap(json));
   }
 
-  /// `GET /progress?chargePointId=…&connectorId=…`
+  /// `POST /transaction/charging/start`
   ///
-  /// Kemajuan sesi pada satu konektor.
+  /// Meminta charger memulai pengisian untuk order ini. Semua yang
+  /// dibutuhkan — charge box, konektor, kWh — sudah melekat pada
+  /// ordernya, jadi cukup [orderId].
   ///
-  /// [connectorId] dibuat wajib dengan sengaja. Backend menerima
-  /// permintaan tanpa parameter itu dan mengembalikan konektor mana pun
-  /// yang sedang aktif — juga mengabaikan salah ejaan seperti
-  /// `connecterId` tanpa error. Dua-duanya gagal secara senyap, jadi
-  /// pemanggil dipaksa menyebutkan konektornya.
-  ///
-  /// Mengembalikan null bila backend tidak mengirim `data`, mis. saat
-  /// belum pernah ada sesi pada konektor tersebut.
-  Future<SessionInfo?> fetchProgress({
-    required String chargePointId,
-    required int connectorId,
-    CancelToken? cancelToken,
-  }) async {
-    final json = await _client.get<Map<String, dynamic>>(
-      '/progress',
-      query: {
-        'chargePointId': chargePointId,
-        'connectorId': connectorId,
-      },
-      cancelToken: cancelToken,
-    );
-    final data = _unwrap(json);
-    return data == null ? null : SessionInfo.fromJson(data);
-  }
-
-  /// `POST /start` — meminta charger memulai sesi pengisian.
-  ///
-  /// Hanya `chargePointId` yang wajib; tanpa itu backend membalas
-  /// [ResponseCode.missingField]. `connectorId` menentukan konektor
-  /// mana yang dipakai. Gagal dengan [ResponseCode.chargePointOffline]
-  /// bila charger sedang tidak terhubung, atau
-  /// [ResponseCode.commandRejected] bila charger menolak perintahnya.
-  ///
-  /// [targetKwh] adalah kWh yang dibeli pengguna — batas berapa banyak
-  /// energi yang boleh disalurkan sesi ini. Diambil dari nominal yang
-  /// dipilih; dihilangkan dari body bila tidak diketahui, mis. pada
-  /// sesi yang dilanjutkan tanpa data pembelian.
-  Future<CommandResult> startCharging({
-    required String chargePointId,
-    required int connectorId,
-    double? targetKwh,
+  /// Gagal dengan [ResponseCode.chargePointOffline] bila charger sedang
+  /// tidak terhubung, [ResponseCode.commandRejected] bila charger
+  /// menolak, atau [ResponseCode.invalidStatusTransition] bila ordernya
+  /// belum siap dimulai.
+  Future<void> startCharging({
+    required String orderId,
     CancelToken? cancelToken,
   }) async {
     final json = await _client.post<Map<String, dynamic>>(
-      '/start',
-      body: {
-        'chargePointId': chargePointId,
-        'connectorId': connectorId,
-        'targetKwh': ?targetKwh,
-      },
+      '/transaction/charging/start',
+      body: {'orderId': orderId},
       cancelToken: cancelToken,
     );
-    return CommandResult.fromJson(_unwrap(json));
+    _unwrap(json);
   }
 
-  /// `POST /stop` — menghentikan sesi yang sedang berjalan.
+  /// `POST /transaction/charging/stop`
   ///
-  /// [connectorId] disertakan agar perintahnya mengenai konektor yang
-  /// tepat pada charger dengan lebih dari satu konektor.
+  /// Menghentikan pengisian order ini.
   ///
-  /// Gagal dengan [ResponseCode.noActiveSession] bila tidak ada
-  /// sesi aktif pada charger tersebut.
-  Future<CommandResult> stopCharging({
-    required String chargePointId,
-    required int connectorId,
+  /// Gagal dengan [ResponseCode.invalidStatusTransition] bila ordernya
+  /// memang sedang tidak mengisi.
+  Future<void> stopCharging({
+    required String orderId,
     CancelToken? cancelToken,
   }) async {
     final json = await _client.post<Map<String, dynamic>>(
-      '/stop',
-      body: {
-        'chargePointId': chargePointId,
-        'connectorId': connectorId,
-      },
+      '/transaction/charging/stop',
+      body: {'orderId': orderId},
       cancelToken: cancelToken,
     );
-    return CommandResult.fromJson(_unwrap(json));
+    _unwrap(json);
+  }
+
+  /// `POST /transaction/charging/ongoing-kwh`
+  ///
+  /// Kemajuan pengisian order ini: kWh yang sudah tersalur, sisanya,
+  /// daya, dan durasinya.
+  Future<ChargingProgress> fetchChargingProgress({
+    required String orderId,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/transaction/charging/ongoing-kwh',
+      body: {'orderId': orderId},
+      cancelToken: cancelToken,
+    );
+
+    return ChargingProgress.fromJson(_unwrap(json));
   }
 
   /// Memeriksa amplop response dan mengembalikan isi `data`.

@@ -12,35 +12,40 @@ import 'package:kossotrik/theme/app_theme.dart';
 import 'fixtures.dart';
 
 class _Stub extends Interceptor {
-  _Stub(this.energyWh);
+  _Stub(this.charged);
 
-  final int energyWh;
+  final double charged;
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     handler.resolve(
       Response<Map<String, dynamic>>(
         requestOptions: options,
-        data: progressResponse(energyWh: energyWh),
+        data: ongoingKwhResponse(charged: charged, status: 3),
         statusCode: 200,
       ),
     );
   }
 }
 
-ChargingSession _session() {
+/// Sesi dengan orderId — tanpa itu halaman status tidak menanyakan
+/// apa pun, karena semua endpoint pengisian berkunci order.
+ChargingSession _session({String orderId = 'ORDER-1'}) {
   final box = ChargeBox.fromJson(chargeBoxJson(), number: 1);
 
-  return ChargingSession.resumed(
+  return ChargingSession(
     chargeBox: box,
     connector: box.connectors.single,
-    now: DateTime(2026),
+    sessionCode: '29',
+    reference: '81067',
+    createdAt: DateTime(2026),
+    orderId: orderId,
   );
 }
 
 void main() {
-  /// `POST /list-chargerbox` tidak membawa sesi yang sedang berjalan,
-  /// jadi tidak ada angka awal untuk dipasang — layar mulai dari nol.
+  /// Daftar charge box tidak membawa sesi yang sedang berjalan, jadi
+  /// tidak ada angka awal untuk dipasang — layar mulai dari nol.
   testWidgets('tanpa scope, energi mulai dari nol', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -54,9 +59,10 @@ void main() {
     expect(find.text('Sedang Mengisi'), findsOneWidget);
   });
 
-  testWidgets('polling /progress pertama mengisi angkanya', (tester) async {
+  testWidgets('polling ongoing-kwh pertama mengisi angkanya',
+      (tester) async {
     final repo = ChargePointRepository(
-      client: ApiClient.withDio(Dio()..interceptors.add(_Stub(127))),
+      client: ApiClient.withDio(Dio()..interceptors.add(_Stub(0.127))),
     );
 
     await tester.pumpWidget(
@@ -76,5 +82,31 @@ void main() {
     await tester.pump();
 
     expect(find.text('0,127 kWh'), findsOneWidget);
+  });
+
+  /// Sesi yang dilanjutkan dari daftar charge box tidak membawa
+  /// orderId, jadi tidak ada yang bisa ditanyakan.
+  testWidgets('sesi tanpa orderId tidak menanyakan apa pun',
+      (tester) async {
+    final stub = _Stub(0.5);
+    final repo = ChargePointRepository(
+      client: ApiClient.withDio(Dio()..interceptors.add(stub)),
+    );
+
+    await tester.pumpWidget(
+      ChargingScope(
+        repository: repo,
+        child: MaterialApp(
+          theme: AppTheme.build(),
+          home: ChargingStatusPage(session: _session(orderId: '')),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+
+    // Jatuh ke simulasi lokal, bukan angka dari backend.
+    expect(find.text('0,500 kWh'), findsNothing);
   });
 }

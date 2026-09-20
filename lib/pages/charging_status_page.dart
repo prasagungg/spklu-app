@@ -6,7 +6,7 @@ import '../data/charging_scope.dart';
 import '../data/formatters.dart';
 import '../config/env.dart';
 import '../models/charging_session.dart';
-import '../models/session_info.dart';
+import '../models/charging_progress.dart';
 import '../theme/app_colors.dart';
 import '../widgets/asset_slot.dart';
 import '../widgets/page_scaffold.dart';
@@ -41,18 +41,26 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
   Timer? _ticker;
   bool _polling = false;
 
-  /// Bacaan terakhir dari `GET /progress` — sumber tunggal angka yang
+  /// Bacaan terakhir dari `ongoing-kwh` — sumber tunggal angka yang
   /// ditampilkan saat daring.
-  SessionInfo? _progress;
+  ChargingProgress? _progress;
 
   /// Hanya dipakai saat tidak ada [ChargingScope].
   double _simulatedKwh = 0;
 
   ChargingScope? _scope;
 
+  /// Bisa menanyakan kemajuan ke backend.
+  ///
+  /// Sesi yang dilanjutkan dari daftar charge box tidak membawa
+  /// orderId — semua endpoint pengisian berkunci order, jadi sesi itu
+  /// hanya bisa disimulasikan lokal sampai ada cara memulihkan ordernya
+  /// dari konektor.
+  bool get _live => _scope != null && widget.session.orderId.isNotEmpty;
+
   /// Energi tersalur. Selalu angka dari `/progress` bila ada; simulasi
   /// hanya menambal mode offline.
-  double get _energyKwh => _progress?.energyKwh ?? _simulatedKwh;
+  double get _energyKwh => _progress?.charged ?? _simulatedKwh;
 
   // Nilai awal sengaja kosong: `POST /list-chargerbox` tidak membawa
   // sesi yang sedang berjalan, jadi angka pertama baru datang dari
@@ -66,7 +74,7 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
   }
 
   Timer _startTicker() {
-    final live = _scope != null;
+    final live = _live;
     return Timer.periodic(
       live ? Env.progressPollInterval : const Duration(seconds: 1),
       (_) => live ? _poll() : _tick(),
@@ -96,21 +104,16 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
     if (_polling || !mounted) return;
     _polling = true;
     try {
-      final progress = await _scope!.repository.fetchProgress(
-        chargePointId: widget.session.chargeBox.id,
-        connectorId: widget.session.connector.id,
+      final progress = await _scope!.repository.fetchChargingProgress(
+        orderId: widget.session.orderId,
       );
-      if (!mounted || progress == null) return;
+      if (!mounted) return;
 
       setState(() => _progress = progress);
 
       if (progress.isFinished) {
-        debugPrint(
-          '[FLOW] Sesi selesai di charger '
-          '(state=${progress.state} alasan=${progress.stopReason}) — '
-          'menuju rincian akhir',
-        );
-        _finish(progress.energyKwh);
+        debugPrint('[FLOW] Sesi selesai di charger: $progress');
+        _finish(progress.charged);
       }
     } on Object catch (_) {
       // Diabaikan; dicoba lagi pada polling berikutnya.

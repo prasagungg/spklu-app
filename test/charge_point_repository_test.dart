@@ -54,6 +54,14 @@ ChargePointRepository _repositoryReturning(Map<String, dynamic> body) {
   return ChargePointRepository(client: ApiClient.withDio(dio));
 }
 
+ChargePointRepository _repositoryFailing(
+  Map<String, dynamic> body, {
+  required int status,
+}) {
+  final dio = Dio()..interceptors.add(_StubAdapter(body, status: status));
+  return ChargePointRepository(client: ApiClient.withDio(dio));
+}
+
 void main() {
   test('memetakan dua charge box beserta konektornya', () async {
     final boxes = await _repositoryReturning(
@@ -210,169 +218,128 @@ void main() {
     });
   });
 
-  group('start & stop', () {
-
-    test('targetKwh dihilangkan bila tidak diketahui', () async {
+  group('perintah pengisian', () {
+    /// Charge box, konektor, dan kWh-nya melekat pada order, jadi
+    /// ketiga endpoint pengisian cukup membawa orderId.
+    test('start dikirim sebagai POST dengan orderId saja', () async {
       final captured = <RequestOptions>[];
       final dio = Dio()
         ..interceptors.add(_StubAdapter(_ok, captured: captured));
 
       await ChargePointRepository(client: ApiClient.withDio(dio))
-          .startCharging(chargePointId: 'SIM-456', connectorId: 1);
-
-      expect(captured.single.data, {
-        'chargePointId': 'SIM-456',
-        'connectorId': 1,
-      });
-    });
-
-    test('/start membawa chargePointId, connectorId, dan targetKwh',
-        () async {
-      final captured = <RequestOptions>[];
-      final dio = Dio()
-        ..interceptors.add(_StubAdapter(_ok, captured: captured));
-
-      await ChargePointRepository(client: ApiClient.withDio(dio))
-          .startCharging(
-            chargePointId: 'SIM-456',
-            connectorId: 1,
-            targetKwh: 19.5,
-          );
-
-      expect(captured, hasLength(1));
-      expect(captured.single.method, 'POST');
-      expect(captured.single.path, '/start');
-      expect(captured.single.data, {
-        'chargePointId': 'SIM-456',
-        'connectorId': 1,
-        'targetKwh': 19.5,
-      });
-    });
-
-    test('/stop dikirim sebagai POST dengan chargePointId dan connectorId',
-        () async {
-      final captured = <RequestOptions>[];
-      final dio = Dio()
-        ..interceptors.add(_StubAdapter(_ok, captured: captured));
-
-      await ChargePointRepository(client: ApiClient.withDio(dio))
-          .stopCharging(chargePointId: 'SIM-123', connectorId: 1);
+          .startCharging(orderId: 'ORDER-1');
 
       expect(captured.single.method, 'POST');
-      expect(captured.single.path, '/stop');
-      expect(captured.single.data, {
-        'chargePointId': 'SIM-123',
-        'connectorId': 1,
-      });
+      expect(captured.single.path, '/transaction/charging/start');
+      expect(captured.single.data, {'orderId': 'ORDER-1'});
     });
 
-    test('charger tidak terhubung memunculkan pesan asli dari backend',
-        () async {
-      // Bentuk nyata dari edge controller: HTTP 503, responseCode "12".
+    test('stop dikirim sebagai POST dengan orderId saja', () async {
+      final captured = <RequestOptions>[];
       final dio = Dio()
-        ..interceptors.add(
-          _StubAdapter(
-            const {
-              'responseCode': '31',
-              'responseMessage': 'Charging station SIM-123 is not connected',
-            },
-            status: 503,
-          ),
-        );
+        ..interceptors.add(_StubAdapter(_ok, captured: captured));
+
+      await ChargePointRepository(client: ApiClient.withDio(dio))
+          .stopCharging(orderId: 'ORDER-1');
+
+      expect(captured.single.path, '/transaction/charging/stop');
+      expect(captured.single.data, {'orderId': 'ORDER-1'});
+    });
+
+    test('charger yang tidak terhubung dilempar sebagai ApiException',
+        () async {
+      final repo = _repositoryFailing(
+        const {
+          'responseCode': '31',
+          'responseMessage': 'Charging station CB-SMR-01 is not connected',
+        },
+        status: 503,
+      );
 
       await expectLater(
-        ChargePointRepository(client: ApiClient.withDio(dio))
-            .startCharging(chargePointId: 'SIM-123', connectorId: 1),
+        repo.startCharging(orderId: 'ORDER-1'),
         throwsA(
-          isA<ApiException>()
-              .having((e) => e.message, 'message',
-                  'Charging station SIM-123 is not connected')
-              .having((e) => e.responseCode, 'responseCode',
-                  ResponseCode.chargePointOffline)
-              .having((e) => e.statusCode, 'statusCode', 503),
+          isA<ApiException>().having(
+            (e) => e.responseCode,
+            'responseCode',
+            ResponseCode.chargePointOffline,
+          ),
         ),
       );
     });
 
-    test('tidak ada sesi berjalan memunculkan pesan asli dari backend',
+    test('menghentikan yang tidak sedang mengisi dilempar apa adanya',
         () async {
-      // Bentuk nyata dari edge controller: HTTP 409, responseCode "15".
-      final dio = Dio()
-        ..interceptors.add(
-          _StubAdapter(
-            const {
-              'responseCode': '34',
-              'responseMessage':
-                  'There is no charging session running on SIM-123',
-            },
-            status: 409,
-          ),
-        );
+      final repo = _repositoryFailing(
+        const {
+          'responseCode': '06',
+          'responseMessage': 'Invalid Status Transition',
+        },
+        status: 400,
+      );
 
       await expectLater(
-        ChargePointRepository(client: ApiClient.withDio(dio))
-            .stopCharging(chargePointId: 'SIM-123', connectorId: 1),
+        repo.stopCharging(orderId: 'ORDER-1'),
         throwsA(
-          isA<ApiException>()
-              .having((e) => e.message, 'message',
-                  'There is no charging session running on SIM-123')
-              .having((e) => e.responseCode, 'responseCode',
-                  ResponseCode.noActiveSession),
+          isA<ApiException>().having(
+            (e) => e.responseCode,
+            'responseCode',
+            ResponseCode.invalidStatusTransition,
+          ),
         ),
       );
     });
   });
 
-  group('hasil perintah', () {
-    ChargePointRepository repoFor(Map<String, dynamic> body) =>
-        ChargePointRepository(
-          client: ApiClient.withDio(Dio()..interceptors.add(_StubAdapter(body))),
+  group('kemajuan pengisian', () {
+    test('ditanyakan lewat ongoing-kwh dengan orderId', () async {
+      final captured = <RequestOptions>[];
+      final dio = Dio()
+        ..interceptors.add(
+          _StubAdapter(ongoingKwhResponse(), captured: captured),
         );
 
-    test('/start mengembalikan state starting beserta konektornya', () async {
-      // Payload nyata dari edge controller.
-      final result = await repoFor(const {
-        'responseCode': '00',
-        'responseMessage': 'Success',
-        'data': {
-          'chargePointId': 'SIM-456',
-          'connectorId': 1,
-          'state': 'starting',
-        },
-      }).startCharging(chargePointId: 'SIM-456', connectorId: 1);
+      await ChargePointRepository(client: ApiClient.withDio(dio))
+          .fetchChargingProgress(orderId: 'ORDER-1');
 
-      expect(result.chargePointId, 'SIM-456');
-      expect(result.connectorId, 1);
-      expect(result.state, 'starting');
-      expect(result.isStarting, isTrue);
-      expect(result.transactionId, isNull);
+      expect(captured.single.method, 'POST');
+      expect(captured.single.path, '/transaction/charging/ongoing-kwh');
+      expect(captured.single.data, {'orderId': 'ORDER-1'});
     });
 
-    test('response tanpa connectorId tetap terbaca', () async {
-      final result = await repoFor(const {
-        'responseCode': '00',
-        'responseMessage': 'Success',
-        'data': {'chargePointId': 'SIM-456', 'state': 'starting'},
-      }).startCharging(chargePointId: 'SIM-456', connectorId: 1);
+    /// Endpoint lama melaporkan Wh; yang ini sudah kWh, jadi angkanya
+    /// dipakai apa adanya tanpa dibagi seribu.
+    test('charged dibaca sebagai kWh apa adanya', () async {
+      final progress = await _repositoryReturning(
+        ongoingKwhResponse(charged: 6.4, orderKwh: 10),
+      ).fetchChargingProgress(orderId: 'ORDER-1');
 
-      expect(result.connectorId, isNull);
-      expect(result.isStarting, isTrue);
+      expect(progress.charged, 6.4);
+      expect(progress.orderKwh, 10);
+      expect(progress.remaining, closeTo(3.6, 0.001));
     });
 
-    test('/stop mengembalikan transactionId yang dihentikan', () async {
-      final result = await repoFor(const {
-        'responseCode': '00',
-        'responseMessage': 'Success',
-        'data': {
-          'chargePointId': 'SIM-456',
-          'connectorId': 1,
-          'transactionId': 1789648927,
-          'state': 'stopping',
-        },
-      }).stopCharging(chargePointId: 'SIM-456', connectorId: 1);
+    test('status memakai kosakata yang sama dengan konektor', () async {
+      final charging = await _repositoryReturning(
+        ongoingKwhResponse(status: 3),
+      ).fetchChargingProgress(orderId: 'ORDER-1');
+      final finished = await _repositoryReturning(
+        ongoingKwhResponse(status: 4),
+      ).fetchChargingProgress(orderId: 'ORDER-1');
 
-      expect(result.transactionId, 1789648927);
-      expect(result.isStopping, isTrue);
+      expect(charging.isCharging, isTrue);
+      expect(charging.isFinished, isFalse);
+      expect(finished.isFinished, isTrue);
+    });
+
+    test('soc yang null tidak membuat parsing gagal', () async {
+      final progress = await _repositoryReturning(
+        ongoingKwhResponse(),
+      ).fetchChargingProgress(orderId: 'ORDER-1');
+
+      expect(progress.firstSoc, isNull);
+      expect(progress.lastSoc, isNull);
+      expect(progress.duration, Duration.zero);
     });
   });
 }

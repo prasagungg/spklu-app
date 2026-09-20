@@ -80,7 +80,7 @@ diketahui dengan menanyai berkala. Jedanya ada di `Env`:
 
 | Layar | Endpoint | Jeda | Alasan |
 |---|---|---|---|
-| Sedang Mengisi | `GET /progress` | 1 detik | Angka kWh harus terlihat bergerak |
+| Sedang Mengisi | `POST /transaction/charging/ongoing-kwh` | 1 detik | Angka kWh harus terlihat bergerak |
 
 Hanya satu layar yang mem-polling. Daftar charge box dulu menyegarkan
 diri tiap dua detik dan halaman Hubungkan Konektor mem-polling menunggu
@@ -114,13 +114,14 @@ halaman daftar terlihat lagi dan datanya harus segar.
 
 Beberapa hal di kode ini terlihat berlebihan sampai tahu sebabnya.
 
-**`connectorId` wajib di `fetchProgress`.** Backend menerima permintaan
-tanpa parameter itu dan mengembalikan konektor mana pun yang sedang
-aktif; salah ejaan seperti `connecterId` juga diabaikan tanpa error.
-Dua-duanya gagal secara senyap, jadi pemanggil dipaksa menyebut
-konektornya. Ada test khusus untuk ejaannya.
+**Seluruh perintah pengisian berkunci order.** `start`, `stop`, dan
+`ongoing-kwh` cukup membawa `orderId` — charge box, konektor, dan
+kWh-nya melekat pada ordernya. Akibatnya sesi yang dilanjutkan dari
+daftar charge box, yang tidak punya orderId, belum bisa dipantau atau
+dihentikan; halamannya jatuh ke simulasi lokal alih-alih menembak
+backend dengan orderId kosong.
 
-**Energi akhir dibaca ulang setelah `/stop`.** Charger masih menyalurkan
+**Energi akhir dibaca ulang setelah stop.** Charger masih menyalurkan
 daya beberapa detik setelah perintah berhenti. `StopConfirmPage`
 memanggil `/progress` sampai lima kali sampai `state` menjadi
 `"finished"`, alih-alih memakai angka saat tombol ditekan.
@@ -208,10 +209,17 @@ nomor kartu tetap dari `Env.cardNumber` — nomor yang sesungguhnya tidak
 bisa dibaca. Gagal di situ menahan alur dan membuka lagi pembacaan
 kartu.
 
-Pemotongan saldo sungguhan masih harus lewat reader atau backend
-pembayaran bersertifikat; tempat memasang panggilannya sudah ditandai di
-`CardPaymentPage._settleBilling`, setelah tagihannya terverifikasi dan
-sebelum halaman berpindah.
+Tagihannya lalu dibayar lewat `POST /transaction/payment-billing`.
+Nominalnya diambil dari jawaban inquiry, tidak pernah dari angka yang
+diingat: backend menolak selisih sekecil apa pun sebagai "Amount
+mismatch". Dua field lain — nomor kartu dan `bankLog` — masih nilai
+tetap karena mesin kartunya belum ada.
+
+Yang ditampilkan di rincian akhir adalah `ChargingSession.paidAmount`,
+yaitu angka yang benar-benar didebit. Tagihan bisa melebihi total order
+karena inquiry menambahkan `fee`, `idleFee`, dan `serviceFee`, dan
+struk yang menyebut angka lain dari yang terpotong adalah struk yang
+salah.
 
 **Abstraksi dan penyuntikan.** `CardReader` (`services/card_reader.dart`)
 memisahkan "menunggu kartu" dari NFC-nya, dengan `NfcCardReader` sebagai

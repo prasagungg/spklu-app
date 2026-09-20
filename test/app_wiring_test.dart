@@ -61,6 +61,7 @@ void main() {
         '/count-kwh' => countKwhResponse(),
         '/transaction/push-order' => pushOrderResponse(),
         '/transaction/inquiry-billing' => inquiryBillingResponse(),
+        '/transaction/payment-billing' => paymentBillingResponse(),
         _ => _ok,
       },
     );
@@ -110,16 +111,16 @@ void main() {
     }
     await tester.pump(const Duration(milliseconds: 600));
 
-    // Tombol ini hanya berpindah halaman, belum menembak /start.
+    // Tombol ini hanya berpindah halaman, belum menembak start.
     await tester.tap(find.text('Mulai Pengisian'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Hubungkan Konektor'), findsOneWidget);
-    expect(recorder.to('/start'), isEmpty);
+    expect(recorder.to('/transaction/charging/start'), isEmpty);
 
-    // Sebelum jeda deteksi habis, tombolnya belum aktif dan /start
-    // belum terkirim.
-    expect(recorder.to('/start'), isEmpty);
+    // Sebelum jeda deteksi habis, tombolnya belum aktif dan perintah
+    // start belum terkirim.
+    expect(recorder.to('/transaction/charging/start'), isEmpty);
 
     await tester.pump(const Duration(seconds: 3));
     await tester.pump();
@@ -129,15 +130,11 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    final starts = recorder.to('/start');
-    expect(starts, hasLength(1), reason: 'POST /start harus terkirim');
+    final starts = recorder.to('/transaction/charging/start');
+    expect(starts, hasLength(1), reason: 'perintah start harus terkirim');
     expect(starts.single.method, 'POST');
-    // targetKwh diambil dari nominal Rp50.000 yang terpilih (19,5 kWh).
-    expect(starts.single.data, {
-      'chargePointId': 'CB-SMR-01',
-      'connectorId': 1,
-      'targetKwh': 10.0,
-    });
+    // Charge box, konektor, dan kWh-nya melekat pada order.
+    expect(starts.single.data, {'orderId': 'YZ00ZG5SP9HUNVRPTZH69Y7POW'});
 
     // Beri waktu transisi rute selesai sebelum memeriksa halaman status.
     await tester.pump(const Duration(milliseconds: 600));
@@ -146,8 +143,8 @@ void main() {
 
   testWidgets('halaman status mem-polling /progress dan pindah saat selesai',
       (tester) async {
-    var progressState = 'charging';
-    var energyWh = 0;
+    var progressStatus = 3;
+    var charged = 0.0;
 
     final recorder = _Recorder((path) {
       if (path == '/list-chargerbox') return _list();
@@ -158,26 +155,15 @@ void main() {
       if (path == '/transaction/inquiry-billing') {
         return inquiryBillingResponse();
       }
-      if (path == '/progress') {
-        return {
-          'responseCode': '00',
-          'responseMessage': 'Success',
-          'data': {
-            'chargePointId': 'CB-SMR-01',
-            'connectorId': 1,
-            'transactionId': 7,
-            'state': progressState,
-            'connectorStatus': 'Charging',
-            'percent': 50.0,
-            'energyWh': energyWh,
-            'powerW': progressState == 'finished' ? null : 12000,
-            'durationSeconds': 30,
-            'stopReason': progressState == 'finished' ? 'Remote' : null,
-            'stoppedAt': progressState == 'finished'
-                ? '2026-09-17T20:58:35.135618667+07:00'
-                : null,
-          },
-        };
+      if (path == '/transaction/payment-billing') {
+        return paymentBillingResponse();
+      }
+      if (path == '/transaction/charging/ongoing-kwh') {
+        return ongoingKwhResponse(
+          orderId: 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
+          status: progressStatus,
+          charged: charged,
+        );
       }
       return _ok;
     });
@@ -234,21 +220,19 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('Sedang Mengisi'), findsOneWidget);
 
-    // Energi naik mengikuti /progress.
-    energyWh = 6400;
+    // Energi naik mengikuti ongoing-kwh.
+    charged = 6.4;
     await tester.pump(const Duration(seconds: 1));
     for (var i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
     expect(find.text('6,4 kWh'), findsOneWidget);
-    expect(recorder.to('/progress'), isNotEmpty);
-    expect(
-      recorder.to('/progress').first.queryParameters,
-      {'chargePointId': 'CB-SMR-01', 'connectorId': 1},
-    );
+    final polls = recorder.to('/transaction/charging/ongoing-kwh');
+    expect(polls, isNotEmpty);
+    expect(polls.first.data, {'orderId': 'YZ00ZG5SP9HUNVRPTZH69Y7POW'});
 
-    // Charger berhenti sendiri: state jadi "finished".
-    progressState = 'finished';
+    // Charger berhenti sendiri: statusnya jadi selesai.
+    progressStatus = 4;
     await tester.pump(const Duration(seconds: 1));
     for (var i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 50));
@@ -270,7 +254,10 @@ void main() {
       if (path == '/transaction/inquiry-billing') {
         return inquiryBillingResponse();
       }
-      if (path == '/progress') {
+      if (path == '/transaction/payment-billing') {
+        return paymentBillingResponse();
+      }
+      if (path == '/transaction/charging/ongoing-kwh') {
         return {
           'responseCode': '00',
           'responseMessage': 'Success',
@@ -347,11 +334,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     }
 
-    final stops = recorder.to('/stop');
+    final stops = recorder.to('/transaction/charging/stop');
     expect(stops, hasLength(1));
-    expect(stops.single.data, {'chargePointId': 'CB-SMR-01', 'connectorId': 1});
+    expect(stops.single.data, {'orderId': 'YZ00ZG5SP9HUNVRPTZH69Y7POW'});
 
-    // Setelah /stop, aplikasi membaca /progress sampai "finished"
+    // Setelah stop, aplikasi membaca ongoing-kwh sampai selesai
     // sebelum menampilkan rincian akhir.
     for (var attempt = 0; attempt < 6; attempt++) {
       await tester.pump(const Duration(seconds: 1));

@@ -145,6 +145,7 @@ flutter run \
 | `SPKLU_API_AUTH` | kosong | Isi header `Authorization`. Kosong berarti header-nya tidak dikirim; endpoint playground menerima request tanpa auth. |
 | `SPKLU_ID` | `SPKLU-SMR` | Lokasi SPKLU tempat unit dipasang, dikirim sebagai `idSpklu` pada `POST /list-chargerbox`. |
 | `SPKLU_CARD_NUMBER` | `0123456789012345` | Nomor kartu e-Money yang dipakai menagih. Masih tetap karena NFC tidak bisa membacanya; empat digit pertamanya menentukan penerbit. |
+| `SPKLU_BANK_LOG` | `1231408098812345678100500` | Bukti transaksi yang dikirim saat membayar. Wajib ada; masih tetap karena mesin kartunya belum ada. |
 | `SPKLU_CLIENT_ID` | `edge` | Isi header `client-id` pada setiap request. |
 | `SPKLU_SECRET_KEY` | kunci environment pengembangan | Kunci penanda tangan request. Environment sungguhan **wajib** menimpanya agar kuncinya tidak ikut tertulis di kode. |
 | `SPKLU_SESSION_PIN` | `00` | Kode yang diterima halaman Verifikasi Sesi. Masih nilai tetap karena backend belum menyediakan cara memverifikasi kode sesi milik pengguna. |

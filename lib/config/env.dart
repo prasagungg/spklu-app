@@ -57,6 +57,16 @@ class Env {
     defaultValue: '0123456789012345',
   );
 
+  /// Bukti transaksi dari mesin kartu, dikirim saat membayar.
+  ///
+  /// Masih nilai tetap karena pembacaan kartunya belum ada — sama
+  /// alasannya dengan [cardNumber]. Backend menolak permintaan tanpa
+  /// field ini.
+  static const String bankLog = String.fromEnvironment(
+    'SPKLU_BANK_LOG',
+    defaultValue: '1231408098812345678100500',
+  );
+
   /// Identitas pemanggil pada header `client-id`.
   static const String apiClientId = String.fromEnvironment(
     'SPKLU_CLIENT_ID',

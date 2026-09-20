@@ -46,10 +46,12 @@ class _StopConfirmPageState extends State<StopConfirmPage> {
     if (_stopping) return;
     final scope = ChargingScope.maybeOf(context);
 
-    if (scope == null) {
+    // Tanpa scope, atau tanpa orderId — sesi yang dilanjutkan dari
+    // daftar charge box — tidak ada yang bisa dihentikan lewat backend.
+    if (scope == null || session.orderId.isEmpty) {
       debugPrint(
-        'ChargingScope tidak ditemukan — /stop DILEWATI dan alur '
-        'berjalan offline.',
+        'Perintah stop DILEWATI: '
+        '${scope == null ? 'tidak ada ChargingScope' : 'sesi tanpa orderId'}.',
       );
       _goToFinished(energyKwh);
       return;
@@ -57,10 +59,7 @@ class _StopConfirmPageState extends State<StopConfirmPage> {
 
     setState(() => _stopping = true);
     try {
-      await scope.repository.stopCharging(
-        chargePointId: session.chargeBox.id,
-        connectorId: session.connector.id,
-      );
+      await scope.repository.stopCharging(orderId: session.orderId);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _stopping = false);
@@ -89,17 +88,12 @@ class _StopConfirmPageState extends State<StopConfirmPage> {
       if (!mounted) return latest;
 
       try {
-        final progress = await scope.repository.fetchProgress(
-          chargePointId: session.chargeBox.id,
-          connectorId: session.connector.id,
+        final progress = await scope.repository.fetchChargingProgress(
+          orderId: session.orderId,
         );
-        if (progress == null) continue;
 
-        latest = progress.energyKwh;
-        debugPrint(
-          '[FLOW] Bacaan akhir ${attempt + 1}: state=${progress.state} '
-          'energi=${progress.energyKwh} kWh',
-        );
+        latest = progress.charged;
+        debugPrint('[FLOW] Bacaan akhir ${attempt + 1}: $progress');
         if (progress.isFinished) return latest;
       } on Object catch (_) {
         // Dicoba lagi; kalau habis, pakai bacaan terakhir.
@@ -169,7 +163,7 @@ class _StopConfirmPageState extends State<StopConfirmPage> {
                       children: [
                         DetailRow(
                           label: 'Pembayaran Awal',
-                          value: formatRupiah(session.price!.rpTotal),
+                          value: formatRupiah(session.paidAmount ?? 0),
                           muted: true,
                         ),
                         const SizedBox(height: 12),

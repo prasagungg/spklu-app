@@ -75,7 +75,7 @@ class ChargingFinishedPage extends StatelessWidget {
                   const SizedBox(height: 16),
                   DetailRow(
                     label: 'Pembayaran Awal',
-                    value: formatRupiah(session.price!.rpTotal),
+                    value: formatRupiah(session.paidAmount ?? 0),
                     muted: true,
                   ),
                   const SizedBox(height: 16),

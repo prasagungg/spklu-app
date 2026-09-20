@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kossotrik/data/demo_data.dart';
 import 'package:kossotrik/models/charging_session.dart';
+import 'package:kossotrik/models/billing.dart';
 import 'package:kossotrik/models/order.dart';
 
 ChargingSession _session() {
@@ -22,6 +23,37 @@ ChargingSession _session() {
 }
 
 void main() {
+  /// Tagihan bisa berbeda dari total order — inquiry menambahkan fee,
+  /// idleFee, dan serviceFee — jadi rincian akhir memakai angka yang
+  /// benar-benar didebit.
+  group('angka yang dipakai adalah yang dibayar', () {
+    test('tanpa bukti pembayaran, jatuh ke total order', () {
+      expect(_session().paidAmount, 50000);
+    });
+
+    test('bukti pembayaran mengalahkan total order', () {
+      final paid = _session().paidWith(
+        const BillingInquiry(
+          orderId: 'ORDER-1',
+          totalAmount: 56000,
+          bankLog: '123',
+        ),
+      );
+
+      expect(paid.paidAmount, 56000);
+      expect(paid.billing!.isPaid, isTrue);
+    });
+
+    test('dana kembali dihitung dari yang dibayar', () {
+      final paid = _session().paidWith(
+        const BillingInquiry(orderId: 'ORDER-1', totalAmount: 56000),
+      );
+
+      // 0 kWh terpakai: seluruh yang didebit kembali.
+      expect(paid.refundFor(0), 56000);
+    });
+  });
+
   test('biaya pemakaian dihitung proporsional dan dibulatkan ke bawah', () {
     final session = _session();
 

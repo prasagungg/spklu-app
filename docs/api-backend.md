@@ -364,6 +364,64 @@ Saldonya sendiri **belum dipotong** — penagihan sungguhan menyusul
 setelah inquiry, dan tempat memanggilnya sudah ditandai di
 `CardPaymentPage._settleBilling`.
 
+## `POST /transaction/payment-billing`
+
+Membayar tagihan yang sudah ditanyakan. Dipanggil tepat setelah
+inquiry, dalam rangkaian yang sama saat kartu terdeteksi.
+
+```json
+{ "orderId": "F3YYZCWLRC4FPR1YDZ7F1A30ID", "amount": 145670,
+  "cardNumber": "0123456789012345",
+  "bankLog": "1231408098812345678100500" }
+```
+
+Jawabannya sama dengan inquiry, ditambah `bankLog` sebagai bukti
+transaksi:
+
+```json
+{
+  "responseCode": "00", "responseMessage": "Success",
+  "data": {
+    "orderId": "F3YYZCWLRC4FPR1YDZ7F1A30ID",
+    "pspId": "EM-BNI", "cardNumber": "0123456789012345",
+    "amount": 145670, "fee": 0, "idleFee": 0, "serviceFee": 0,
+    "totalAmount": 145670, "sessionCode": "",
+    "bankLog": "1231408098812345678100500"
+  }
+}
+```
+
+### `amount` harus persis dari inquiry
+
+Nilai lain dibalas `responseCode` `25`, "Amount mismatch" (422) — **total
+order pun ditolak** kalau berbeda. Terbukti saat pengujian: order
+bernilai 145.670, dibayar dengan 25.400 → `25`. Aplikasi karena itu
+selalu mengirim `totalAmount` dari jawaban inquiry, tidak pernah angka
+yang diingat atau dihitung sendiri.
+
+Inquiry menambahkan `fee`, `idleFee`, dan `serviceFee` di atas `amount`,
+jadi tagihan memang bisa berbeda dari total order. Yang ditampilkan di
+rincian akhir adalah angka yang benar-benar didebit
+(`ChargingSession.paidAmount`), bukan total order.
+
+### `bankLog` wajib
+
+Tanpa field itu dibalas `responseCode` `07`, "Missing Field: bankLog".
+Isinya bukti transaksi dari mesin kartu; masih nilai tetap dari
+`Env.bankLog` karena mesin kartunya belum ada, bisa diganti lewat
+`--dart-define=SPKLU_BANK_LOG=…`.
+
+### Yang diamati saat pengujian
+
+- **Idempoten**: pembayaran kedua untuk order yang sama dibalas sukses,
+  bukan `23` "Transaction already paid".
+- Inquiry setelah pembayaran membalas sama seperti sebelumnya — tidak
+  ada penanda sudah dibayar di jawabannya.
+- **Membayar tidak melepas konektor.** Push order berikutnya pada
+  konektor yang sama tetap dibalas `16`.
+- Order kedaluwarsa cukup cepat: order yang dibuat beberapa menit
+  sebelumnya sudah dibalas `21` "Transaction Not Found".
+
 ## `POST /booked-connector`
 
 Mengunci konektor atas nama pengguna yang sedang memakai unit ini, lalu
@@ -476,106 +534,78 @@ Kegagalan pembatalan hanya dicatat ke log. Pengguna sudah pergi dari
 alur itu; memunculkan error atas sesuatu yang tidak ia minta hanya
 membingungkan.
 
-## `GET /progress`
+## `POST /transaction/charging/start`
 
-Kemajuan sesi pada satu konektor.
+Meminta charger memulai pengisian.
 
+```json
+{ "orderId": "F3YYZCWLRC4FPR1YDZ7F1A30ID" }
 ```
-GET /progress?chargePointId=SIM-456&connectorId=2
+
+Charge box, konektor, dan kWh-nya sudah melekat pada order, jadi cukup
+`orderId`. Tanpa itu dibalas `07`, "Missing Field: orderId".
+
+Gagal dengan `31` bila charger tidak terhubung, `32` bila charger
+menolak, atau `06` bila ordernya belum siap dimulai.
+
+## `POST /transaction/charging/stop`
+
+Menghentikan pengisian.
+
+```json
+{ "orderId": "F3YYZCWLRC4FPR1YDZ7F1A30ID" }
 ```
 
-Kedua parameter **wajib** dikirim aplikasi. Backend sebenarnya menerima
-permintaan tanpa `connectorId` dan mengembalikan konektor aktif mana
-pun, juga mengabaikan salah ejaan seperti `connecterId` tanpa error.
-Dua-duanya gagal secara senyap, jadi `fetchProgress()` memaksa
-pemanggil menyebut konektornya.
+Dibalas `06` "Invalid Status Transition" bila ordernya memang sedang
+tidak mengisi — terbukti saat pengujian.
 
-Isi `data`:
+## `POST /transaction/charging/ongoing-kwh`
+
+Kemajuan pengisian. Di-polling tiap detik oleh halaman Sedang Mengisi.
+
+```json
+{ "orderId": "F3YYZCWLRC4FPR1YDZ7F1A30ID" }
+```
 
 ```json
 {
-  "chargePointId": "SIM-456",
-  "connectorId": 2,
-  "transactionId": 1789648926,
-  "idTag": "REMOTE",
-  "state": "charging",
-  "connectorStatus": "Charging",
-  "percent": 20.1,
-  "energyWh": 24,
-  "powerW": 12330,
-  "durationSeconds": 6,
-  "stoppedAt": null,
-  "updatedAt": "2026-09-17T20:13:51.943093729+07:00"
+  "responseCode": "00", "responseMessage": "Success",
+  "data": {
+    "orderId": "F3YYZCWLRC4FPR1YDZ7F1A30ID",
+    "chargeBoxId": "CB-SMR-01",
+    "chargeBoxName": "Kempower Satellite 200 kW",
+    "connectorName": "Gun 2",
+    "orderKwh": 10, "charged": 0, "remaining": 10,
+    "status": 2, "lastSoc": null, "firstSoc": null,
+    "power": 0, "chargeDurationS": 0, "chargeDurationM": 0,
+    "estRemainingTime": 0, "powerActiveImport": 0,
+    "estimatedCharged": 0
+  }
 }
 ```
 
-Setelah sesi berhenti, `powerW` menjadi null dan muncul `stopReason`:
+Dua hal yang berbeda dari `GET /progress` yang lama:
 
-```json
-{
-  "state": "finished",
-  "connectorStatus": "Preparing",
-  "percent": 55.5,
-  "energyWh": 207,
-  "powerW": null,
-  "durationSeconds": 59,
-  "stopReason": "Remote",
-  "stoppedAt": "2026-09-17T20:58:35.135618667+07:00"
-}
-```
+- **`charged` sudah dalam kWh**, bukan Wh. Angkanya dipakai apa adanya,
+  tidak dibagi seribu.
+- **`status` memakai kosakata angka yang sama dengan konektor** — lihat
+  tabel di `POST /list-chargerbox`. Order yang sudah dibayar tetapi
+  belum mulai membalas `2`; `3` berarti sedang mengisi dan `4` berarti
+  selesai. Halaman status berpindah ke rincian akhir saat melihat `4`.
 
-`data` yang tidak ada mengembalikan null, bukan error — itu terjadi bila
-belum pernah ada sesi pada konektor tersebut.
+`firstSoc` dan `lastSoc` adalah daya baterai kendaraan dalam persen,
+dan bisa null bila charger tidak melaporkannya.
 
-Tentang energi: backend mengirim `energyWh` dan kadang `energyKwh`
-sekaligus. `energyKwh` dipakai apa adanya bila ada; kalau tidak,
-dihitung dari `energyWh`.
+### Sesi tanpa order belum bisa dipantau
 
-## `POST /start`
+Ketiga endpoint ini berkunci `orderId`. Sesi yang dilanjutkan dari
+daftar charge box — konektor berstatus 2, 3, atau 4 milik orang lain —
+tidak membawa orderId, jadi kemajuannya tidak bisa ditanyakan dan
+pengisiannya tidak bisa dihentikan lewat aplikasi. Halaman status jatuh
+ke simulasi lokal untuk sesi seperti itu.
 
-Meminta charger memulai sesi.
-
-```json
-{ "chargePointId": "SIM-456", "connectorId": 1, "targetKwh": 19.5 }
-```
-
-`targetKwh` adalah kWh yang dibeli pengguna — batas energi yang boleh
-disalurkan sesi ini. Field-nya dihilangkan dari body bila tidak
-diketahui, misalnya pada sesi yang dilanjutkan tanpa data pembelian.
-
-Hanya `chargePointId` yang wajib; tanpa itu backend membalas kode `07`.
-
-Response:
-
-```json
-{ "chargePointId": "SIM-456", "connectorId": 1, "state": "starting" }
-```
-
-`state` bernilai `"starting"`, bukan `"charging"`. Controller baru
-meneruskan perintah ke charger; konfirmasi bahwa pengisian berjalan
-datang dari `session` pada `/list` atau dari `/progress`.
-
-## `POST /stop`
-
-Menghentikan sesi yang sedang berjalan.
-
-```json
-{ "chargePointId": "SIM-456", "connectorId": 1 }
-```
-
-`connectorId` disertakan agar perintahnya mengenai konektor yang tepat
-pada charger dengan lebih dari satu konektor.
-
-Response menyertakan `transactionId` sesi yang dihentikan:
-
-```json
-{ "chargePointId": "SIM-456", "connectorId": 1,
-  "transactionId": 1789648927, "state": "stopping" }
-```
-
-Sama seperti `/start`, `"stopping"` berarti perintah diteruskan — bukan
-bahwa daya sudah berhenti mengalir. Karena itu energi akhir dibaca ulang
-lewat `/progress`.
+Melanjutkan sesi orang lain baru benar-benar bisa jalan bila ada cara
+memulihkan `orderId` dari sebuah konektor.
 
 ## Kode `responseCode`
 

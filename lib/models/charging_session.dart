@@ -1,3 +1,4 @@
+import 'billing.dart';
 import 'charge_box.dart';
 import 'connector.dart';
 import 'kwh_price.dart';
@@ -17,6 +18,7 @@ class ChargingSession {
     required this.createdAt,
     this.price,
     this.orderId = '',
+    this.billing,
   });
 
   final ChargeBox chargeBox;
@@ -38,6 +40,29 @@ class ChargingSession {
   /// Identitas order, mis. "ADWTJU5D56QGZNXTTNOX9YZFTN". Kosong pada
   /// sesi yang dilanjutkan dari daftar.
   final String orderId;
+
+  /// Tagihan yang benar-benar dibayar. Terisi setelah kartu ditempelkan
+  /// dan pembayarannya berhasil.
+  final BillingInquiry? billing;
+
+  /// Salinan dengan bukti pembayarannya.
+  ChargingSession paidWith(BillingInquiry billing) => ChargingSession(
+        chargeBox: chargeBox,
+        connector: connector,
+        sessionCode: sessionCode,
+        reference: reference,
+        createdAt: createdAt,
+        price: price,
+        orderId: orderId,
+        billing: billing,
+      );
+
+  /// Yang benar-benar dibayar pengguna.
+  ///
+  /// Tagihan bisa berbeda dari total order — inquiry menambahkan `fee`,
+  /// `idleFee`, dan `serviceFee` — jadi yang dipakai untuk rincian akhir
+  /// adalah angka yang didebit, bukan angka order.
+  int? get paidAmount => billing?.totalAmount ?? price?.rpTotal;
 
   final DateTime createdAt;
 
@@ -93,18 +118,19 @@ class ChargingSession {
   /// Null bila sesi dilanjutkan tanpa data pembelian.
   int? usageCostFor(double energyKwh) {
     final purchase = price;
-    if (purchase == null || purchase.kwh <= 0) return null;
+    final paid = paidAmount;
+    if (purchase == null || paid == null || purchase.kwh <= 0) return null;
     final ratio = (energyKwh / purchase.kwh).clamp(0.0, 1.0);
-    final raw = ratio * purchase.rpTotal;
+    final raw = ratio * paid;
     return (raw ~/ 1000) * 1000;
   }
 
   /// Sisa yang dikembalikan setelah pengisian dihentikan.
   int? refundFor(double energyKwh) {
-    final purchase = price;
+    final paid = paidAmount;
     final usage = usageCostFor(energyKwh);
-    if (purchase == null || usage == null) return null;
-    return purchase.rpTotal - usage;
+    if (paid == null || usage == null) return null;
+    return paid - usage;
   }
 
   /// "2026-09-16 18:40:39"

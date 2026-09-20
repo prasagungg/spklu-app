@@ -23,10 +23,11 @@ import 'payment_success_page.dart';
 /// ada tombol untuk memajukannya: yang memajukan alur adalah tap kartu
 /// itu sendiri, persis seperti di mesin pembayaran sungguhan.
 ///
-/// Begitu kartu terbaca, `POST /transaction/inquiry-billing` menanyakan
-/// tagihan ordernya. Gagal di situ menahan alur: pengguna tidak boleh
-/// maju ke "Pembayaran Berhasil" untuk tagihan yang tidak pernah
-/// terverifikasi.
+/// Begitu kartu terbaca, dua panggilan berurutan:
+/// `POST /transaction/inquiry-billing` menanyakan tagihannya, lalu
+/// `POST /transaction/payment-billing` membayarnya. Gagal di salah
+/// satunya menahan alur — pengguna tidak boleh maju ke "Pembayaran
+/// Berhasil" untuk tagihan yang tidak pernah terbayar.
 ///
 /// Perlu diingat **nomor kartunya tidak dibaca dari kartu**. NFC hanya
 /// memberi nomor seri, bukan nomor uang elektronik, jadi yang dikirim
@@ -123,37 +124,44 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
     unawaited(_settleBilling());
   }
 
-  /// Menanyakan tagihan order ini, lalu maju bila berhasil.
+  /// Menanyakan tagihan order ini lalu membayarnya.
   Future<void> _settleBilling() async {
     final repository = ChargingScope.maybeOf(context)?.repository;
 
-    // Mode offline: tidak ada yang bisa ditanyakan.
+    // Mode offline: tidak ada yang bisa ditagih.
     if (repository == null) {
-      _proceed();
+      _proceed(widget.session);
       return;
     }
 
     setState(() => _inquiring = true);
 
     try {
-      final billing = await repository.inquiryBilling(
+      final inquiry = await repository.inquiryBilling(
         orderId: widget.session.orderId,
       );
       if (!mounted) return;
-      debugPrint('[FLOW] Tagihan: $billing');
-      setState(() => _inquiring = false);
+      debugPrint('[FLOW] Tagihan: $inquiry');
 
-      // Di sinilah panggilan debit dipasang nanti, setelah tagihannya
-      // terverifikasi dan sebelum halaman berpindah.
-      _proceed();
+      // Nominalnya harus persis dari inquiry. Total order pun ditolak
+      // backend sebagai "Amount mismatch" bila berbeda.
+      final paid = await repository.payBilling(
+        orderId: widget.session.orderId,
+        amount: inquiry.totalAmount,
+      );
+      if (!mounted) return;
+      debugPrint('[FLOW] Pembayaran: $paid');
+
+      setState(() => _inquiring = false);
+      _proceed(widget.session.paidWith(paid));
     } on ApiException catch (e) {
       _failBilling(billingErrorMessage(e));
     } on Object catch (e) {
-      _failBilling('Tagihan gagal ditanyakan: $e');
+      _failBilling('Pembayaran gagal diproses: $e');
     }
   }
 
-  void _proceed() {
+  void _proceed(ChargingSession session) {
     _ticker?.cancel();
 
     reportBookingStage(
@@ -165,12 +173,12 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => PaymentSuccessPage(session: widget.session),
+        builder: (_) => PaymentSuccessPage(session: session),
       ),
     );
   }
 
-  /// Tagihannya gagal ditanyakan: kartu dibiarkan bisa ditempelkan lagi.
+  /// Pembayarannya gagal: kartu dibiarkan bisa ditempelkan lagi.
   Future<void> _failBilling(String message) async {
     if (!mounted) return;
 
@@ -228,7 +236,7 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
               // Kesiapan masih diperiksa — tampilannya sama dengan
               // menunggu kartu, jadi layar tidak berkedip.
               null || CardReaderStatus.ready => WaitingPanel(
-                  label: _inquiring ? 'Memeriksa Tagihan' : 'Menunggu Kartu',
+                  label: _inquiring ? 'Memproses Pembayaran' : 'Menunggu Kartu',
                   soft: true,
                 ),
               CardReaderStatus.disabled => const _ReaderNotice(
@@ -246,7 +254,7 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SessionInfoRow(
               // Halaman pembayaran hanya dicapai dari alur pembelian.
-              nominalLabel: formatRupiah(widget.session.price!.rpTotal),
+              nominalLabel: formatRupiah(widget.session.paidAmount ?? 0),
               sessionCode: widget.session.sessionCode,
             ),
           ),

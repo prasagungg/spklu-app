@@ -35,7 +35,10 @@ class _Recorder extends Interceptor {
           '/count-kwh' => countKwhResponse(),
           '/transaction/push-order' => pushOrderResponse(),
           '/transaction/inquiry-billing' => inquiryBillingResponse(),
-          '/progress' => progressResponse(),
+          '/transaction/payment-billing' => paymentBillingResponse(),
+          '/transaction/charging/ongoing-kwh' => ongoingKwhResponse(
+              status: 3,
+            ),
           _ => okResponse,
         },
       ),

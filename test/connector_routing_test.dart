@@ -18,7 +18,9 @@ class _Stub extends Interceptor {
       Response<Map<String, dynamic>>(
         requestOptions: options,
         data: switch (options.path) {
-          '/progress' => progressResponse(),
+          '/transaction/charging/ongoing-kwh' => ongoingKwhResponse(
+              status: 3,
+            ),
           // Status sebenarnya datang dari sini, bukan dari daftar.
           '/status-konektor' => connectorStatusResponse(status: status),
           '/booked-connector' => bookingResponse(),
@@ -26,6 +28,7 @@ class _Stub extends Interceptor {
           '/count-kwh' => countKwhResponse(),
           '/transaction/push-order' => pushOrderResponse(),
           '/transaction/inquiry-billing' => inquiryBillingResponse(),
+          '/transaction/payment-billing' => paymentBillingResponse(),
           _ => listResponse([
               chargeBoxJson(
                 nama: 'CB-SMR-01',

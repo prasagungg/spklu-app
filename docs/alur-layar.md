@@ -56,6 +56,10 @@ dari sesi orang lain (status 2–4) tidak dibooking ulang.
 | `2` | Sudah dibayar, menunggu konektor | `preparing` | ya | Hubungkan Konektor |
 | `3` | Sedang mengisi | `inUse` | ya | Sedang Mengisi |
 | `4` | Pengisian selesai | `finished` | ya | Sedang Mengisi |
+
+Sesi yang dilanjutkan dari daftar **belum bisa dipantau atau
+dihentikan**: endpoint pengisian berkunci `orderId`, dan konektor tidak
+membawanya. Layarnya jatuh ke simulasi lokal.
 | lainnya | Tidak dikenal | `unavailable` | tidak | — |
 
 Konektor yang **bukan** `1` sudah diklaim orang lain, jadi sebelum
@@ -84,11 +88,11 @@ Ini bagian yang paling mudah salah baca.
 | Konektor ditekan | Daftar Konektor | `POST /booked-connector` **R0** mengunci konektor. Ditolak → alur berhenti di sini. |
 | Pilihan kWh ditekan | Pilih Nominal | `POST /count-kwh` menghitung harganya. |
 | "Lanjutkan" | Pilih Nominal | Booking naik ke **R1**, lalu `POST /transaction/push-order` membuat ordernya. |
-| Kartu ditempelkan | Pembayaran Kartu | `POST /transaction/inquiry-billing` menanyakan tagihan. Berhasil → booking naik ke **R2** lalu pindah ke Pembayaran Berhasil; gagal → tetap di sini dan kartu bisa ditempelkan ulang. |
+| Kartu ditempelkan | Pembayaran Kartu | `inquiry-billing` menanyakan tagihan, lalu `payment-billing` membayarnya. Keduanya berhasil → booking naik ke **R2** lalu pindah ke Pembayaran Berhasil; gagal di salah satunya → tetap di sini dan kartu bisa ditempelkan ulang. |
 | "Mulai Pengisian" | Pembayaran Berhasil | **Tidak** mengirim apa pun. Hanya pindah ke Hubungkan Konektor. |
-| "Mulai Pengisian" | Hubungkan Konektor | Booking naik ke **R3**, lalu `POST /start`, lalu pindah ke Sedang Mengisi. |
+| "Mulai Pengisian" | Hubungkan Konektor | Booking naik ke **R3**, lalu `POST /transaction/charging/start`, lalu pindah ke Sedang Mengisi. |
 | Kembali ke daftar sebelum pengisian jalan | mana pun di alur pembelian | `POST /cancelled-connector` melepas konektornya. |
-| "Ya, Akhiri Pengisian" | Akhiri Pengisian? | `POST /stop`, baca energi akhir, lalu Pengisian Selesai. |
+| "Ya, Akhiri Pengisian" | Akhiri Pengisian? | `POST /transaction/charging/stop`, baca energi akhir lewat `ongoing-kwh`, lalu Pengisian Selesai. |
 
 `/start` sengaja dikirim dari **Hubungkan Konektor**, bukan lebih awal,
 supaya perintahnya berangkat sesudah kabel terpasang.
@@ -126,11 +130,11 @@ juga membawa nomor referensi dan kode sesi — bukan perkiraan dari
 ## Dua jalan menuju "Pengisian Selesai"
 
 1. **Pengguna menekan Akhiri Pengisian.** `StopConfirmPage` mengirim
-   `/stop`, lalu membaca `/progress` sampai lima kali sampai `state`
-   menjadi `"finished"` untuk mendapat angka energi yang benar.
-2. **Charger berhenti sendiri**, misalnya karena `targetKwh` tercapai.
-   Polling `/progress` di halaman Sedang Mengisi melihat
-   `state: "finished"` dan langsung pindah.
+   perintah stop, lalu membaca `ongoing-kwh` sampai lima kali sampai
+   statusnya `4` untuk mendapat angka energi yang benar.
+2. **Charger berhenti sendiri**, misalnya karena kWh yang dipesan sudah
+   tersalur. Polling `ongoing-kwh` di halaman Sedang Mengisi melihat
+   status `4` dan langsung pindah.
 
 Keduanya berujung ke `ChargingFinishedPage` dengan angka kWh final.
 

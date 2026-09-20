@@ -81,7 +81,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
           ),
           const SizedBox(height: 16),
           SessionInfoRow(
-            nominalLabel: formatRupiah(price.rpTotal),
+            nominalLabel: formatRupiah(session.paidAmount ?? price.rpTotal),
             sessionCode: session.sessionCode,
           ),
           const SizedBox(height: 16),

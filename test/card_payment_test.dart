@@ -57,16 +57,22 @@ Future<void> pumpPayment(WidgetTester tester, FakeCardReader reader) async {
 
 /// Menjawab inquiry billing; bisa dibuat menolak dengan kode tertentu.
 class _Billing extends Interceptor {
-  _Billing({this.errorCode});
+  _Billing({this.errorCode, this.errorPath, this.totalAmount = 25400});
 
   final String? errorCode;
+
+  /// Hanya path ini yang ditolak; null berarti semuanya.
+  final String? errorPath;
+
+  final int totalAmount;
   final List<RequestOptions> requests = [];
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     requests.add(options);
 
-    if (errorCode != null) {
+    if (errorCode != null &&
+        (errorPath == null || options.path == errorPath)) {
       handler.reject(
         DioException.badResponse(
           statusCode: 400,
@@ -89,7 +95,12 @@ class _Billing extends Interceptor {
         requestOptions: options,
         statusCode: 200,
         data: switch (options.path) {
-          '/transaction/inquiry-billing' => inquiryBillingResponse(),
+          '/transaction/inquiry-billing' => inquiryBillingResponse(
+              totalAmount: totalAmount,
+            ),
+          '/transaction/payment-billing' => paymentBillingResponse(
+              totalAmount: totalAmount,
+            ),
           _ => okResponse,
         },
       ),
@@ -149,6 +160,83 @@ void main() {
         'cardNumber': Env.cardNumber,
       });
       expect(find.byType(PaymentSuccessPage), findsOneWidget);
+    });
+
+    /// Nominalnya harus persis dari inquiry: total order pun ditolak
+    /// backend sebagai "Amount mismatch".
+    testWidgets('pembayaran memakai totalAmount dari inquiry',
+        (tester) async {
+      final reader = FakeCardReader();
+      final billing = _Billing(totalAmount: 145670);
+      await _pumpOnline(tester, reader, billing);
+
+      reader.tap();
+      await settleNetwork(tester);
+
+      final call = billing.requests
+          .firstWhere((r) => r.path == '/transaction/payment-billing');
+      expect(call.data, {
+        'orderId': 'ORDER-1',
+        'amount': 145670,
+        'cardNumber': Env.cardNumber,
+        // Wajib; tanpa itu backend membalas "Missing Field: bankLog".
+        'bankLog': Env.bankLog,
+      });
+      expect(find.byType(PaymentSuccessPage), findsOneWidget);
+    });
+
+    testWidgets('tagihan ditanyakan lebih dulu, baru dibayar',
+        (tester) async {
+      final reader = FakeCardReader();
+      final billing = _Billing();
+      await _pumpOnline(tester, reader, billing);
+
+      reader.tap();
+      await settleNetwork(tester);
+
+      final paths = billing.requests
+          .map((r) => r.path)
+          .where((p) => p.startsWith('/transaction/'))
+          .toList();
+      expect(paths, [
+        '/transaction/inquiry-billing',
+        '/transaction/payment-billing',
+      ]);
+    });
+
+    testWidgets('nominal yang ditolak menahan alur', (tester) async {
+      final reader = FakeCardReader();
+      await _pumpOnline(
+        tester,
+        reader,
+        _Billing(errorCode: '25', errorPath: '/transaction/payment-billing'),
+      );
+
+      reader.tap();
+      await settleNetwork(tester);
+
+      expect(find.byType(PaymentSuccessPage), findsNothing);
+      expect(
+        find.textContaining('Nominal tagihan tidak cocok'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('pembayaran gagal tidak menghitungnya sebagai dibayar',
+        (tester) async {
+      final reader = FakeCardReader();
+      await _pumpOnline(
+        tester,
+        reader,
+        _Billing(errorCode: '24', errorPath: '/transaction/payment-billing'),
+      );
+
+      reader.tap();
+      await settleNetwork(tester);
+
+      expect(find.textContaining('Transaksi ditolak'), findsOneWidget);
+      // Kartu bisa ditempelkan lagi.
+      expect(reader.isWaiting, isTrue);
     });
 
     /// Maju ke "Pembayaran Berhasil" untuk tagihan yang tidak pernah
