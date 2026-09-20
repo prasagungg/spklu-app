@@ -6,7 +6,7 @@ flutter test test/host_test.dart
 dart analyze lib test
 ```
 
-Suite-nya 168 test di 26 berkas dan berjalan sekitar lima detik. Tidak
+Suite-nya 187 test di 28 berkas dan berjalan sekitar lima detik. Tidak
 ada yang menyentuh jaringan.
 
 ## Cara test menghindari jaringan
@@ -112,6 +112,8 @@ ikut dijalankan sebagai suite.
 | `api_config_page_test.dart` | Isian awal, pratinjau alamat, uji koneksi gagal/berhasil, penyimpanan, tombol roda gigi |
 | `card_payment_test.dart` | Tap kartu memajukan alur, tap berulang hanya dihitung sekali, sesi NFC ditutup, keadaan NFC mati dan tanpa NFC |
 | `widget_test.dart` | Render daftar charge box dan data dummy |
+| `nominal_page_test.dart` | Pilihan dari `/list-kwh`, tidak ada yang terpilih di awal, perhitungan lewat `/count-kwh`, dan rincian harga yang tampil |
+| `booking_test.dart` | R0 mengunci konektor dan menghentikan alur saat ditolak, urutan tahap R0→R1→R2→R3, serta pelepasan konektor saat alur ditinggalkan |
 | `connector_sheet_test.dart` | Status ditanyakan sekali per konektor saat sheet dibuka, status daftar ditimpa hasilnya, label tiap status, dan tidak ada polling |
 | `charge_box_list_render_test.dart` | Dua charge box dari `/list` keduanya tampil |
 | `charge_box_reload_test.dart` | `/list` dipanggil ulang tiap kembali ke daftar |

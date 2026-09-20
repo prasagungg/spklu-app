@@ -1,13 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kossotrik/data/demo_data.dart';
 import 'package:kossotrik/models/charging_session.dart';
+import 'package:kossotrik/models/kwh_price.dart';
 
 ChargingSession _session() {
   final box = DemoData.chargeBoxes[3];
   return ChargingSession.demo(
     chargeBox: box,
     connector: box.connectors.first,
-    nominal: DemoData.nominals[1], // Rp50.000 / 19,5 kWh
+    // Rp50.000 untuk 19,5 kWh — angka bulat supaya pembulatan
+    // tagihan ke bawah mudah dibaca.
+    price: const KwhPrice(kwh: 19.5, rpTotal: 50000),
     now: DateTime(2026, 9, 16, 18, 40, 39),
   );
 }

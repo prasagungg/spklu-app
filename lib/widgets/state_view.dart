@@ -8,7 +8,7 @@ import '../theme/app_theme.dart';
 class StateView extends StatelessWidget {
   const StateView({
     super.key,
-    required this.icon,
+    this.icon,
     required this.title,
     required this.message,
     this.onRetry,
@@ -22,6 +22,7 @@ class StateView extends StatelessWidget {
         onRetry = null,
         retryLabel = '';
 
+  /// Null menggantinya dengan spinner.
   final IconData? icon;
   final String title;
   final String message;

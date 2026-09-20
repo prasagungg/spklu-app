@@ -42,9 +42,9 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    // Halaman ini hanya dicapai lewat alur pembelian, jadi nominalnya
+    // Halaman ini hanya dicapai lewat alur pembelian, jadi harganya
     // dipastikan ada.
-    final nominal = session.nominal!;
+    final price = session.price!;
 
     return PageScaffold(
       backgroundColor: AppColors.pageBackgroundPlain,
@@ -81,7 +81,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
           ),
           const SizedBox(height: 16),
           SessionInfoRow(
-            nominalLabel: formatRupiah(nominal.amount),
+            nominalLabel: formatRupiah(price.rpTotal),
             sessionCode: session.sessionCode,
           ),
           const SizedBox(height: 16),
@@ -168,9 +168,9 @@ class _TransactionDetail extends StatelessWidget {
                   muted: true,
                 ),
                 const SizedBox(height: 12),
-                CostRows(nominal: session.nominal!),
+                CostRows(price: session.price!),
                 const SizedBox(height: 12),
-                TotalRow(amount: session.nominal!.total),
+                TotalRow(amount: session.price!.rpTotal),
               ],
             ),
             crossFadeState: expanded

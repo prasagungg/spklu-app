@@ -21,6 +21,9 @@ class _Stub extends Interceptor {
           '/progress' => progressResponse(),
           // Status sebenarnya datang dari sini, bukan dari daftar.
           '/status-konektor' => connectorStatusResponse(status: status),
+          '/booked-connector' => bookingResponse(),
+          '/list-kwh' => kwhOptionsResponse(),
+          '/count-kwh' => countKwhResponse(),
           _ => listResponse([
               chargeBoxJson(
                 nama: 'CB-SMR-01',

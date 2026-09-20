@@ -72,6 +72,80 @@ Map<String, dynamic> connectorStatusResponse({
       },
     };
 
+/// Amplop `GET /list-kwh`.
+Map<String, dynamic> kwhOptionsResponse([List<num> list = const [10, 20, 30]]) =>
+    {
+      'responseCode': '00',
+      'responseMessage': 'Success',
+      'data': {'list': list},
+    };
+
+/// Amplop `POST /count-kwh`.
+Map<String, dynamic> countKwhResponse({
+  num kwh = 10,
+  int rpTotal = 27135,
+  String chargeBoxId = 'CB-SMR-01',
+  String connectorId = '1',
+}) =>
+    {
+      'responseCode': '00',
+      'responseMessage': 'Success',
+      'data': {
+        'chargeBoxId': chargeBoxId,
+        'connectorId': connectorId,
+        'kwh': kwh,
+        'rpJaminanSpklu': 0,
+        'rpAdmin': 0,
+        'rpDiskon': 0,
+        'rpPerKwh': 2466.78,
+        'rpPpj': 2467,
+        'rpPpn': 0,
+        'rpTotal': rpTotal,
+        'rpLayanan': 0,
+        'rpMaterai': 0,
+        'idleFee': 0,
+      },
+    };
+
+/// Amplop `POST /booked-connector`.
+///
+/// [accepted] mengisi field `status`: konektornya bersedia atau tidak.
+Map<String, dynamic> bookingResponse({
+  bool accepted = true,
+  String stage = 'R0',
+  String chargeBoxId = 'CB-SMR-01',
+  String connectorId = '1',
+}) =>
+    {
+      'responseCode': '00',
+      'responseMessage': 'Success',
+      'data': {
+        'chargeBoxId': chargeBoxId,
+        'chargeBoxName': 'Kempower Satellite 200 kW',
+        'connectorName': 'Gun $connectorId',
+        'connectorId': connectorId,
+        'connectorStatus': stage,
+        'status': accepted,
+      },
+    };
+
+/// Amplop `POST /cancelled-connector`.
+Map<String, dynamic> cancellationResponse({
+  String chargeBoxId = 'CB-SMR-01',
+  String connectorId = '1',
+}) =>
+    {
+      'responseCode': '00',
+      'responseMessage': 'Success',
+      'data': {
+        'chargeBoxId': chargeBoxId,
+        'chargeBoxName': 'Kempower Satellite 200 kW',
+        'connectorName': 'Gun $connectorId',
+        'connectorId': connectorId,
+        'statusMessage': 'Connector Cancelled',
+      },
+    };
+
 /// Amplop `GET /progress` untuk sesi yang sedang berjalan.
 Map<String, dynamic> progressResponse({
   String chargeBoxId = 'CB-SMR-01',

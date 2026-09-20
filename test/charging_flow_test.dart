@@ -54,8 +54,19 @@ void main() {
     await tester.tap(find.text('Gun 1'));
     await tester.pumpAndSettle();
 
-    // 3. Pilih Nominal — Rp50.000 sudah terpilih sejak awal.
+    // 3. Pilih Nominal — tidak ada yang tercentang sejak awal, jadi
+    // rincian harga baru muncul setelah salah satu ditekan.
     expect(find.text('Pilih Nominal'), findsOneWidget);
+    expect(find.text('Rincian Harga'), findsNothing);
+    expect(
+      tester.widget<PrimaryButton>(
+        find.widgetWithText(PrimaryButton, 'Lanjutkan'),
+      ).onPressed,
+      isNull,
+    );
+
+    await tester.tap(find.text('10,0 kWh'));
+    await tester.pumpAndSettle();
     expect(find.text('Rincian Harga'), findsOneWidget);
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
@@ -146,6 +157,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
     await tester.pumpAndSettle();
+    // Tidak ada pilihan yang tercentang sejak awal.
+    await tester.tap(find.text('10,0 kWh'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Konfirmasi & Bayar'));
@@ -181,6 +195,9 @@ void main() {
     await tester.tap(find.text('04'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
+    await tester.pumpAndSettle();
+    // Tidak ada pilihan yang tercentang sejak awal.
+    await tester.tap(find.text('10,0 kWh'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
@@ -227,6 +244,9 @@ void main() {
     await tester.pumpAndSettle();
     await expectHome('Pilih Nominal');
 
+    // Tidak ada pilihan yang tercentang sejak awal.
+    await tester.tap(find.text('10,0 kWh'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
     await expectHome('Konfirmasi Pengisian');
@@ -266,6 +286,9 @@ void main() {
     await tester.tap(find.text('04'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
+    await tester.pumpAndSettle();
+    // Tidak ada pilihan yang tercentang sejak awal.
+    await tester.tap(find.text('10,0 kWh'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();

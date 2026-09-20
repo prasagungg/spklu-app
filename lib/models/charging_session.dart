@@ -1,6 +1,6 @@
 import 'charge_box.dart';
 import 'connector.dart';
-import 'nominal_option.dart';
+import 'kwh_price.dart';
 
 /// Satu sesi pengisian yang dibawa dari halaman konfirmasi sampai
 /// halaman "Pengisian Dimulai".
@@ -14,16 +14,18 @@ class ChargingSession {
     required this.sessionCode,
     required this.reference,
     required this.createdAt,
-    this.nominal,
+    this.price,
   });
 
   final ChargeBox chargeBox;
   final Connector connector;
 
+  /// Rincian harga yang dibeli pengguna.
+  ///
   /// Null untuk sesi yang dilanjutkan dari daftar charge box: aplikasi
   /// tidak tahu berapa yang dibayarkan pengguna sebelumnya, jadi baris
   /// pembayaran disembunyikan alih-alih menampilkan angka karangan.
-  final NominalOption? nominal;
+  final KwhPrice? price;
 
   /// Kode yang diperlukan pengguna untuk mengakhiri sesi, mis. "29".
   final String sessionCode;
@@ -54,13 +56,13 @@ class ChargingSession {
   factory ChargingSession.demo({
     required ChargeBox chargeBox,
     required Connector connector,
-    required NominalOption nominal,
+    required KwhPrice price,
     required DateTime now,
   }) {
     return ChargingSession(
       chargeBox: chargeBox,
       connector: connector,
-      nominal: nominal,
+      price: price,
       sessionCode: '29',
       reference: '93CHROVO27092418401',
       createdAt: now,
@@ -74,7 +76,7 @@ class ChargingSession {
   String get jenisLayanan => 'EV Charging';
 
   /// Apakah sesi ini punya data pembelian.
-  bool get hasPurchase => nominal != null;
+  bool get hasPurchase => price != null;
 
   /// Biaya pemakaian untuk [energyKwh] yang sudah tersalur, dihitung
   /// proporsional terhadap kWh yang dibeli lalu dibulatkan ke bawah per
@@ -83,19 +85,19 @@ class ChargingSession {
   ///
   /// Null bila sesi dilanjutkan tanpa data pembelian.
   int? usageCostFor(double energyKwh) {
-    final purchase = nominal;
+    final purchase = price;
     if (purchase == null || purchase.kwh <= 0) return null;
     final ratio = (energyKwh / purchase.kwh).clamp(0.0, 1.0);
-    final raw = ratio * purchase.amount;
+    final raw = ratio * purchase.rpTotal;
     return (raw ~/ 1000) * 1000;
   }
 
   /// Sisa yang dikembalikan setelah pengisian dihentikan.
   int? refundFor(double energyKwh) {
-    final purchase = nominal;
+    final purchase = price;
     final usage = usageCostFor(energyKwh);
     if (purchase == null || usage == null) return null;
-    return purchase.amount - usage;
+    return purchase.rpTotal - usage;
   }
 
   /// "2026-09-16 18:40:39"

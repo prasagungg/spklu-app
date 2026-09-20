@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import 'active_booking.dart';
 import 'charge_point_repository.dart';
 
 /// Menyediakan akses backend ke seluruh alur pengisian tanpa harus
@@ -17,6 +18,11 @@ class ChargingScope extends InheritedWidget {
   }) : repository = repository ?? ChargePointRepository();
 
   final ChargePointRepository repository;
+
+  /// Booking konektor yang sedang dipegang. Dipasang di sini — bukan
+  /// sebagai variabel global — supaya tiap aplikasi dan tiap test punya
+  /// miliknya sendiri.
+  final ActiveBooking booking = ActiveBooking();
 
   static ChargingScope? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<ChargingScope>();

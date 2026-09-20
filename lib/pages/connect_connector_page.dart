@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../data/booking_progress.dart';
 import '../data/charge_point_repository.dart';
 import '../data/charging_scope.dart';
+import '../models/booking.dart';
 import '../models/charging_session.dart';
 import '../services/api_exception.dart';
 import '../theme/app_colors.dart';
@@ -90,6 +92,14 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
     );
 
     if (_starting) return;
+
+    reportBookingStage(
+      context,
+      chargeBoxId: widget.session.chargeBox.id,
+      connectorId: widget.session.connector.id,
+      stage: BookingStage.starting,
+    );
+
     final scope = ChargingScope.maybeOf(context);
 
     if (scope == null) {
@@ -107,12 +117,16 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
           chargePointId: widget.session.chargeBox.id,
           connectorId: widget.session.connector.id,
           // kWh yang dibeli pengguna pada halaman Pilih Nominal.
-          targetKwh: widget.session.nominal?.kwh,
+          targetKwh: widget.session.price?.kwh,
         );
         // Controller hanya meneruskan perintah; konfirmasi pengisian
         // benar-benar jalan datang dari GET /progress yang dipantau
         // halaman status.
         debugPrint('Perintah start diterima: $result');
+
+        // Konektornya sekarang sedang dipakai, bukan sekadar dipesan —
+        // kembalinya pengguna ke daftar tidak boleh melepasnya.
+        scope.booking.forget();
       } on ApiException catch (e) {
         if (!mounted) return;
         setState(() => _starting = false);

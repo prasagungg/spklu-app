@@ -87,24 +87,19 @@ void main() {
       expect(dc.isAvailable, isTrue);
     });
 
-    test('nominal menghitung total dari rincian biayanya', () {
-      final nominal = DemoData.nominals[1];
-
-      expect(nominal.amount, 50000);
-      expect(nominal.total, 50000);
-      expect(
-        nominal.total,
-        nominal.electricityCost +
-            nominal.pbjtTl +
-            nominal.ppn +
-            nominal.serviceFee,
-      );
+    test('pilihan kWh offline mengikuti bentuk /list-kwh', () {
+      expect(DemoData.kwhOptions, [10, 20, 30]);
     });
 
-    test('setiap nominal totalnya sama dengan nilai yang dipilih', () {
-      for (final nominal in DemoData.nominals) {
-        expect(nominal.total, nominal.amount, reason: 'Rp${nominal.amount}');
-      }
+    /// Harga tiruan hanya dipakai saat tidak ada ChargingScope; di
+    /// aplikasi sungguhan semua angkanya dari `POST /count-kwh`.
+    test('harga tiruan naik seiring kWh yang dipilih', () {
+      final murah = DemoData.priceFor(10);
+      final mahal = DemoData.priceFor(30);
+
+      expect(murah.kwh, 10);
+      expect(mahal.rpTotal, greaterThan(murah.rpTotal));
+      expect(murah.rpPerKwh, mahal.rpPerKwh);
     });
   });
 }

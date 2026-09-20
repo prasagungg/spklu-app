@@ -16,7 +16,13 @@ class _Counter extends Interceptor {
     handler.resolve(
       Response<Map<String, dynamic>>(
         requestOptions: options,
-        data: options.path == '/list-chargerbox' ? _list : _ok,
+        data: switch (options.path) {
+          '/list-chargerbox' => _list,
+          '/booked-connector' => bookingResponse(),
+          '/list-kwh' => kwhOptionsResponse(),
+          '/count-kwh' => countKwhResponse(),
+          _ => _ok,
+        },
         statusCode: 200,
       ),
     );
@@ -63,6 +69,9 @@ void main() {
     await tester.tap(find.text('01'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
+    await tester.pumpAndSettle();
+    // Tidak ada pilihan yang tercentang sejak awal.
+    await tester.tap(find.text('10,0 kWh'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();

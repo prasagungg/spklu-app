@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../data/booking_progress.dart';
 import '../data/card_reader_scope.dart';
 import '../data/formatters.dart';
+import '../models/booking.dart';
 import '../models/charging_session.dart';
 import '../services/card_reader.dart';
 import '../theme/app_colors.dart';
@@ -108,6 +110,13 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
     unawaited(_reader?.stop());
     _ticker?.cancel();
 
+    reportBookingStage(
+      context,
+      chargeBoxId: widget.session.chargeBox.id,
+      connectorId: widget.session.connector.id,
+      stage: BookingStage.paid,
+    );
+
     // Di sinilah panggilan debit ke backend pembayaran dipasang nanti,
     // sebelum halaman berpindah.
     Navigator.of(context).pushReplacement(
@@ -176,7 +185,7 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SessionInfoRow(
               // Halaman pembayaran hanya dicapai dari alur pembelian.
-              nominalLabel: formatRupiah(widget.session.nominal!.amount),
+              nominalLabel: formatRupiah(widget.session.price!.rpTotal),
               sessionCode: widget.session.sessionCode,
             ),
           ),

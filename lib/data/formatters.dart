@@ -9,6 +9,19 @@ String formatRupiah(int amount) {
   return 'Rp${buffer.toString()}';
 }
 
+/// Tarif pecahan: 2466.78 -> "Rp2.466,78".
+///
+/// Dipakai untuk tarif per kWh, satu-satunya angka rupiah dari backend
+/// yang bukan bilangan bulat.
+String formatRupiahDecimal(double amount) {
+  final whole = formatRupiah(amount.abs().truncate());
+  final cents = ((amount.abs() - amount.abs().truncate()) * 100).round();
+
+  return cents == 0
+      ? whole
+      : '$whole,${cents.toString().padLeft(2, '0')}';
+}
+
 /// 19.5 -> "19,5 kWh" (koma desimal, gaya Indonesia).
 ///
 /// Dipakai untuk nilai yang memang dalam satuan kWh, mis. kWh yang

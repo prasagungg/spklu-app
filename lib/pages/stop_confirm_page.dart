@@ -169,7 +169,7 @@ class _StopConfirmPageState extends State<StopConfirmPage> {
                       children: [
                         DetailRow(
                           label: 'Pembayaran Awal',
-                          value: formatRupiah(session.nominal!.amount),
+                          value: formatRupiah(session.price!.rpTotal),
                           muted: true,
                         ),
                         const SizedBox(height: 12),

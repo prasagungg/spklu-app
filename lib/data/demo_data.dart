@@ -1,6 +1,6 @@
 import '../models/charge_box.dart';
 import '../models/connector.dart';
-import '../models/nominal_option.dart';
+import '../models/kwh_price.dart';
 
 /// Data dummy untuk demo.
 ///
@@ -107,13 +107,24 @@ class DemoData {
     ),
   ];
 
-  static const List<NominalOption> nominals = [
-    // Sengaja hanya 1 kWh: dipakai untuk menguji apakah charger benar
-    // berhenti sendiri saat mencapai targetKwh, tanpa perlu mengisi
-    // sampai puluhan kWh.
-    NominalOption(amount: 20000, kwh: 1, electricityCost: 18500, pbjtTl: 1500),
-    NominalOption(amount: 50000, kwh: 19.5, electricityCost: 48500, pbjtTl: 1500),
-    NominalOption(amount: 100000, kwh: 39.0, electricityCost: 98500, pbjtTl: 1500),
-    NominalOption(amount: 150000, kwh: 58.5, electricityCost: 148500, pbjtTl: 1500),
-  ];
+  /// Pilihan kWh untuk mode offline, mengikuti `GET /list-kwh`.
+  static const List<double> kwhOptions = [10, 20, 30];
+
+  /// Rincian harga tiruan untuk mode offline.
+  ///
+  /// Angkanya mengikuti bentuk `POST /count-kwh`, dengan tarif per kWh
+  /// yang sama seperti playground. Hanya dipakai bila tidak ada
+  /// ChargingScope — di aplikasi sungguhan harganya selalu dari backend.
+  static KwhPrice priceFor(double kwh) {
+    const ratePerKwh = 2466.78;
+    const ppj = 2467;
+    final energy = (kwh * ratePerKwh).round();
+
+    return KwhPrice(
+      kwh: kwh,
+      rpPerKwh: ratePerKwh,
+      rpPpj: ppj,
+      rpTotal: energy + ppj,
+    );
+  }
 }

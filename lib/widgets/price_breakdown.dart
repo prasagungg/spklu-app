@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/formatters.dart';
-import '../models/nominal_option.dart';
+import '../models/kwh_price.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
@@ -88,32 +88,36 @@ class TotalRow extends StatelessWidget {
   }
 }
 
-/// Lima baris biaya yang sama di halaman Nominal, Konfirmasi, dan
+/// Rincian biaya yang sama di halaman Nominal, Konfirmasi, dan
 /// Pembayaran Berhasil.
+///
+/// Setiap angka datang langsung dari `POST /count-kwh`. Tidak ada yang
+/// dihitung di sini — termasuk biaya energi, yang sengaja tidak
+/// diturunkan dari kWh dikali tarif supaya tidak pernah berselisih
+/// dengan total dari backend.
 class CostRows extends StatelessWidget {
-  const CostRows({super.key, required this.nominal});
+  const CostRows({super.key, required this.price});
 
-  final NominalOption nominal;
+  final KwhPrice price;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        DetailRow(label: 'Total kWh dibeli', value: formatKwh(nominal.kwh)),
+        DetailRow(label: 'Total kWh dibeli', value: formatKwh(price.kwh)),
         const SizedBox(height: 12),
         DetailRow(
-          label: 'Biaya Listrik',
-          value: formatRupiah(nominal.electricityCost),
+          label: 'Tarif per kWh',
+          value: formatRupiahDecimal(price.rpPerKwh),
         ),
         const SizedBox(height: 12),
-        DetailRow(label: 'PBJT-TL', value: formatRupiah(nominal.pbjtTl)),
+        DetailRow(label: 'PPJ-TL', value: formatRupiah(price.rpPpj)),
         const SizedBox(height: 12),
-        DetailRow(label: 'Biaya PPN', value: formatRupiah(nominal.ppn)),
-        const SizedBox(height: 12),
-        DetailRow(
-          label: 'Biaya Layanan',
-          value: formatRupiah(nominal.serviceFee),
-        ),
+        DetailRow(label: 'Biaya PPN', value: formatRupiah(price.rpPpn)),
+        for (final row in price.extraCharges) ...[
+          const SizedBox(height: 12),
+          DetailRow(label: row.label, value: formatRupiah(row.amount)),
+        ],
       ],
     );
   }

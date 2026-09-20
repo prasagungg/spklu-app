@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kossotrik/data/card_reader_scope.dart';
 import 'package:kossotrik/data/demo_data.dart';
 import 'package:kossotrik/models/charging_session.dart';
+import 'package:kossotrik/models/kwh_price.dart';
 import 'package:kossotrik/pages/card_payment_page.dart';
 import 'package:kossotrik/pages/payment_success_page.dart';
 import 'package:kossotrik/services/card_reader.dart';
@@ -16,7 +17,7 @@ ChargingSession _session() {
   return ChargingSession.demo(
     chargeBox: box,
     connector: box.connectors.first,
-    nominal: DemoData.nominals[1],
+    price: const KwhPrice(kwh: 19.5, rpTotal: 50000),
     now: DateTime(2026, 9, 16, 18, 40, 39),
   );
 }

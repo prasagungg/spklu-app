@@ -54,7 +54,13 @@ void main() {
   testWidgets('menekan Mulai Pengisian benar-benar mengirim POST /start',
       (tester) async {
     final recorder = _Recorder(
-      (path) => path == '/list-chargerbox' ? _list() : _ok,
+      (path) => switch (path) {
+        '/list-chargerbox' => _list(),
+        '/booked-connector' => bookingResponse(),
+        '/list-kwh' => kwhOptionsResponse(),
+        '/count-kwh' => countKwhResponse(),
+        _ => _ok,
+      },
     );
     final repo = ChargePointRepository(
       client: ApiClient.withDio(Dio()..interceptors.add(recorder)),
@@ -83,6 +89,9 @@ void main() {
     await tester.tap(find.text('Gun 1'));
     await tester.pumpAndSettle();
 
+    // Tidak ada pilihan yang tercentang sejak awal.
+    await tester.tap(find.text('10,0 kWh'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Konfirmasi & Bayar'));
@@ -120,7 +129,7 @@ void main() {
     expect(starts.single.data, {
       'chargePointId': 'CB-SMR-01',
       'connectorId': 1,
-      'targetKwh': 19.5,
+      'targetKwh': 10.0,
     });
 
     // Beri waktu transisi rute selesai sebelum memeriksa halaman status.
@@ -135,6 +144,9 @@ void main() {
 
     final recorder = _Recorder((path) {
       if (path == '/list-chargerbox') return _list();
+      if (path == '/booked-connector') return bookingResponse();
+      if (path == '/list-kwh') return kwhOptionsResponse();
+      if (path == '/count-kwh') return countKwhResponse();
       if (path == '/progress') {
         return {
           'responseCode': '00',
@@ -174,6 +186,9 @@ void main() {
     await tester.tap(find.text('01'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
+    await tester.pumpAndSettle();
+    // Tidak ada pilihan yang tercentang sejak awal.
+    await tester.tap(find.text('10,0 kWh'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
@@ -232,6 +247,9 @@ void main() {
       (tester) async {
     final recorder = _Recorder((path) {
       if (path == '/list-chargerbox') return _list();
+      if (path == '/booked-connector') return bookingResponse();
+      if (path == '/list-kwh') return kwhOptionsResponse();
+      if (path == '/count-kwh') return countKwhResponse();
       if (path == '/progress') {
         return {
           'responseCode': '00',
@@ -266,6 +284,9 @@ void main() {
     await tester.tap(find.text('01'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
+    await tester.pumpAndSettle();
+    // Tidak ada pilihan yang tercentang sejak awal.
+    await tester.tap(find.text('10,0 kWh'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();

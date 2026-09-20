@@ -3,7 +3,9 @@ import 'package:dio/dio.dart';
 import '../config/env.dart';
 import '../models/charge_box.dart';
 import '../models/backend_status.dart';
+import '../models/booking.dart';
 import '../models/command_result.dart';
+import '../models/kwh_price.dart';
 import '../models/session_info.dart';
 import '../models/spklu.dart';
 import '../services/api_client.dart';
@@ -127,6 +129,123 @@ class ChargePointRepository {
     final data = _unwrap(json);
 
     return BackendStatus.parse(data?['connectorStatus']);
+  }
+
+  /// `GET /list-kwh`
+  ///
+  /// Pilihan kWh yang bisa dibeli, mis. `[10, 20, 30]`.
+  Future<List<double>> fetchKwhOptions({CancelToken? cancelToken}) async {
+    final json = await _client.get<Map<String, dynamic>>(
+      '/list-kwh',
+      cancelToken: cancelToken,
+    );
+    final data = _unwrap(json);
+    final list = data?['list'];
+
+    if (list is! List) return const [];
+
+    return [
+      for (final value in list)
+        if (value is num) value.toDouble(),
+    ];
+  }
+
+  /// `POST /count-kwh`
+  ///
+  /// Rincian harga untuk [kwh] pada konektor tertentu. Backend yang
+  /// menghitung; aplikasi hanya menampilkan.
+  ///
+  /// ```json
+  /// { "chargeBoxId": "CB-SMR-01", "connectorId": "1", "kwh": 10 }
+  /// ```
+  Future<KwhPrice> countKwh({
+    required String chargeBoxId,
+    required int connectorId,
+    required double kwh,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/count-kwh',
+      body: {
+        'chargeBoxId': chargeBoxId,
+        'connectorId': connectorId.toString(),
+        // Pilihan selalu bulat; dikirim sebagai angka, bukan teks.
+        'kwh': kwh == kwh.roundToDouble() ? kwh.round() : kwh,
+      },
+      cancelToken: cancelToken,
+    );
+
+    return KwhPrice.fromJson(_unwrap(json));
+  }
+
+  /// `POST /booked-connector`
+  ///
+  /// Mengunci konektor atas nama pengguna yang sedang memakai unit ini,
+  /// lalu menaikkan tahapnya seiring alur pembelian.
+  ///
+  /// ```json
+  /// { "chargeBoxId": "CB-SMR-01", "connectorId": "1",
+  ///   "connectorStatus": "R0" }
+  /// ```
+  ///
+  /// [BookingStage.selected] yang dibalas
+  /// [BookingResult.accepted] false berarti konektornya sudah diambil
+  /// orang lain. Tahap berikutnya selalu dibalas false dan itu wajar —
+  /// lihat [BookingResult.accepted].
+  ///
+  /// Konektor yang tidak dikenal, dan kode tahap di luar R0–R3, dibalas
+  /// 404.
+  Future<BookingResult> bookConnector({
+    required String chargeBoxId,
+    required int connectorId,
+    required BookingStage stage,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/booked-connector',
+      body: {
+        'chargeBoxId': chargeBoxId,
+        // Backend memakai teks untuk nomor konektor, seperti di daftar.
+        'connectorId': connectorId.toString(),
+        'connectorStatus': stage.code,
+      },
+      cancelToken: cancelToken,
+    );
+
+    return BookingResult.fromJson(_unwrap(json));
+  }
+
+  /// `POST /cancelled-connector`
+  ///
+  /// Melepas booking sehingga konektornya bisa diambil orang lain lagi.
+  ///
+  /// ```json
+  /// { "chargeBoxId": "CB-SMR-01", "connectorId": "1",
+  ///   "connectorStatus": "R0" }
+  /// ```
+  ///
+  /// [stage] wajib disertakan — tanpa `connectorStatus` backend membalas
+  /// [ChargeErrorCode.missingField]. Nilainya sendiri tidak menentukan
+  /// apa pun: booking di tahap mana pun terlepas, dan membatalkan
+  /// konektor yang memang tidak dibooking tetap dibalas sukses. Konektor
+  /// yang tidak dikenal dibalas 404.
+  Future<CancellationResult> cancelConnector({
+    required String chargeBoxId,
+    required int connectorId,
+    BookingStage stage = BookingStage.selected,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/cancelled-connector',
+      body: {
+        'chargeBoxId': chargeBoxId,
+        'connectorId': connectorId.toString(),
+        'connectorStatus': stage.code,
+      },
+      cancelToken: cancelToken,
+    );
+
+    return CancellationResult.fromJson(_unwrap(json));
   }
 
   /// `GET /progress?chargePointId=…&connectorId=…`

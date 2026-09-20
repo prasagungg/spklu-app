@@ -77,7 +77,7 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
   void _tick() {
     if (!mounted) return;
     // Tanpa data pembelian, simulasi offline dibatasi nilai wajar.
-    final max = widget.session.nominal?.kwh ?? 20;
+    final max = widget.session.price?.kwh ?? 20;
     if (_simulatedKwh >= max) {
       _ticker?.cancel();
       return;

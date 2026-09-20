@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../app_route_observer.dart';
 import '../data/charge_point_repository.dart';
 import '../data/charging_scope.dart';
 import '../models/charge_box.dart';
+import '../models/booking.dart';
 import '../models/charging_session.dart';
 import '../models/connector.dart';
 import '../services/api_exception.dart';
@@ -82,7 +85,42 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
   @override
   void didPopNext() {
     debugPrint('[FLOW] Kembali ke Pilih Charge Box — memuat ulang daftar');
+    // Pengguna sampai di sini berarti ia keluar dari alur pembelian.
+    // Booking yang masih dipegang harus dilepas, kalau tidak
+    // konektornya terkunci selamanya.
+    unawaited(_cancelAbandonedBooking());
     _load();
+  }
+
+  /// Melepas booking yang ditinggalkan pengguna.
+  ///
+  /// Tidak melakukan apa-apa bila pengisian sudah dimulai: sejak
+  /// `/start` berhasil, [ActiveBooking] dilupakan, jadi kembalinya
+  /// pengguna ke daftar tidak membatalkan sesi yang sedang jalan.
+  ///
+  /// Kegagalannya hanya dicatat. Pengguna sudah pergi dari alur itu;
+  /// memunculkan error atas sesuatu yang tidak ia minta hanya
+  /// membingungkan.
+  Future<void> _cancelAbandonedBooking() async {
+    final scope = ChargingScope.maybeOf(context);
+    final booking = scope?.booking;
+    if (scope == null || booking == null || !booking.isHeld) return;
+
+    final chargeBoxId = booking.chargeBoxId!;
+    final connectorId = booking.connectorId!;
+    final stage = booking.stage;
+    booking.forget();
+
+    try {
+      final result = await scope.repository.cancelConnector(
+        chargeBoxId: chargeBoxId,
+        connectorId: connectorId,
+        stage: stage,
+      );
+      debugPrint('[FLOW] Booking ditinggalkan, dilepas: $result');
+    } on Object catch (e) {
+      debugPrint('[FLOW] Booking gagal dilepas: $e');
+    }
   }
 
   /// Memuat daftar. Data lama dipertahankan selama pemuatan berlangsung
@@ -141,6 +179,11 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
         ),
       );
       if (verified != true || !mounted) return;
+    } else {
+      // Konektor bebas: kunci dulu atas nama pengguna ini sebelum ia
+      // menghabiskan waktu memilih nominal dan membayar.
+      final booked = await _book(box, connector);
+      if (!booked || !mounted) return;
     }
 
     // Tujuannya ditentukan status konektor: yang masih bebas memulai
@@ -175,6 +218,52 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
       MaterialPageRoute<void>(builder: (_) => destination),
     );
     // Pemuatan ulang ditangani didPopNext saat rute di atas ditutup.
+  }
+
+  /// Mengunci konektor lewat `POST /booked-connector` tahap R0.
+  ///
+  /// Mengembalikan false bila konektornya baru saja diambil orang lain
+  /// atau permintaannya gagal — dua-duanya berarti alur tidak boleh
+  /// lanjut. Tanpa repository (mode offline untuk test) langsung
+  /// dianggap berhasil.
+  Future<bool> _book(ChargeBox box, Connector connector) async {
+    final repository = _repository;
+    if (repository == null) return true;
+
+    // Diambil sebelum await: sesudahnya context belum tentu masih hidup.
+    final booking = ChargingScope.maybeOf(context)?.booking;
+
+    try {
+      final result = await repository.bookConnector(
+        chargeBoxId: box.id,
+        connectorId: connector.id,
+        stage: BookingStage.selected,
+      );
+      debugPrint('[FLOW] Booking R0: $result');
+      if (result.accepted) {
+        booking?.hold(chargeBoxId: box.id, connectorId: connector.id);
+        return true;
+      }
+    } on ApiException catch (e) {
+      _complain(e.message);
+      return false;
+    } on Object catch (e) {
+      _complain('Konektor gagal dipesan: $e');
+      return false;
+    }
+
+    _complain(
+      '${connector.name} baru saja diambil pengguna lain. '
+      'Silakan pilih konektor lain.',
+    );
+    // Daftarnya sudah basi kalau konektor ini ternyata sudah terpakai.
+    _load();
+    return false;
+  }
+
+  void _complain(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   /// Sesi tanpa data pembelian — aplikasi tidak tahu berapa yang sudah

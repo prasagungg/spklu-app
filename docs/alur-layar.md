@@ -44,6 +44,12 @@ berbunyi "Memeriksa…" dan konektornya belum bisa ditekan.
 Sheet lalu mengembalikan konektor yang dipilih, dan tujuannya ditentukan
 status hasil pemeriksaan itu — bukan status yang ikut di daftar.
 
+Konektor yang bebas **dikunci lebih dulu** lewat `POST /booked-connector`
+tahap R0 sebelum alur pembelian dimulai. Kalau ternyata sudah diambil
+orang lain, pengguna diberi tahu dan daftarnya dimuat ulang — lebih baik
+berhenti di sini daripada setelah ia membayar. Konektor yang dilanjutkan
+dari sesi orang lain (status 2–4) tidak dibooking ulang.
+
 | `status` | Arti | `ConnectorStatus` | Bisa ditekan | Tujuan |
 |---|---|---|---|---|
 | `1` | Belum dibayar / masih bisa dipakai | `available` | ya | Pilih Nominal |
@@ -75,9 +81,13 @@ Ini bagian yang paling mudah salah baca.
 
 | Pemicu | Layar | Yang terjadi |
 |---|---|---|
-| Kartu ditempelkan | Pembayaran Kartu | Tidak ada transaksi. Hanya pindah ke Pembayaran Berhasil. |
+| Konektor ditekan | Daftar Konektor | `POST /booked-connector` **R0** mengunci konektor. Ditolak → alur berhenti di sini. |
+| Pilihan kWh ditekan | Pilih Nominal | `POST /count-kwh` menghitung harganya. |
+| "Lanjutkan" | Pilih Nominal | Booking naik ke **R1**. |
+| Kartu ditempelkan | Pembayaran Kartu | Tidak ada transaksi. Booking naik ke **R2**, lalu pindah ke Pembayaran Berhasil. |
 | "Mulai Pengisian" | Pembayaran Berhasil | **Tidak** mengirim apa pun. Hanya pindah ke Hubungkan Konektor. |
-| "Mulai Pengisian" | Hubungkan Konektor | `POST /start`, lalu pindah ke Sedang Mengisi. |
+| "Mulai Pengisian" | Hubungkan Konektor | Booking naik ke **R3**, lalu `POST /start`, lalu pindah ke Sedang Mengisi. |
+| Kembali ke daftar sebelum pengisian jalan | mana pun di alur pembelian | `POST /cancelled-connector` melepas konektornya. |
 | "Ya, Akhiri Pengisian" | Akhiri Pengisian? | `POST /stop`, baca energi akhir, lalu Pengisian Selesai. |
 
 `/start` sengaja dikirim dari **Hubungkan Konektor**, bukan lebih awal,
@@ -94,6 +104,19 @@ terpasang; charger yang menolak `/start` muncul sebagai pesan error.
 Perlu diingat `POST /start` membalas `state: "starting"`, bukan
 `"charging"`. Controller baru meneruskan perintah. Konfirmasi bahwa
 pengisian benar-benar jalan datang dari polling berikutnya.
+
+## Memilih jumlah kWh
+
+Pilihannya datang dari `GET /list-kwh` saat halaman dibuka, dan harganya
+dari `POST /count-kwh` setiap kali salah satu ditekan.
+
+**Tidak ada yang terpilih saat halaman dibuka**, dan tombol "Lanjutkan"
+mati sampai ada harga. Pilihan yang sudah tercentang sejak awal gampang
+terlewat, dan pengguna bisa membayar jumlah yang tidak pernah ia pilih
+sendiri.
+
+Rincian harga baru muncul setelah ada pilihan; sebelum itu tempatnya
+diisi keterangan singkat, bukan kartu kosong.
 
 ## Dua jalan menuju "Pengisian Selesai"
 
@@ -115,6 +138,13 @@ Keduanya berujung ke `ChargingFinishedPage` dengan angka kWh final.
   ke Halaman Awal" di halaman-halaman lanjutan memakai
   `popUntil((r) => r.isFirst)` — rute pertama harus daftar charge box,
   bukan layar konfigurasi.
+- **Meninggalkan alur melepas booking.** Konektor yang dikunci R0 tetap
+  terkunci sampai dilepas, jadi setiap jalan keluar dari alur pembelian
+  harus membatalkannya. Ketiganya — "Kembali", tombol Home, dan tombol
+  kembali perangkat — berujung ke halaman Pilih Charge Box, jadi
+  pembatalannya cukup dipasang sekali di `didPopNext()` halaman itu.
+  Begitu `POST /start` berhasil bookingnya dilupakan, sehingga pulang
+  dari layar pemantauan tidak menghentikan pengisian yang sedang jalan.
 - **Tombol Home dipasang otomatis.** `PageScaffold` menaruhnya di ujung
   kanan header pada semua halaman kecuali yang menandai dirinya
   `isHome`, sehingga tidak ada halaman yang lupa menyediakan jalan

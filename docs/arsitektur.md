@@ -147,10 +147,34 @@ disembunyikan, bukan diisi nol.
 cukup diikuti di satu tempat. `Connector.mapStatus` satu-satunya yang
 menerjemahkannya ke `ConnectorStatus`.
 
+## Booking konektor
+
+Konektor dikunci atas nama pengguna sejak ia memilih nozzle, supaya
+tidak diambil orang lain selama ia memilih nominal dan membayar.
+Tahapnya dinaikkan mengikuti alur: R0 dipilih, R1 order dibuat, R2
+dibayar, R3 mulai mengisi.
+
+Yang menahan bug di sini adalah **melepasnya lagi**. Konektor yang
+dikunci tidak lepas sendiri, jadi pengguna yang pergi di tengah jalan
+akan membuatnya terkunci selamanya. `ActiveBooking` — dipegang
+`ChargingScope`, bukan variabel global, supaya tiap test punya miliknya
+sendiri — mencatat booking yang sedang dipegang, dan `didPopNext()` di
+halaman Pilih Charge Box melepasnya begitu pengguna kembali ke sana.
+
+Satu tempat itu menangkap semua jalan keluar: "Kembali", tombol Home,
+dan tombol kembali perangkat semuanya berujung ke halaman daftar.
+Bookingnya dilupakan tanpa dibatalkan begitu `/start` berhasil, sehingga
+sesi yang sedang berjalan tidak ikut dilepas.
+
+**Harga tidak pernah dihitung di aplikasi.** `POST /count-kwh` yang
+berwenang; `KwhPrice` menyimpan angkanya apa adanya dan `CostRows`
+menampilkannya tanpa menurunkan apa pun. Angka turunan yang berselisih
+dengan total dari backend lebih buruk daripada rincian yang ringkas.
+
 ## Data dummy
 
-`data/demo_data.dart` masih menyediakan daftar nominal yang dipakai
-halaman Pilih Nominal — backend belum punya endpoint harga.
+`data/demo_data.dart` menyediakan pilihan kWh dan harga tiruan untuk
+mode offline, dipakai hanya bila tidak ada `ChargingScope`.
 `DemoData.chargeBoxes` sudah tidak dipakai alur utama dan hanya tersisa
 untuk test.
 
