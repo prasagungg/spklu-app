@@ -24,6 +24,8 @@ class _Stub extends Interceptor {
           '/booked-connector' => bookingResponse(),
           '/list-kwh' => kwhOptionsResponse(),
           '/count-kwh' => countKwhResponse(),
+          '/transaction/push-order' => pushOrderResponse(),
+          '/transaction/inquiry-billing' => inquiryBillingResponse(),
           _ => listResponse([
               chargeBoxJson(
                 nama: 'CB-SMR-01',

@@ -87,8 +87,11 @@ NFC tidak butuh izin runtime, jadi tidak ada dialog yang perlu diminta.
 Kalau pengguna mematikan NFC dari pengaturan, halaman pembayaran
 menampilkan arahan menyalakannya beserta tombol Periksa Lagi.
 
-Yang **tidak** bisa dilakukan: membaca atau memotong saldo kartu. Lihat
-[arsitektur.md](arsitektur.md#pembayaran-kartu).
+Yang **tidak** bisa dilakukan: membaca nomor uang elektronik atau
+memotong saldo kartu. Lihat
+[arsitektur.md](arsitektur.md#pembayaran-kartu). Karena itu nomor kartu
+yang dikirim ke `POST /transaction/inquiry-billing` diambil dari
+`SPKLU_CARD_NUMBER`, bukan dari kartunya.
 
 ## Sertifikat TLS
 
@@ -141,6 +144,7 @@ flutter run \
 | `SPKLU_API_BASE_URL` | `https://edge-controller-playground.lentera-app.id/api` | Alamat awal di kolom Konfigurasi Server. Bukan alamat final — operator bisa menggantinya. |
 | `SPKLU_API_AUTH` | kosong | Isi header `Authorization`. Kosong berarti header-nya tidak dikirim; endpoint playground menerima request tanpa auth. |
 | `SPKLU_ID` | `SPKLU-SMR` | Lokasi SPKLU tempat unit dipasang, dikirim sebagai `idSpklu` pada `POST /list-chargerbox`. |
+| `SPKLU_CARD_NUMBER` | `0123456789012345` | Nomor kartu e-Money yang dipakai menagih. Masih tetap karena NFC tidak bisa membacanya; empat digit pertamanya menentukan penerbit. |
 | `SPKLU_CLIENT_ID` | `edge` | Isi header `client-id` pada setiap request. |
 | `SPKLU_SECRET_KEY` | kunci environment pengembangan | Kunci penanda tangan request. Environment sungguhan **wajib** menimpanya agar kuncinya tidak ikut tertulis di kode. |
 | `SPKLU_SESSION_PIN` | `00` | Kode yang diterima halaman Verifikasi Sesi. Masih nilai tetap karena backend belum menyediakan cara memverifikasi kode sesi milik pengguna. |

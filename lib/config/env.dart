@@ -46,6 +46,17 @@ class Env {
     defaultValue: 'SPKLU-SMR',
   );
 
+  /// Nomor kartu uang elektronik yang dipakai saat menagih.
+  ///
+  /// Masih nilai tetap: NFC hanya bisa membaca nomor seri kartu, bukan
+  /// nomor uang elektroniknya — lihat `CardReader`. Empat digit
+  /// pertamanya menentukan penerbit yang dikenali backend; daftarnya
+  /// ada di `emoneyIssuers`.
+  static const String cardNumber = String.fromEnvironment(
+    'SPKLU_CARD_NUMBER',
+    defaultValue: '0123456789012345',
+  );
+
   /// Identitas pemanggil pada header `client-id`.
   static const String apiClientId = String.fromEnvironment(
     'SPKLU_CLIENT_ID',

@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../data/booking_progress.dart';
-import '../data/charge_point_repository.dart';
 import '../data/charging_scope.dart';
 import '../models/booking.dart';
 import '../models/charging_session.dart';
 import '../services/api_exception.dart';
+import '../services/response_code.dart';
 import '../theme/app_colors.dart';
 import '../widgets/asset_slot.dart';
 import '../widgets/page_scaffold.dart';
@@ -238,15 +238,20 @@ class _ConnectedPanel extends StatelessWidget {
 }
 
 /// Menerjemahkan kegagalan `/start` jadi arahan yang bisa ditindaklanjuti
-/// pengguna. Kode yang tidak dikenal memakai pesan asli dari backend.
+/// pengguna.
 String startErrorMessage(ApiException e) => switch (e.responseCode) {
-  ChargeErrorCode.notConnected =>
+  ResponseCode.chargePointOffline =>
     'Charge box sedang tidak terhubung ke controller. '
         'Pilih charge box lain atau coba lagi sebentar.',
-  ChargeErrorCode.rejected =>
+  ResponseCode.commandRejected =>
     'Charger menolak perintah. Pastikan konektor sudah terpasang '
         'dengan benar, lalu coba lagi.',
-  ChargeErrorCode.missingField =>
+  ResponseCode.chargePointTimedOut =>
+    'Charger tidak menjawab tepat waktu. Coba lagi sebentar.',
+  ResponseCode.connectorRequired =>
+    'Charger ini sedang melayani lebih dari satu sesi. Kembali dan '
+        'pilih konektornya lagi.',
+  ResponseCode.missingField =>
     'Data charge box tidak lengkap. Kembali dan pilih ulang.',
-  _ => e.message,
+  _ => generalErrorMessage(e),
 };

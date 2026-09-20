@@ -1,3 +1,25 @@
+/// Rincian biaya yang bisa ditampilkan `CostRows`.
+///
+/// Dua endpoint mengirim bentuk yang mirip: `POST /count-kwh` sebagai
+/// perkiraan saat memilih kWh, dan `POST /transaction/push-order`
+/// sebagai angka final setelah ordernya dibuat. Antarmuka ini membuat
+/// satu widget cukup untuk keduanya.
+abstract interface class PriceBreakdown {
+  double get kwh;
+  double get rpPerKwh;
+
+  /// Biaya energi. Nol berarti backend tidak mengirimnya, dan barisnya
+  /// disembunyikan — aplikasi tidak menghitung sendiri.
+  int get rpKwh;
+
+  int get rpPpj;
+  int get rpPpn;
+  int get rpTotal;
+
+  /// Biaya tambahan yang tidak nol, siap ditampilkan.
+  List<({String label, int amount})> get extraCharges;
+}
+
 /// Rincian harga untuk sejumlah kWh, dari `POST /count-kwh`.
 ///
 /// ```json
@@ -13,7 +35,7 @@
 /// sendiri, bahkan tidak mengalikan [kwh] dengan [rpPerKwh]: backend
 /// yang berwenang atas harga, dan angka turunan yang tidak cocok dengan
 /// [rpTotal] hanya akan membingungkan pengguna.
-class KwhPrice {
+class KwhPrice implements PriceBreakdown {
   const KwhPrice({
     required this.kwh,
     required this.rpTotal,
@@ -34,14 +56,18 @@ class KwhPrice {
   final String connectorId;
 
   /// kWh yang dibeli. Dikirim balik backend apa adanya.
+  @override
   final double kwh;
 
   /// Tarif per kWh. Pecahan, mis. 2466,78.
+  @override
   final double rpPerKwh;
 
   /// Pajak penerangan jalan.
+  @override
   final int rpPpj;
 
+  @override
   final int rpPpn;
   final int rpAdmin;
   final int rpLayanan;
@@ -55,6 +81,7 @@ class KwhPrice {
   final int idleFee;
 
   /// Yang dibayar pengguna.
+  @override
   final int rpTotal;
 
   factory KwhPrice.fromJson(Map<String, dynamic>? json) {
@@ -78,11 +105,17 @@ class KwhPrice {
     );
   }
 
+  /// `POST /count-kwh` tidak mengirim biaya energi sebagai angka
+  /// tersendiri, jadi barisnya tidak ditampilkan di tahap perkiraan.
+  @override
+  int get rpKwh => 0;
+
   /// Baris biaya tambahan yang layak ditampilkan.
   ///
   /// Sebagian besar bernilai nol pada kebanyakan transaksi; menampilkan
   /// deretan "Rp0" hanya menenggelamkan angka yang penting. Yang nol
   /// karena itu disembunyikan.
+  @override
   List<({String label, int amount})> get extraCharges => [
         for (final row in [
           (label: 'Biaya Admin', amount: rpAdmin),

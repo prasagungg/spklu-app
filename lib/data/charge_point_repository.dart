@@ -3,33 +3,19 @@ import 'package:dio/dio.dart';
 import '../config/env.dart';
 import '../models/charge_box.dart';
 import '../models/backend_status.dart';
+import '../models/billing.dart';
 import '../models/booking.dart';
 import '../models/command_result.dart';
 import '../models/kwh_price.dart';
+import '../models/order.dart';
 import '../models/session_info.dart';
 import '../models/spklu.dart';
 import '../services/api_client.dart';
 import '../services/api_exception.dart';
+import '../services/response_code.dart';
 
 /// Kode sukses pada amplop response backend.
-const String _successCode = '00';
-
-/// Kode bisnis yang dikirim edge controller saat permintaan ditolak.
-class ChargeErrorCode {
-  const ChargeErrorCode._();
-
-  /// "Missing Field: chargePointId" (HTTP 400).
-  static const missingField = '07';
-
-  /// "Charging station SIM-123 is not connected" (HTTP 503).
-  static const notConnected = '12';
-
-  /// "The charging station rejected the command" (HTTP 409).
-  static const rejected = '13';
-
-  /// "There is no charging session running on SIM-123" (HTTP 409).
-  static const noRunningSession = '15';
-}
+const String _successCode = ResponseCode.ok;
 
 /// Akses ke edge controller: daftar charger, mulai, dan hentikan sesi.
 ///
@@ -178,6 +164,72 @@ class ChargePointRepository {
     return KwhPrice.fromJson(_unwrap(json));
   }
 
+  /// `POST /transaction/push-order`
+  ///
+  /// Membuat order di backend untuk kWh yang dipilih. Inilah yang
+  /// memberi [Order.orderId], [Order.sessionCode], dan
+  /// [Order.partnerReference] — tiga hal yang sebelumnya dikarang
+  /// aplikasi.
+  ///
+  /// ```json
+  /// { "chargeBoxId": "CB-SMR-01", "connectorId": "1", "kwh": 10 }
+  /// ```
+  ///
+  /// Gagal dengan [ResponseCode.processingAnotherRequest] bila masih
+  /// ada order tertunda pada konektor itu.
+  Future<Order> pushOrder({
+    required String chargeBoxId,
+    required int connectorId,
+    required double kwh,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/transaction/push-order',
+      body: {
+        'chargeBoxId': chargeBoxId,
+        'connectorId': connectorId.toString(),
+        'kwh': kwh == kwh.roundToDouble() ? kwh.round() : kwh,
+      },
+      cancelToken: cancelToken,
+    );
+
+    return Order.fromJson(_unwrap(json));
+  }
+
+  /// `POST /transaction/inquiry-billing`
+  ///
+  /// Menanyakan tagihan satu order untuk kartu tertentu, sebelum
+  /// didebit.
+  ///
+  /// ```json
+  /// { "orderId": "QHGQM7SNQ6IY7GQLQDSLTY2RJI",
+  ///   "cardNumber": "0123456789012345" }
+  /// ```
+  ///
+  /// [cardNumber] bawaannya [Env.cardNumber] — masih nilai tetap karena
+  /// NFC tidak bisa membaca nomor uang elektronik kartunya.
+  ///
+  /// Gagal dengan [ResponseCode.invalidFieldFormat] bila empat digit
+  /// pertamanya tidak dikenal, atau
+  /// [ResponseCode.transactionNotFound] bila ordernya tidak ada.
+  /// Aman dipanggil berulang: jawabannya sama.
+  Future<BillingInquiry> inquiryBilling({
+    required String orderId,
+    String? cardNumber,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/transaction/inquiry-billing',
+      body: {
+        'orderId': orderId,
+        'cardNumber': cardNumber ?? Env.cardNumber,
+      },
+      cancelToken: cancelToken,
+    );
+
+    return BillingInquiry.fromJson(_unwrap(json));
+  }
+
   /// `POST /booked-connector`
   ///
   /// Mengunci konektor atas nama pengguna yang sedang memakai unit ini,
@@ -225,7 +277,7 @@ class ChargePointRepository {
   /// ```
   ///
   /// [stage] wajib disertakan — tanpa `connectorStatus` backend membalas
-  /// [ChargeErrorCode.missingField]. Nilainya sendiri tidak menentukan
+  /// [ResponseCode.missingField]. Nilainya sendiri tidak menentukan
   /// apa pun: booking di tahap mana pun terlepas, dan membatalkan
   /// konektor yang memang tidak dibooking tetap dibalas sukses. Konektor
   /// yang tidak dikenal dibalas 404.
@@ -280,10 +332,10 @@ class ChargePointRepository {
   /// `POST /start` — meminta charger memulai sesi pengisian.
   ///
   /// Hanya `chargePointId` yang wajib; tanpa itu backend membalas
-  /// [ChargeErrorCode.missingField]. `connectorId` menentukan konektor
-  /// mana yang dipakai. Gagal dengan [ChargeErrorCode.notConnected]
+  /// [ResponseCode.missingField]. `connectorId` menentukan konektor
+  /// mana yang dipakai. Gagal dengan [ResponseCode.chargePointOffline]
   /// bila charger sedang tidak terhubung, atau
-  /// [ChargeErrorCode.rejected] bila charger menolak perintahnya.
+  /// [ResponseCode.commandRejected] bila charger menolak perintahnya.
   ///
   /// [targetKwh] adalah kWh yang dibeli pengguna — batas berapa banyak
   /// energi yang boleh disalurkan sesi ini. Diambil dari nominal yang
@@ -312,7 +364,7 @@ class ChargePointRepository {
   /// [connectorId] disertakan agar perintahnya mengenai konektor yang
   /// tepat pada charger dengan lebih dari satu konektor.
   ///
-  /// Gagal dengan [ChargeErrorCode.noRunningSession] bila tidak ada
+  /// Gagal dengan [ResponseCode.noActiveSession] bila tidak ada
   /// sesi aktif pada charger tersebut.
   Future<CommandResult> stopCharging({
     required String chargePointId,

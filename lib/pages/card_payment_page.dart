@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 
 import '../data/booking_progress.dart';
 import '../data/card_reader_scope.dart';
+import '../data/charging_scope.dart';
 import '../data/formatters.dart';
 import '../models/booking.dart';
 import '../models/charging_session.dart';
+import '../services/api_exception.dart';
+import '../services/response_code.dart';
 import '../services/card_reader.dart';
 import '../theme/app_colors.dart';
 import '../widgets/page_scaffold.dart';
@@ -20,9 +23,15 @@ import 'payment_success_page.dart';
 /// ada tombol untuk memajukannya: yang memajukan alur adalah tap kartu
 /// itu sendiri, persis seperti di mesin pembayaran sungguhan.
 ///
-/// Perlu diingat tap di sini hanya *memicu* langkah berikutnya. Saldo
-/// kartu tidak dibaca dan tidak dipotong — lihat [CardReader] untuk
-/// sebabnya, dan di mana panggilan debit sungguhan nanti dipasang.
+/// Begitu kartu terbaca, `POST /transaction/inquiry-billing` menanyakan
+/// tagihan ordernya. Gagal di situ menahan alur: pengguna tidak boleh
+/// maju ke "Pembayaran Berhasil" untuk tagihan yang tidak pernah
+/// terverifikasi.
+///
+/// Perlu diingat **nomor kartunya tidak dibaca dari kartu**. NFC hanya
+/// memberi nomor seri, bukan nomor uang elektronik, jadi yang dikirim
+/// adalah [Env.cardNumber] yang tetap — lihat [CardReader]. Saldonya
+/// juga belum dipotong; penagihan sungguhan menyusul setelah inquiry.
 class CardPaymentPage extends StatefulWidget {
   const CardPaymentPage({super.key, required this.session});
 
@@ -43,8 +52,12 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
 
   /// Kartu bisa terbaca berkali-kali selama masih menempel; tap pertama
   /// yang menang dan sisanya diabaikan agar halaman tidak didorong dua
-  /// kali.
+  /// kali. Dilepas lagi bila tagihannya gagal ditanyakan, supaya
+  /// pengguna bisa mencoba menempelkan ulang.
   bool _accepted = false;
+
+  /// Tagihan sedang ditanyakan ke backend.
+  bool _inquiring = false;
 
   @override
   void initState() {
@@ -105,9 +118,42 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
     if (_accepted || !mounted) return;
     _accepted = true;
 
-    debugPrint('[FLOW] Kartu terbaca: $card — menuju Pembayaran Berhasil');
-
+    debugPrint('[FLOW] Kartu terbaca: $card — menanyakan tagihan');
     unawaited(_reader?.stop());
+    unawaited(_settleBilling());
+  }
+
+  /// Menanyakan tagihan order ini, lalu maju bila berhasil.
+  Future<void> _settleBilling() async {
+    final repository = ChargingScope.maybeOf(context)?.repository;
+
+    // Mode offline: tidak ada yang bisa ditanyakan.
+    if (repository == null) {
+      _proceed();
+      return;
+    }
+
+    setState(() => _inquiring = true);
+
+    try {
+      final billing = await repository.inquiryBilling(
+        orderId: widget.session.orderId,
+      );
+      if (!mounted) return;
+      debugPrint('[FLOW] Tagihan: $billing');
+      setState(() => _inquiring = false);
+
+      // Di sinilah panggilan debit dipasang nanti, setelah tagihannya
+      // terverifikasi dan sebelum halaman berpindah.
+      _proceed();
+    } on ApiException catch (e) {
+      _failBilling(billingErrorMessage(e));
+    } on Object catch (e) {
+      _failBilling('Tagihan gagal ditanyakan: $e');
+    }
+  }
+
+  void _proceed() {
     _ticker?.cancel();
 
     reportBookingStage(
@@ -117,13 +163,28 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
       stage: BookingStage.paid,
     );
 
-    // Di sinilah panggilan debit ke backend pembayaran dipasang nanti,
-    // sebelum halaman berpindah.
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
         builder: (_) => PaymentSuccessPage(session: widget.session),
       ),
     );
+  }
+
+  /// Tagihannya gagal ditanyakan: kartu dibiarkan bisa ditempelkan lagi.
+  Future<void> _failBilling(String message) async {
+    if (!mounted) return;
+
+    setState(() {
+      _inquiring = false;
+      _accepted = false;
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+
+    // Sesi NFC sudah ditutup saat kartu terbaca; dibuka lagi supaya
+    // tempelan berikutnya terdeteksi.
+    await _reader?.start(_onCardTapped);
   }
 
   @override
@@ -166,8 +227,8 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
             child: switch (_status) {
               // Kesiapan masih diperiksa — tampilannya sama dengan
               // menunggu kartu, jadi layar tidak berkedip.
-              null || CardReaderStatus.ready => const WaitingPanel(
-                  label: 'Menunggu Kartu',
+              null || CardReaderStatus.ready => WaitingPanel(
+                  label: _inquiring ? 'Memeriksa Tagihan' : 'Menunggu Kartu',
                   soft: true,
                 ),
               CardReaderStatus.disabled => const _ReaderNotice(
@@ -285,3 +346,23 @@ Future<void> showHelpSheet(BuildContext context) {
     ),
   );
 }
+
+/// Menerjemahkan kegagalan `POST /transaction/inquiry-billing` jadi
+/// arahan yang bisa ditindaklanjuti pengguna.
+String billingErrorMessage(ApiException e) => switch (e.responseCode) {
+  // Satu-satunya field yang datang dari aplikasi di sini adalah nomor
+  // kartu, jadi format yang ditolak hampir pasti soal kartunya.
+  ResponseCode.invalidFieldFormat =>
+    'Kartu ini tidak didukung. Pakai kartu e-Money terbitan bank yang '
+        'bekerja sama (${e.message}).',
+  ResponseCode.transactionNotFound || ResponseCode.transactionExpired =>
+    'Pesanan tidak ditemukan atau sudah kedaluwarsa. Kembali dan ulangi '
+        'pemilihan nominal.',
+  ResponseCode.transactionAlreadyPaid =>
+    'Pesanan ini sudah dibayar. Lanjutkan tanpa menempelkan kartu lagi.',
+  ResponseCode.transactionFailed =>
+    'Transaksi ditolak. Coba tempelkan kartu lagi atau pakai kartu lain.',
+  ResponseCode.amountMismatch =>
+    'Nominal tagihan tidak cocok. Kembali dan ulangi pemilihan nominal.',
+  _ => generalErrorMessage(e),
+};

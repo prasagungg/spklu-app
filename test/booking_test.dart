@@ -33,6 +33,8 @@ class _Recorder extends Interceptor {
           '/cancelled-connector' => cancellationResponse(),
           '/list-kwh' => kwhOptionsResponse(),
           '/count-kwh' => countKwhResponse(),
+          '/transaction/push-order' => pushOrderResponse(),
+          '/transaction/inquiry-billing' => inquiryBillingResponse(),
           '/progress' => progressResponse(),
           _ => okResponse,
         },
@@ -141,6 +143,11 @@ void main() {
         .cardReader as FakeCardReader;
     reader.tap();
     await _settle(tester);
+    // Inquiry tagihan menambah satu hop async sebelum halaman pindah.
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
     expect(recorder.stages, ['R0', 'R1', 'R2']);
 
     // R3 — pengisian dimulai.
@@ -220,6 +227,11 @@ void main() {
           .cardReader as FakeCardReader;
       reader.tap();
       await _settle(tester);
+      // Inquiry tagihan menambah satu hop async sebelum halaman pindah.
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await tester.pump(const Duration(milliseconds: 600));
       await tester.tap(find.text('Mulai Pengisian'));
       await _settle(tester);
       await tester.pump(const Duration(seconds: 3));
@@ -259,6 +271,36 @@ void main() {
       expect(recorder.to('/cancelled-connector'), isEmpty);
       expect(recorder.to('/booked-connector'), isEmpty);
     });
+  });
+
+  testWidgets('kode sesi dan referensi datang dari order', (tester) async {
+    final recorder = _Recorder();
+    await _pickConnector(tester, recorder);
+
+    await tester.tap(find.text('10,0 kWh'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lanjutkan'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Konfirmasi & Bayar'));
+    await _settle(tester);
+
+    final reader = tester
+        .widget<SPKLUApp>(find.byType(SPKLUApp))
+        .cardReader as FakeCardReader;
+    reader.tap();
+    await _settle(tester);
+    // Inquiry tagihan menambah satu hop async sebelum halaman pindah.
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
+
+    // Keduanya dulu dikarang aplikasi; sekarang dari push-order.
+    expect(find.text('Pembayaran Berhasil'), findsOneWidget);
+    expect(find.text('29'), findsOneWidget);
+    await tester.tap(find.text('Detail Transaksi'));
+    await tester.pumpAndSettle();
+    expect(find.text('81067'), findsOneWidget);
   });
 
   group('BookingStage', () {

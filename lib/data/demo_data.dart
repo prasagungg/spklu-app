@@ -1,6 +1,7 @@
 import '../models/charge_box.dart';
 import '../models/connector.dart';
 import '../models/kwh_price.dart';
+import '../models/order.dart';
 
 /// Data dummy untuk demo.
 ///
@@ -125,6 +126,21 @@ class DemoData {
       rpPerKwh: ratePerKwh,
       rpPpj: ppj,
       rpTotal: energy + ppj,
+    );
+  }
+
+  /// Order tiruan untuk mode offline, mengikuti bentuk
+  /// `POST /transaction/push-order`.
+  static Order orderFor(KwhPrice price) {
+    return Order(
+      orderId: 'DEMO-ORDER',
+      sessionCode: '29',
+      partnerReference: '81067',
+      kwh: price.kwh,
+      rpPerKwh: price.rpPerKwh,
+      rpKwh: (price.kwh * price.rpPerKwh).round(),
+      rpPpj: price.rpPpj,
+      rpTotal: price.rpTotal,
     );
   }
 }

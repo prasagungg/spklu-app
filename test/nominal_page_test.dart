@@ -12,10 +12,18 @@ import 'package:kossotrik/widgets/primary_button.dart';
 import 'fixtures.dart';
 
 class _Stub extends Interceptor {
-  _Stub({this.options = const [10, 20, 30], this.failCount = false});
+  _Stub({
+    this.options = const [10, 20, 30],
+    this.failCount = false,
+    this.orderErrorCode,
+  });
 
   final List<num> options;
   final bool failCount;
+
+  /// Kode amplop yang dibalas `/transaction/push-order`, mis. "16".
+  final String? orderErrorCode;
+
   final List<RequestOptions> requests = [];
 
   @override
@@ -32,6 +40,25 @@ class _Stub extends Interceptor {
       return;
     }
 
+    if (options_.path == '/transaction/push-order' &&
+        orderErrorCode != null) {
+      handler.reject(
+        DioException.badResponse(
+          statusCode: 409,
+          requestOptions: options_,
+          response: Response<Map<String, dynamic>>(
+            requestOptions: options_,
+            statusCode: 409,
+            data: {
+              'responseCode': orderErrorCode,
+              'responseMessage': 'Processing Another Request',
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
     handler.resolve(
       Response<Map<String, dynamic>>(
         requestOptions: options_,
@@ -39,6 +66,9 @@ class _Stub extends Interceptor {
         data: switch (options_.path) {
           '/list-kwh' => kwhOptionsResponse(options),
           '/count-kwh' => countKwhResponse(
+              kwh: (options_.data as Map)['kwh'] as num,
+            ),
+          '/transaction/push-order' => pushOrderResponse(
               kwh: (options_.data as Map)['kwh'] as num,
             ),
           _ => okResponse,
@@ -168,6 +198,103 @@ void main() {
       find.text('Tidak dapat terhubung ke server. Periksa jaringan Anda.'),
       findsOneWidget,
     );
+  });
+
+  group('push order saat Lanjutkan', () {
+    testWidgets('order dibuat dengan kWh yang dipilih', (tester) async {
+      final stub = await _pump(tester);
+
+      await tester.tap(find.text('20,0 kWh'));
+      await tester.pumpAndSettle();
+      expect(stub.to('/transaction/push-order'), isEmpty);
+
+      await tester.tap(find.text('Lanjutkan'));
+      await tester.pumpAndSettle();
+
+      final call = stub.to('/transaction/push-order').single;
+      expect(call.method, 'POST');
+      expect(call.data, {
+        'chargeBoxId': 'CB-SMR-01',
+        'connectorId': '1',
+        'kwh': 20,
+      });
+      expect(find.text('Konfirmasi Pengisian'), findsOneWidget);
+    });
+
+    /// Rincian di halaman konfirmasi datang dari order, bukan dari
+    /// perkiraan `/count-kwh` — termasuk biaya listrik yang hanya
+    /// dikirim order.
+    testWidgets('halaman konfirmasi memakai angka dari order',
+        (tester) async {
+      await _pump(tester);
+
+      await tester.tap(find.text('10,0 kWh'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Lanjutkan'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Biaya Listrik'), findsOneWidget);
+      expect(find.text('Rp24.660'), findsOneWidget);
+      expect(find.text('Rp740'), findsOneWidget);
+      expect(find.text('Rp25.400'), findsOneWidget);
+      // Angka perkiraan tidak ikut terbawa.
+      expect(find.text('Rp27.135'), findsNothing);
+    });
+
+    testWidgets('order yang tertunda dijelaskan, bukan sekadar gagal',
+        (tester) async {
+      await _pump(tester, stub: _Stub(orderErrorCode: '16'));
+
+      await tester.tap(find.text('10,0 kWh'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Lanjutkan'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Konfirmasi Pengisian'), findsNothing);
+      expect(
+        find.textContaining('Masih ada pesanan yang belum selesai'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('kode tak dikenal memakai pesan asli backend',
+        (tester) async {
+      await _pump(tester, stub: _Stub(orderErrorCode: '77'));
+
+      await tester.tap(find.text('10,0 kWh'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Lanjutkan'));
+      await tester.pumpAndSettle();
+
+      // Pesan mentah dari stub, diteruskan apa adanya.
+      expect(find.text('Processing Another Request'), findsOneWidget);
+    });
+
+    /// Kode 99 dulu lolos apa adanya sebagai "Generic Error"; sejak
+    /// tabel kode diketahui ia diterjemahkan jadi gangguan server.
+    testWidgets('gangguan server diarahkan mencoba lagi', (tester) async {
+      await _pump(tester, stub: _Stub(orderErrorCode: '99'));
+
+      await tester.tap(find.text('10,0 kWh'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Lanjutkan'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Server sedang bermasalah. Coba lagi sebentar.'),
+          findsOneWidget);
+    });
+
+    testWidgets('tanda tangan yang ditolak menunjuk ke kredensial',
+        (tester) async {
+      await _pump(tester, stub: _Stub(orderErrorCode: '13'));
+
+      await tester.tap(find.text('10,0 kWh'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Lanjutkan'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('kredensial'), findsOneWidget);
+    });
   });
 
   testWidgets('daftar kWh kosong dijelaskan', (tester) async {

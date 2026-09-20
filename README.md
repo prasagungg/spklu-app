@@ -38,7 +38,7 @@ Daftar lengkap `--dart-define` ada di [docs/konfigurasi.md](docs/konfigurasi.md)
 ## Periksa
 
 ```sh
-flutter test     # 187 test
+flutter test     # 209 test
 dart analyze lib test
 ```
 
@@ -47,9 +47,9 @@ dart analyze lib test
 ```
 lib/
   config/    Env (nilai build), ApiConfig (alamat aktif), Host (normalisasi alamat)
-  services/  ApiClient (Dio), ApiException, ApiLogger, CardReader (NFC)
+  services/  ApiClient (Dio), ApiException, ResponseCode, ApiLogger, CardReader (NFC)
   data/      ChargePointRepository, ChargingScope, CardReaderScope, formatters
-  models/    Spklu, ChargeBox, Connector, KwhPrice, SessionInfo, ChargingSession
+  models/    Spklu, ChargeBox, Connector, KwhPrice, Order, SessionInfo, ChargingSession
   pages/     satu berkas per layar Figma
   widgets/   komponen bersama (PageScaffold, tombol, kartu, chip)
   theme/     AppColors & AppTheme — token warna dan teks

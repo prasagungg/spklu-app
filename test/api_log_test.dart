@@ -128,12 +128,12 @@ void main() {
 
       await _dio(
         store,
-        body: const {'responseCode': '12', 'responseMessage': 'Not connected'},
+        body: const {'responseCode': '31', 'responseMessage': 'Not connected'},
       ).post<Map<String, dynamic>>('/start');
 
       final entry = store.entries.single;
       expect(entry.statusCode, 200);
-      expect(entry.responseCode, '12');
+      expect(entry.responseCode, '31');
       expect(entry.isFailure, isTrue);
     });
 

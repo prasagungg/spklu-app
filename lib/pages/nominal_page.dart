@@ -9,7 +9,9 @@ import '../models/booking.dart';
 import '../models/charge_box.dart';
 import '../models/connector.dart';
 import '../models/kwh_price.dart';
+import '../models/order.dart';
 import '../services/api_exception.dart';
+import '../services/response_code.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/asset_slot.dart';
@@ -51,6 +53,9 @@ class _NominalPageState extends State<NominalPage> {
 
   /// Harga sedang dihitung backend untuk pilihan yang baru ditekan.
   bool _counting = false;
+
+  /// Order sedang dibuat setelah "Lanjutkan" ditekan.
+  bool _pushing = false;
 
   ChargePointRepository? _repository;
 
@@ -133,9 +138,14 @@ class _NominalPageState extends State<NominalPage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _continue() {
+  /// Membuat order di backend, lalu maju ke halaman konfirmasi.
+  ///
+  /// Ordernya dibuat di sini — bukan setelah pembayaran — karena
+  /// nomor referensi dan kode sesi yang ditampilkan halaman berikutnya
+  /// datang dari sana.
+  Future<void> _continue() async {
     final price = _price;
-    if (price == null) return;
+    if (price == null || _pushing) return;
 
     // Nominal sudah dipilih: ordernya sedang dibuat.
     reportBookingStage(
@@ -145,15 +155,49 @@ class _NominalPageState extends State<NominalPage> {
       stage: BookingStage.ordering,
     );
 
+    final repository = _repository;
+    if (repository == null) {
+      _openConfirmation(DemoData.orderFor(price));
+      return;
+    }
+
+    setState(() => _pushing = true);
+
+    try {
+      final order = await repository.pushOrder(
+        chargeBoxId: widget.chargeBox.id,
+        connectorId: widget.connector.id,
+        kwh: price.kwh,
+      );
+      if (!mounted) return;
+      setState(() => _pushing = false);
+      debugPrint('[FLOW] Order dibuat: $order');
+      _openConfirmation(order);
+    } on ApiException catch (e) {
+      _failPush(orderErrorMessage(e));
+    } on Object catch (e) {
+      _failPush('Order gagal dibuat: $e');
+    }
+  }
+
+  void _openConfirmation(Order order) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ConfirmationPage(
           chargeBox: widget.chargeBox,
           connector: widget.connector,
-          price: price,
+          order: order,
         ),
       ),
     );
+  }
+
+  void _failPush(String message) {
+    if (!mounted) return;
+    setState(() => _pushing = false);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -167,14 +211,18 @@ class _NominalPageState extends State<NominalPage> {
       bottomBar: BottomActionBar(
         children: [
           PrimaryButton(
-            label: _counting ? 'Menghitung…' : 'Lanjutkan',
+            label: switch ((_counting, _pushing)) {
+              (true, _) => 'Menghitung…',
+              (_, true) => 'Memproses…',
+              _ => 'Lanjutkan',
+            },
             // Mati sampai ada harga: tanpa itu tidak ada yang bisa
             // dikonfirmasi di halaman berikutnya.
-            onPressed: price == null ? null : _continue,
+            onPressed: price == null || _pushing ? null : _continue,
           ),
           SecondaryButton(
             label: 'Kembali',
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: _pushing ? null : () => Navigator.of(context).pop(),
           ),
         ],
       ),
@@ -395,3 +443,15 @@ class PriceBreakdownCard extends StatelessWidget {
     );
   }
 }
+
+/// Menerjemahkan kegagalan `POST /transaction/push-order` jadi arahan
+/// yang bisa ditindaklanjuti pengguna.
+String orderErrorMessage(ApiException e) => switch (e.responseCode) {
+  ResponseCode.processingAnotherRequest =>
+    'Masih ada pesanan yang belum selesai di konektor ini. '
+        'Tunggu sebentar atau pilih konektor lain.',
+  ResponseCode.invalidStatusTransition =>
+    'Konektor ini sedang dalam keadaan yang tidak menerima pesanan '
+        'baru. Kembali dan pilih konektor lain.',
+  _ => generalErrorMessage(e),
+};

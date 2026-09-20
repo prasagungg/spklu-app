@@ -1,12 +1,13 @@
 import 'charge_box.dart';
 import 'connector.dart';
 import 'kwh_price.dart';
+import 'order.dart';
 
 /// Satu sesi pengisian yang dibawa dari halaman konfirmasi sampai
 /// halaman "Pengisian Dimulai".
 ///
-/// Nomor referensi dan kode sesi masih dibangkitkan lokal untuk demo —
-/// nanti keduanya datang dari backend saat transaksi dibuat.
+/// Nomor referensi, kode sesi, dan rincian harganya datang dari order
+/// yang dibuat `POST /transaction/push-order`.
 class ChargingSession {
   const ChargingSession({
     required this.chargeBox,
@@ -15,6 +16,7 @@ class ChargingSession {
     required this.reference,
     required this.createdAt,
     this.price,
+    this.orderId = '',
   });
 
   final ChargeBox chargeBox;
@@ -25,13 +27,17 @@ class ChargingSession {
   /// Null untuk sesi yang dilanjutkan dari daftar charge box: aplikasi
   /// tidak tahu berapa yang dibayarkan pengguna sebelumnya, jadi baris
   /// pembayaran disembunyikan alih-alih menampilkan angka karangan.
-  final KwhPrice? price;
+  final PriceBreakdown? price;
 
   /// Kode yang diperlukan pengguna untuk mengakhiri sesi, mis. "29".
   final String sessionCode;
 
-  /// Nomor referensi transaksi, mis. "93CHROVO27092418401".
+  /// Nomor referensi transaksi dari backend (`partnerReference`).
   final String reference;
+
+  /// Identitas order, mis. "ADWTJU5D56QGZNXTTNOX9YZFTN". Kosong pada
+  /// sesi yang dilanjutkan dari daftar.
+  final String orderId;
 
   final DateTime createdAt;
 
@@ -52,19 +58,20 @@ class ChargingSession {
     );
   }
 
-  /// Data demo mengikuti angka pada desain Figma.
-  factory ChargingSession.demo({
+  /// Sesi baru dari order yang sudah dibuat backend.
+  factory ChargingSession.fromOrder({
     required ChargeBox chargeBox,
     required Connector connector,
-    required KwhPrice price,
+    required Order order,
     required DateTime now,
   }) {
     return ChargingSession(
       chargeBox: chargeBox,
       connector: connector,
-      price: price,
-      sessionCode: '29',
-      reference: '93CHROVO27092418401',
+      price: order,
+      orderId: order.orderId,
+      sessionCode: order.sessionCode,
+      reference: order.partnerReference,
       createdAt: now,
     );
   }

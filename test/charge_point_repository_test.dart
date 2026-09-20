@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kossotrik/config/env.dart';
 import 'package:kossotrik/data/charge_point_repository.dart';
+import 'package:kossotrik/services/response_code.dart';
 import 'package:kossotrik/services/api_client.dart';
 import 'package:kossotrik/services/api_exception.dart';
 
@@ -272,7 +273,7 @@ void main() {
         ..interceptors.add(
           _StubAdapter(
             const {
-              'responseCode': '12',
+              'responseCode': '31',
               'responseMessage': 'Charging station SIM-123 is not connected',
             },
             status: 503,
@@ -287,7 +288,7 @@ void main() {
               .having((e) => e.message, 'message',
                   'Charging station SIM-123 is not connected')
               .having((e) => e.responseCode, 'responseCode',
-                  ChargeErrorCode.notConnected)
+                  ResponseCode.chargePointOffline)
               .having((e) => e.statusCode, 'statusCode', 503),
         ),
       );
@@ -300,7 +301,7 @@ void main() {
         ..interceptors.add(
           _StubAdapter(
             const {
-              'responseCode': '15',
+              'responseCode': '34',
               'responseMessage':
                   'There is no charging session running on SIM-123',
             },
@@ -316,7 +317,7 @@ void main() {
               .having((e) => e.message, 'message',
                   'There is no charging session running on SIM-123')
               .having((e) => e.responseCode, 'responseCode',
-                  ChargeErrorCode.noRunningSession),
+                  ResponseCode.noActiveSession),
         ),
       );
     });

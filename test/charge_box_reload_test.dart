@@ -21,6 +21,8 @@ class _Counter extends Interceptor {
           '/booked-connector' => bookingResponse(),
           '/list-kwh' => kwhOptionsResponse(),
           '/count-kwh' => countKwhResponse(),
+          '/transaction/push-order' => pushOrderResponse(),
+          '/transaction/inquiry-billing' => inquiryBillingResponse(),
           _ => _ok,
         },
         statusCode: 200,

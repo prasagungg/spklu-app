@@ -6,7 +6,7 @@ flutter test test/host_test.dart
 dart analyze lib test
 ```
 
-Suite-nya 187 test di 28 berkas dan berjalan sekitar lima detik. Tidak
+Suite-nya 209 test di 28 berkas dan berjalan sekitar lima detik. Tidak
 ada yang menyentuh jaringan.
 
 ## Cara test menghindari jaringan
@@ -93,7 +93,7 @@ ikut dijalankan sebagai suite.
 | `host_test.dart` | Normalisasi alamat dan pengenalan jaringan privat |
 | `session_info_test.dart` | Penguraian `GET /progress`, termasuk sesi selesai dengan `powerW` null |
 | `connector_detection_test.dart` | Pemetaan angka `status` ke kelompok UI, penguraian nama/tipe konektor, dan aturan bisa-ditekan |
-| `start_error_message_test.dart` | Kode error `/start` menjadi arahan yang bisa ditindaklanjuti |
+| `start_error_message_test.dart` | Kode error `/start` menjadi arahan yang bisa ditindaklanjuti, dan kode autentikasi tidak menyamar jadi masalah charger |
 
 ### Lapisan jaringan
 
@@ -110,9 +110,9 @@ ikut dijalankan sebagai suite.
 | Berkas | Menguji |
 |---|---|
 | `api_config_page_test.dart` | Isian awal, pratinjau alamat, uji koneksi gagal/berhasil, penyimpanan, tombol roda gigi |
-| `card_payment_test.dart` | Tap kartu memajukan alur, tap berulang hanya dihitung sekali, sesi NFC ditutup, keadaan NFC mati dan tanpa NFC |
+| `card_payment_test.dart` | Tap kartu menanyakan tagihan lalu memajukan alur, kegagalan menahan alur dan membuka lagi pembacaan kartu, pemetaan prefix kartu ke penerbit, serta keadaan NFC mati dan tanpa NFC |
 | `widget_test.dart` | Render daftar charge box dan data dummy |
-| `nominal_page_test.dart` | Pilihan dari `/list-kwh`, tidak ada yang terpilih di awal, perhitungan lewat `/count-kwh`, dan rincian harga yang tampil |
+| `nominal_page_test.dart` | Pilihan dari `/list-kwh`, tidak ada yang terpilih di awal, perhitungan lewat `/count-kwh`, pembuatan order lewat `/transaction/push-order`, dan penanganan kode `16` |
 | `booking_test.dart` | R0 mengunci konektor dan menghentikan alur saat ditolak, urutan tahap R0→R1→R2→R3, serta pelepasan konektor saat alur ditinggalkan |
 | `connector_sheet_test.dart` | Status ditanyakan sekali per konektor saat sheet dibuka, status daftar ditimpa hasilnya, label tiap status, dan tidak ada polling |
 | `charge_box_list_render_test.dart` | Dua charge box dari `/list` keduanya tampil |

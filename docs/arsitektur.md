@@ -141,6 +141,14 @@ disembunyikan, bukan diisi nol.
 **Kebijakan sertifikat dihitung ulang tiap ganti alamat.** Lihat
 [konfigurasi.md](konfigurasi.md#sertifikat-tls).
 
+**Kode `responseCode` tidak ditebak.** Seluruh kosakatanya ada di
+`lib/services/response_code.dart`, disalin dari definisi backend.
+Sebelum tabelnya diketahui, tiga kode ditebak dan ketiganya salah —
+`12`, `13`, `15` dipakai sebagai error charger padahal berarti error
+autentikasi, sehingga tanda tangan yang ditolak muncul sebagai "Charger
+menolak perintah". Lihat
+[api-backend.md](api-backend.md#koreksi-yang-dibawa-tabel-ini).
+
 **Arti angka `status` ditafsirkan di satu berkas.**
 `lib/models/backend_status.dart` memegang kosakata angkanya — 1 bebas,
 2 menunggu konektor, 3 mengisi, 4 selesai — supaya perubahan berikutnya
@@ -178,8 +186,9 @@ mode offline, dipakai hanya bila tidak ada `ChargingScope`.
 `DemoData.chargeBoxes` sudah tidak dipakai alur utama dan hanya tersisa
 untuk test.
 
-Hal lain yang masih dibangkitkan lokal: nomor referensi transaksi dan
-kode sesi (`ChargingSession.demo`).
+Nomor referensi transaksi dan kode sesi tidak lagi dikarang: keduanya
+datang dari `POST /transaction/push-order` lewat
+`ChargingSession.fromOrder`.
 
 ## Pembayaran kartu
 
@@ -193,11 +202,16 @@ kunci milik penerbit dan hanya bisa dibaca atau didebit lewat SAM
 (Secure Access Module) bersertifikat. Aplikasi Android biasa tidak bisa
 melakukannya, dan tidak ada pustaka yang mengubah kenyataan itu.
 
-Jadi tap berfungsi sebagai **pemicu**, bukan transaksi. Pemotongan saldo
-sungguhan harus lewat reader atau backend pembayaran bersertifikat;
-tempat memasang panggilannya sudah ditandai di
-`CardPaymentPage._onCardTapped`, setelah kartu terbaca dan sebelum
-halaman berpindah.
+Jadi tap berfungsi sebagai **pemicu**. Begitu kartu terbaca, aplikasi
+menanyakan tagihan lewat `POST /transaction/inquiry-billing` dengan
+nomor kartu tetap dari `Env.cardNumber` — nomor yang sesungguhnya tidak
+bisa dibaca. Gagal di situ menahan alur dan membuka lagi pembacaan
+kartu.
+
+Pemotongan saldo sungguhan masih harus lewat reader atau backend
+pembayaran bersertifikat; tempat memasang panggilannya sudah ditandai di
+`CardPaymentPage._settleBilling`, setelah tagihannya terverifikasi dan
+sebelum halaman berpindah.
 
 **Abstraksi dan penyuntikan.** `CardReader` (`services/card_reader.dart`)
 memisahkan "menunggu kartu" dari NFC-nya, dengan `NfcCardReader` sebagai

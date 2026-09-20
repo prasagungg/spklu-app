@@ -107,6 +107,63 @@ Map<String, dynamic> countKwhResponse({
       },
     };
 
+/// Amplop `POST /transaction/push-order`.
+Map<String, dynamic> pushOrderResponse({
+  num kwh = 10,
+  int rpTotal = 25400,
+  String orderId = 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
+  String sessionCode = '29',
+  String partnerReference = '81067',
+}) =>
+    {
+      'responseCode': '00',
+      'responseMessage': 'Success',
+      'data': {
+        'orderId': orderId,
+        'chargeBoxId': 'CB-SMR-01',
+        'chargeBoxName': 'Kempower Satellite 200 kW',
+        'connectorName': 'Gun 1',
+        'connectorId': '1',
+        'partnerReference': partnerReference,
+        'sessionCode': sessionCode,
+        'kwh': kwh,
+        'rpPerKwh': 2466,
+        'rpPpj': 740,
+        'rpPpn': 0,
+        'rpTotal': rpTotal,
+        'rpLayanan': 0,
+        'rpMaterai': 0,
+        'rpKwh': 24660,
+        'idleFee': 0,
+        'serviceFee': 0,
+      },
+    };
+
+/// Amplop `POST /transaction/inquiry-billing`.
+Map<String, dynamic> inquiryBillingResponse({
+  String orderId = 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
+  String pspId = 'EM-BNI',
+  String cardNumber = '0123456789012345',
+  int totalAmount = 25400,
+}) =>
+    {
+      'responseCode': '00',
+      'responseMessage': 'Success',
+      'data': {
+        'orderId': orderId,
+        'pspId': pspId,
+        'cardNumber': cardNumber,
+        'amount': totalAmount,
+        'fee': 0,
+        'idleFee': 0,
+        'serviceFee': 0,
+        'totalAmount': totalAmount,
+        // Backend mengirimnya kosong di sini; yang berlaku dari
+        // push-order.
+        'sessionCode': '',
+      },
+    };
+
 /// Amplop `POST /booked-connector`.
 ///
 /// [accepted] mengisi field `status`: konektornya bersedia atau tidak.

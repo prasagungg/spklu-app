@@ -83,8 +83,8 @@ Ini bagian yang paling mudah salah baca.
 |---|---|---|
 | Konektor ditekan | Daftar Konektor | `POST /booked-connector` **R0** mengunci konektor. Ditolak → alur berhenti di sini. |
 | Pilihan kWh ditekan | Pilih Nominal | `POST /count-kwh` menghitung harganya. |
-| "Lanjutkan" | Pilih Nominal | Booking naik ke **R1**. |
-| Kartu ditempelkan | Pembayaran Kartu | Tidak ada transaksi. Booking naik ke **R2**, lalu pindah ke Pembayaran Berhasil. |
+| "Lanjutkan" | Pilih Nominal | Booking naik ke **R1**, lalu `POST /transaction/push-order` membuat ordernya. |
+| Kartu ditempelkan | Pembayaran Kartu | `POST /transaction/inquiry-billing` menanyakan tagihan. Berhasil → booking naik ke **R2** lalu pindah ke Pembayaran Berhasil; gagal → tetap di sini dan kartu bisa ditempelkan ulang. |
 | "Mulai Pengisian" | Pembayaran Berhasil | **Tidak** mengirim apa pun. Hanya pindah ke Hubungkan Konektor. |
 | "Mulai Pengisian" | Hubungkan Konektor | Booking naik ke **R3**, lalu `POST /start`, lalu pindah ke Sedang Mengisi. |
 | Kembali ke daftar sebelum pengisian jalan | mana pun di alur pembelian | `POST /cancelled-connector` melepas konektornya. |
@@ -117,6 +117,11 @@ sendiri.
 
 Rincian harga baru muncul setelah ada pilihan; sebelum itu tempatnya
 diisi keterangan singkat, bukan kartu kosong.
+
+"Lanjutkan" membuat order lewat `POST /transaction/push-order`. Sejak
+halaman Konfirmasi, angka yang ditampilkan adalah angka **order** — yang
+juga membawa nomor referensi dan kode sesi — bukan perkiraan dari
+`/count-kwh`.
 
 ## Dua jalan menuju "Pengisian Selesai"
 

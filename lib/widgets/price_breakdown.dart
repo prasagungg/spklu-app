@@ -98,7 +98,7 @@ class TotalRow extends StatelessWidget {
 class CostRows extends StatelessWidget {
   const CostRows({super.key, required this.price});
 
-  final KwhPrice price;
+  final PriceBreakdown price;
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +110,12 @@ class CostRows extends StatelessWidget {
           label: 'Tarif per kWh',
           value: formatRupiahDecimal(price.rpPerKwh),
         ),
+        // Hanya order yang mengirim biaya energi sebagai angka
+        // tersendiri; pada tahap perkiraan barisnya tidak ada.
+        if (price.rpKwh != 0) ...[
+          const SizedBox(height: 12),
+          DetailRow(label: 'Biaya Listrik', value: formatRupiah(price.rpKwh)),
+        ],
         const SizedBox(height: 12),
         DetailRow(label: 'PPJ-TL', value: formatRupiah(price.rpPpj)),
         const SizedBox(height: 12),

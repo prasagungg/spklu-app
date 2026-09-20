@@ -245,6 +245,125 @@ Ini alasan lain kenapa aplikasi tidak menurunkan angka sendiri: kalau
 "Biaya Listrik" dihitung dari kWh × tarif, untuk 30 kWh ia akan jauh
 melebihi total yang dikirim backend.
 
+## `POST /transaction/push-order`
+
+Membuat order untuk kWh yang dipilih. Dipanggil saat "Lanjutkan"
+ditekan di halaman Pilih Nominal.
+
+```json
+{ "chargeBoxId": "CB-SMR-01", "connectorId": "1", "kwh": 10 }
+```
+
+```json
+{
+  "responseCode": "00",
+  "responseMessage": "Success",
+  "data": {
+    "orderId": "ADWTJU5D56QGZNXTTNOX9YZFTN",
+    "chargeBoxId": "CB-SMR-01",
+    "chargeBoxName": "Kempower Satellite 200 kW",
+    "connectorName": "Gun 1", "connectorId": "1",
+    "partnerReference": "81067", "sessionCode": "29",
+    "kwh": 10, "rpPerKwh": 2466, "rpPpj": 740, "rpPpn": 0,
+    "rpTotal": 25400, "rpLayanan": 0, "rpMaterai": 0,
+    "rpKwh": 24660, "idleFee": 0, "serviceFee": 0
+  }
+}
+```
+
+Inilah sumber tiga hal yang sebelumnya **dikarang aplikasi**:
+
+| Field | Dipakai sebagai |
+|---|---|
+| `orderId` | Identitas order, disimpan di `ChargingSession.orderId` |
+| `sessionCode` | Kode yang dipakai pengguna mengakhiri sesinya |
+| `partnerReference` | "No Reference" pada Detail Transaksi |
+
+Rinciannya juga lebih lengkap daripada `/count-kwh`: ada **`rpKwh`**,
+biaya energi sebagai angka tersendiri, jadi baris "Biaya Listrik" muncul
+di halaman Konfirmasi tanpa aplikasi perlu menghitungnya. Angkanya
+konsisten — 24.660 + 740 = 25.400.
+
+### Yang diamati saat pengujian
+
+- **Hanya satu order tertunda per konektor.** Push kedua dibalas
+  `responseCode` `16` "Processing Another Request" (HTTP 409).
+- **`POST /cancelled-connector` tidak melepas order yang tertunda.**
+  Setelah konektor dibatalkan, push berikutnya tetap dibalas `16`.
+- `orderId` baru setiap order; `partnerReference` dan `sessionCode`
+  tetap pada playground.
+- Angkanya **berbeda dari `/count-kwh`** untuk kWh yang sama — 2466 vs
+  2466,78 per kWh, PPJ 740 vs 2467, total 25.400 vs 27.135. Yang
+  berlaku adalah angka order, dan itulah yang ditampilkan sejak halaman
+  Konfirmasi.
+
+Kode `16` diterjemahkan jadi arahan yang bisa ditindaklanjuti — "Masih
+ada pesanan yang belum selesai di konektor ini" — bukan pesan mentah
+backend.
+
+## `POST /transaction/inquiry-billing`
+
+Menanyakan tagihan satu order untuk kartu tertentu, sebelum didebit.
+Dipanggil begitu kartu ditempelkan di halaman Pembayaran.
+
+```json
+{ "orderId": "QHGQM7SNQ6IY7GQLQDSLTY2RJI",
+  "cardNumber": "0123456789012345" }
+```
+
+```json
+{
+  "responseCode": "00",
+  "responseMessage": "Success",
+  "data": {
+    "orderId": "QHGQM7SNQ6IY7GQLQDSLTY2RJI",
+    "pspId": "EM-BNI", "cardNumber": "0123456789012345",
+    "amount": 25400, "fee": 0, "idleFee": 0, "serviceFee": 0,
+    "totalAmount": 25400, "sessionCode": ""
+  }
+}
+```
+
+### Nomor kartu masih tetap
+
+NFC hanya bisa membaca nomor seri kartu, bukan nomor uang elektroniknya
+— lihat [arsitektur.md](arsitektur.md#pembayaran-kartu). Yang dikirim
+karena itu `Env.cardNumber`, bisa diganti lewat
+`--dart-define=SPKLU_CARD_NUMBER=…`.
+
+Empat digit pertamanya menentukan penerbit yang dikenali backend:
+
+| Prefix | `pspId` |
+|---|---|
+| `0123` | EM-BNI |
+| `4567` | EM-BRI |
+| `8901` | EM-BCA |
+| `2345` | EM-MANDIRI |
+
+Bawaannya `0123456789012345` (EM-BNI).
+
+### Yang diamati saat pengujian
+
+- **Prefix diperiksa lebih dulu.** Prefix di luar keempatnya dibalas
+  `responseCode` `05`, "E-Money Provider Is Not Supported" (400) —
+  bahkan sebelum ordernya dicari.
+- **Idempoten**: panggilan kedua untuk order dan kartu yang sama
+  membalas persis sama.
+- Panjang nomor tidak diperiksa; yang penting prefiksnya.
+- Order yang tidak ditemukan dibalas `responseCode` `21`, "Transaction
+  Not Found" (404).
+- **`sessionCode` di sini dikirim kosong.** Yang berlaku adalah
+  `sessionCode` dari `push-order`, dan aplikasi tidak menimpanya dengan
+  nilai dari sini.
+
+Kegagalan menahan alur: pengguna tidak dibiarkan maju ke "Pembayaran
+Berhasil" untuk tagihan yang tidak pernah terverifikasi. Sesi NFC dibuka
+lagi supaya kartu bisa ditempelkan ulang.
+
+Saldonya sendiri **belum dipotong** — penagihan sungguhan menyusul
+setelah inquiry, dan tempat memanggilnya sudah ditandai di
+`CardPaymentPage._settleBilling`.
+
 ## `POST /booked-connector`
 
 Mengunci konektor atas nama pengguna yang sedang memakai unit ini, lalu
@@ -458,22 +577,70 @@ Sama seperti `/start`, `"stopping"` berarti perintah diteruskan — bukan
 bahwa daya sudah berhenti mengalir. Karena itu energi akhir dibaca ulang
 lewat `/progress`.
 
-## Kode error bisnis
+## Kode `responseCode`
 
-Didefinisikan di `ChargeErrorCode`. Terbaca lewat
+Daftar lengkap dari definisi backend, disalin ke
+`lib/services/response_code.dart`. Terbaca lewat
 `ApiException.responseCode`.
 
-| Kode | HTTP | Arti | Ditangani di |
-|---|---|---|---|
-| `04` | 404 | Endpoint tidak ditemukan | Pesan bawaan `ApiException` |
-| `07` | 400 | `Missing Field: chargePointId` | Pesan "Data charge box tidak lengkap" |
-| `12` | 503 | Charger tidak terhubung ke controller | Pesan menyarankan pilih charge box lain |
-| `13` | 409 | Charger menolak perintah | Pesan menyarankan periksa konektor |
-| `15` | 409 | Tidak ada sesi berjalan pada charger itu | Pesan asli backend |
+| Kode | HTTP | Arti |
+|---|---|---|
+| `00` | 200 | Success |
+| `04` | 404 | Not Found |
+| `05` | 400 | Invalid field format |
+| `06` | 400 | Invalid Status Transition |
+| `07` | 400 | Missing Field |
+| `11` | 401 | Invalid Client ID |
+| `12` | 401 | Invalid Timestamp |
+| `13` | 401 | Invalid Signature |
+| `14` | 401 | Unauthorized |
+| `15` | 400 | Bad Request Data |
+| `16` | 409 | Processing Another Request |
+| `21` | 404 | Transaction Not Found |
+| `22` | 410 | Transaction Expired |
+| `23` | 409 | Transaction already paid |
+| `24` | 422 | Transaction failed |
+| `25` | 422 | Amount mismatch |
+| `31` | 503 | Charging station is not connected |
+| `32` | 409 | The charging station rejected the command |
+| `33` | 504 | The charging station did not answer in time |
+| `34` | 409 | There is no charging session running |
+| `35` | 400 | More than one session running; sebutkan konektornya |
+| `96` | 502 | Network Error |
+| `98` | 503 | Link Down |
+| `99` | 500 | Generic Error |
 
-Penerjemahannya ada di `startErrorMessage()` di
-`lib/pages/connect_connector_page.dart`. Kode yang tidak dikenal memakai
-pesan asli dari backend.
+### Koreksi yang dibawa tabel ini
+
+Sebelum tabelnya diketahui, aplikasi menebak tiga kode dan **ketiganya
+salah**:
+
+| Dipakai sebagai | Arti sebenarnya | Yang benar |
+|---|---|---|
+| `12` charger tidak terhubung | Invalid Timestamp | `31` |
+| `13` perintah ditolak charger | Invalid Signature | `32` |
+| `15` tidak ada sesi berjalan | Bad Request Data | `34` |
+
+Akibatnya tanda tangan yang ditolak — dikonfirmasi lewat pengujian:
+`13` "Invalid Signature" — muncul di layar sebagai "Charger menolak
+perintah. Pastikan konektor sudah terpasang dengan benar", yang akan
+mengirim petugas mengejar hal yang sama sekali salah.
+
+### Cara kode diterjemahkan
+
+Tiap halaman punya penerjemahnya sendiri untuk kode yang relevan dengan
+langkah di situ — `startErrorMessage`, `billingErrorMessage`,
+`orderErrorMessage`. Yang tidak ditangani jatuh ke
+`generalErrorMessage`, yang membedakan dua kelompok:
+
+- **`11`–`14`** berarti aplikasi ini yang ditolak, bukan permintaannya:
+  client id, jam perangkat, atau kunci penanda tangan salah. Pesannya
+  menunjuk ke konfigurasi kredensial dan menyertakan kodenya, supaya
+  petugas tahu ini bukan masalah charger.
+- **`96`, `98`, `99`** gangguan sementara di sisi server; pengguna
+  diarahkan mencoba lagi.
+
+Sisanya memakai `responseMessage` dari backend apa adanya.
 
 ## Penanganan error umum
 

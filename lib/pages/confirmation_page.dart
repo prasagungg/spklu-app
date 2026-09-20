@@ -4,7 +4,7 @@ import '../data/formatters.dart';
 import '../models/charge_box.dart';
 import '../models/charging_session.dart';
 import '../models/connector.dart';
-import '../models/kwh_price.dart';
+import '../models/order.dart';
 import '../theme/app_colors.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/price_breakdown.dart';
@@ -18,18 +18,18 @@ class ConfirmationPage extends StatelessWidget {
     super.key,
     required this.chargeBox,
     required this.connector,
-    required this.price,
+    required this.order,
   });
 
   final ChargeBox chargeBox;
   final Connector connector;
-  final KwhPrice price;
+  final Order order;
 
   void _confirm(BuildContext context) {
-    final session = ChargingSession.demo(
+    final session = ChargingSession.fromOrder(
       chargeBox: chargeBox,
       connector: connector,
-      price: price,
+      order: order,
       now: DateTime.now(),
     );
 
@@ -87,7 +87,7 @@ class ConfirmationPage extends StatelessWidget {
                 IconDetailRow(
                   asset: 'assets/icons/ic_nominal.svg',
                   label: 'Nominal',
-                  value: formatKwh(price.kwh),
+                  value: formatKwh(order.kwh),
                 ),
                 const SizedBox(height: 12),
                 // Blok rincian biaya berlatar #ECF5FE (73:2643).
@@ -99,9 +99,9 @@ class ConfirmationPage extends StatelessWidget {
                   padding: const EdgeInsets.all(8),
                   child: Column(
                     children: [
-                      CostRows(price: price),
+                      CostRows(price: order),
                       const SizedBox(height: 12),
-                      TotalRow(amount: price.rpTotal, solid: true),
+                      TotalRow(amount: order.rpTotal, solid: true),
                     ],
                   ),
                 ),

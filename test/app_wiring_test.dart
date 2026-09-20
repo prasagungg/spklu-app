@@ -59,6 +59,8 @@ void main() {
         '/booked-connector' => bookingResponse(),
         '/list-kwh' => kwhOptionsResponse(),
         '/count-kwh' => countKwhResponse(),
+        '/transaction/push-order' => pushOrderResponse(),
+        '/transaction/inquiry-billing' => inquiryBillingResponse(),
         _ => _ok,
       },
     );
@@ -102,6 +104,11 @@ void main() {
     reader.tap();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
+    // Inquiry tagihan menambah satu hop async sebelum halaman pindah.
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
 
     // Tombol ini hanya berpindah halaman, belum menembak /start.
     await tester.tap(find.text('Mulai Pengisian'));
@@ -147,6 +154,10 @@ void main() {
       if (path == '/booked-connector') return bookingResponse();
       if (path == '/list-kwh') return kwhOptionsResponse();
       if (path == '/count-kwh') return countKwhResponse();
+      if (path == '/transaction/push-order') return pushOrderResponse();
+      if (path == '/transaction/inquiry-billing') {
+        return inquiryBillingResponse();
+      }
       if (path == '/progress') {
         return {
           'responseCode': '00',
@@ -199,6 +210,11 @@ void main() {
     reader.tap();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
+    // Inquiry tagihan menambah satu hop async sebelum halaman pindah.
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
     await tester.tap(find.text('Mulai Pengisian'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
@@ -250,6 +266,10 @@ void main() {
       if (path == '/booked-connector') return bookingResponse();
       if (path == '/list-kwh') return kwhOptionsResponse();
       if (path == '/count-kwh') return countKwhResponse();
+      if (path == '/transaction/push-order') return pushOrderResponse();
+      if (path == '/transaction/inquiry-billing') {
+        return inquiryBillingResponse();
+      }
       if (path == '/progress') {
         return {
           'responseCode': '00',
@@ -297,6 +317,11 @@ void main() {
     reader.tap();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
+    // Inquiry tagihan menambah satu hop async sebelum halaman pindah.
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
     await tester.tap(find.text('Mulai Pengisian'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));

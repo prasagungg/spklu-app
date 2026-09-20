@@ -86,6 +86,11 @@ void main() {
     // Kartu e-Money ditempelkan — inilah yang memajukan alur sekarang.
     reader.tap();
     await settle(tester);
+    // Inquiry tagihan menambah satu hop async sebelum halaman pindah.
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
 
     // 6. Pembayaran Berhasil.
     expect(find.text('Pembayaran Berhasil'), findsOneWidget);
@@ -167,6 +172,11 @@ void main() {
     // Kartu e-Money ditempelkan — inilah yang memajukan alur sekarang.
     reader.tap();
     await settle(tester);
+    // Inquiry tagihan menambah satu hop async sebelum halaman pindah.
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
     await tester.tap(find.text('Mulai Pengisian'));
     await settle(tester);
     await tester.pump(const Duration(seconds: 3));
@@ -206,6 +216,11 @@ void main() {
     // Kartu e-Money ditempelkan — inilah yang memajukan alur sekarang.
     reader.tap();
     await settle(tester);
+    // Inquiry tagihan menambah satu hop async sebelum halaman pindah.
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
     await tester.tap(find.text('Mulai Pengisian'));
     await settle(tester);
 
@@ -258,6 +273,11 @@ void main() {
     // Kartu e-Money ditempelkan — inilah yang memajukan alur sekarang.
     reader.tap();
     await settle(tester);
+    // Inquiry tagihan menambah satu hop async sebelum halaman pindah.
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
     await expectHome('Pembayaran Berhasil');
 
     await tester.tap(find.text('Mulai Pengisian'));

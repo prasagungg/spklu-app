@@ -25,6 +25,8 @@ class _Stub extends Interceptor {
           '/booked-connector' => bookingResponse(),
           '/list-kwh' => kwhOptionsResponse(),
           '/count-kwh' => countKwhResponse(),
+          '/transaction/push-order' => pushOrderResponse(),
+          '/transaction/inquiry-billing' => inquiryBillingResponse(),
           '/progress' => progress(),
           _ => okResponse,
         },
@@ -75,6 +77,11 @@ void main() {
 
     reader.tap();
     await _settle(tester);
+    // Inquiry tagihan menambah satu hop async sebelum halaman pindah.
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
     await tester.tap(find.text('Mulai Pengisian'));
     await _settle(tester);
 

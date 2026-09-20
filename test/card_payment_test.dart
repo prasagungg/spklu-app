@@ -1,23 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dio/dio.dart';
+import 'package:kossotrik/config/env.dart';
 import 'package:kossotrik/data/card_reader_scope.dart';
+import 'package:kossotrik/data/charge_point_repository.dart';
+import 'package:kossotrik/data/charging_scope.dart';
+import 'package:kossotrik/models/billing.dart';
+import 'package:kossotrik/services/api_client.dart';
 import 'package:kossotrik/data/demo_data.dart';
 import 'package:kossotrik/models/charging_session.dart';
-import 'package:kossotrik/models/kwh_price.dart';
+import 'package:kossotrik/models/order.dart';
 import 'package:kossotrik/pages/card_payment_page.dart';
 import 'package:kossotrik/pages/payment_success_page.dart';
 import 'package:kossotrik/services/card_reader.dart';
 import 'package:kossotrik/theme/app_theme.dart';
 
 import 'fake_card_reader.dart';
+import 'fixtures.dart';
 
 ChargingSession _session() {
   final box = DemoData.chargeBoxes[3];
 
-  return ChargingSession.demo(
+  return ChargingSession.fromOrder(
     chargeBox: box,
     connector: box.connectors.first,
-    price: const KwhPrice(kwh: 19.5, rpTotal: 50000),
+    order: const Order(
+      orderId: 'ORDER-1',
+      sessionCode: '29',
+      partnerReference: '81067',
+      kwh: 19.5,
+      rpTotal: 50000,
+    ),
     now: DateTime(2026, 9, 16, 18, 40, 39),
   );
 }
@@ -42,7 +55,159 @@ Future<void> pumpPayment(WidgetTester tester, FakeCardReader reader) async {
   await settle(tester);
 }
 
+/// Menjawab inquiry billing; bisa dibuat menolak dengan kode tertentu.
+class _Billing extends Interceptor {
+  _Billing({this.errorCode});
+
+  final String? errorCode;
+  final List<RequestOptions> requests = [];
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    requests.add(options);
+
+    if (errorCode != null) {
+      handler.reject(
+        DioException.badResponse(
+          statusCode: 400,
+          requestOptions: options,
+          response: Response<Map<String, dynamic>>(
+            requestOptions: options,
+            statusCode: 400,
+            data: {
+              'responseCode': errorCode,
+              'responseMessage': 'Ditolak backend',
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
+    handler.resolve(
+      Response<Map<String, dynamic>>(
+        requestOptions: options,
+        statusCode: 200,
+        data: switch (options.path) {
+          '/transaction/inquiry-billing' => inquiryBillingResponse(),
+          _ => okResponse,
+        },
+      ),
+    );
+  }
+}
+
+/// Halaman pembayaran yang tersambung backend tiruan.
+Future<void> _pumpOnline(
+  WidgetTester tester,
+  FakeCardReader reader,
+  _Billing billing,
+) async {
+  final repo = ChargePointRepository(
+    client: ApiClient.withDio(Dio()..interceptors.add(billing)),
+  );
+
+  await tester.pumpWidget(
+    ChargingScope(
+      repository: repo,
+      child: CardReaderScope(
+        reader: reader,
+        child: MaterialApp(
+          theme: AppTheme.build(),
+          home: CardPaymentPage(session: _session()),
+        ),
+      ),
+    ),
+  );
+  await settle(tester);
+}
+
+/// Inquiry menambah satu hop async sebelum halaman pindah.
+Future<void> settleNetwork(WidgetTester tester) async {
+  for (var i = 0; i < 5; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+  await tester.pump(const Duration(milliseconds: 600));
+}
+
 void main() {
+  group('inquiry billing', () {
+    testWidgets('tap kartu menanyakan tagihan ordernya', (tester) async {
+      final reader = FakeCardReader();
+      final billing = _Billing();
+      await _pumpOnline(tester, reader, billing);
+
+      reader.tap();
+      await settleNetwork(tester);
+
+      final call = billing.requests
+          .firstWhere((r) => r.path == '/transaction/inquiry-billing');
+      expect(call.method, 'POST');
+      expect(call.data, {
+        'orderId': 'ORDER-1',
+        // Nomor kartu masih tetap: NFC tidak bisa membacanya.
+        'cardNumber': Env.cardNumber,
+      });
+      expect(find.byType(PaymentSuccessPage), findsOneWidget);
+    });
+
+    /// Maju ke "Pembayaran Berhasil" untuk tagihan yang tidak pernah
+    /// terverifikasi jauh lebih berbahaya daripada menahan pengguna.
+    testWidgets('kartu yang tidak didukung menahan alur', (tester) async {
+      final reader = FakeCardReader();
+      await _pumpOnline(tester, reader, _Billing(errorCode: '05'));
+
+      reader.tap();
+      await settleNetwork(tester);
+
+      expect(find.byType(PaymentSuccessPage), findsNothing);
+      expect(find.textContaining('Kartu ini tidak didukung'), findsOneWidget);
+    });
+
+    testWidgets('order kedaluwarsa dijelaskan', (tester) async {
+      final reader = FakeCardReader();
+      await _pumpOnline(tester, reader, _Billing(errorCode: '21'));
+
+      reader.tap();
+      await settleNetwork(tester);
+
+      expect(
+        find.textContaining('Pesanan tidak ditemukan atau sudah kedaluwarsa'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('gagal menagih membuka lagi pembacaan kartu',
+        (tester) async {
+      final reader = FakeCardReader();
+      await _pumpOnline(tester, reader, _Billing(errorCode: '05'));
+
+      reader.tap();
+      await settleNetwork(tester);
+
+      // Sesi NFC dibuka kembali supaya kartu bisa ditempelkan ulang.
+      expect(reader.isWaiting, isTrue);
+    });
+  });
+
+  group('penerbit kartu', () {
+    test('prefix menentukan penerbitnya', () {
+      expect(issuerOf('0123456789012345'), 'EM-BNI');
+      expect(issuerOf('4567000000000000'), 'EM-BRI');
+      expect(issuerOf('8901000000000000'), 'EM-BCA');
+      expect(issuerOf('2345000000000000'), 'EM-MANDIRI');
+    });
+
+    test('prefix tak dikenal tidak punya penerbit', () {
+      expect(issuerOf('9999000000000000'), isNull);
+      expect(issuerOf('012'), isNull);
+    });
+
+    test('nomor bawaan memakai prefix yang didukung', () {
+      expect(issuerOf(Env.cardNumber), isNotNull);
+    });
+  });
+
   testWidgets('tidak ada lagi tombol bayar', (tester) async {
     await pumpPayment(tester, FakeCardReader());
 
