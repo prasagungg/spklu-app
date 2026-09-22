@@ -7,6 +7,7 @@ import 'package:kossotrik/services/api_client.dart';
 
 import 'fake_card_reader.dart';
 import 'fixtures.dart';
+import 'flow_helpers.dart';
 
 /// Merekam setiap request dan menjawabnya lewat [responder], sehingga
 /// test bisa mengubah jawaban `/list` di tengah alur.
@@ -57,6 +58,8 @@ void main() {
       (path) => switch (path) {
         '/list-chargerbox' => _list(),
         '/booked-connector' => bookingResponse(),
+        '/status-konektor' => connectorStatusResponse(),
+        '/manage-sessioncode' => sessionCodeResponse(),
         '/list-kwh' => kwhOptionsResponse(),
         '/count-kwh' => countKwhResponse(),
         '/transaction/push-order' => pushOrderResponse(),
@@ -136,9 +139,11 @@ void main() {
     // Charge box, konektor, dan kWh-nya melekat pada order.
     expect(starts.single.data, {'orderId': 'YZ00ZG5SP9HUNVRPTZH69Y7POW'});
 
-    // Beri waktu transisi rute selesai sebelum memeriksa halaman status.
+    // Beri waktu transisi rute selesai. Yang muncul adalah halaman
+    // kode sesi, bukan layar pemantauan.
     await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('Sedang Mengisi'), findsOneWidget);
+    expect(find.text('Pengisian Dimulai'), findsOneWidget);
+    expect(find.text('29'), findsOneWidget);
   });
 
   testWidgets('halaman status mem-polling /progress dan pindah saat selesai',
@@ -146,9 +151,18 @@ void main() {
     var progressStatus = 3;
     var charged = 0.0;
 
+    // Setelah perintah start, konektornya melapor sedang mengisi —
+    // seperti backend sungguhan, sehingga sesinya bisa dibuka lagi.
+    var charging = false;
+
     final recorder = _Recorder((path) {
+      if (path == '/transaction/charging/start') charging = true;
+      if (path == '/status-konektor') {
+        return connectorStatusResponse(status: charging ? 3 : 1);
+      }
       if (path == '/list-chargerbox') return _list();
       if (path == '/booked-connector') return bookingResponse();
+      if (path == '/manage-sessioncode') return sessionCodeResponse();
       if (path == '/list-kwh') return kwhOptionsResponse();
       if (path == '/count-kwh') return countKwhResponse();
       if (path == '/transaction/push-order') return pushOrderResponse();
@@ -218,6 +232,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     }
     await tester.pump(const Duration(milliseconds: 600));
+
+    await reopenChargingSession(tester);
     expect(find.text('Sedang Mengisi'), findsOneWidget);
 
     // Energi naik mengikuti ongoing-kwh.
@@ -245,9 +261,18 @@ void main() {
 
   testWidgets('Akhiri Pengisian mengirim /stop dengan connectorId',
       (tester) async {
+    // Setelah perintah start, konektornya melapor sedang mengisi —
+    // seperti backend sungguhan, sehingga sesinya bisa dibuka lagi.
+    var charging = false;
+
     final recorder = _Recorder((path) {
+      if (path == '/transaction/charging/start') charging = true;
+      if (path == '/status-konektor') {
+        return connectorStatusResponse(status: charging ? 3 : 1);
+      }
       if (path == '/list-chargerbox') return _list();
       if (path == '/booked-connector') return bookingResponse();
+      if (path == '/manage-sessioncode') return sessionCodeResponse();
       if (path == '/list-kwh') return kwhOptionsResponse();
       if (path == '/count-kwh') return countKwhResponse();
       if (path == '/transaction/push-order') return pushOrderResponse();
@@ -322,6 +347,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     }
     await tester.pump(const Duration(milliseconds: 600));
+
+    await reopenChargingSession(tester);
     expect(find.text('Sedang Mengisi'), findsOneWidget);
 
     await tester.tap(find.text('Akhiri Pengisian'));

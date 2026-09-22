@@ -7,14 +7,19 @@ import 'package:kossotrik/services/api_client.dart';
 
 import 'fake_card_reader.dart';
 import 'fixtures.dart';
+import 'flow_helpers.dart';
 
 class _Stub extends Interceptor {
   _Stub(this.progress);
 
   final Map<String, dynamic> Function() progress;
 
+  /// Setelah perintah start, konektornya melapor sedang mengisi.
+  bool _charging = false;
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    if (options.path == '/transaction/charging/start') _charging = true;
     handler.resolve(
       Response<Map<String, dynamic>>(
         requestOptions: options,
@@ -23,6 +28,10 @@ class _Stub extends Interceptor {
               chargeBoxJson(id: 'CB-SMR-01', nama: 'CB-SMR-01'),
             ]),
           '/booked-connector' => bookingResponse(),
+          '/manage-sessioncode' => sessionCodeResponse(),
+          '/status-konektor' => connectorStatusResponse(
+              status: _charging ? 3 : 1,
+            ),
           '/list-kwh' => kwhOptionsResponse(),
           '/count-kwh' => countKwhResponse(),
           '/transaction/push-order' => pushOrderResponse(),
@@ -97,9 +106,12 @@ void main() {
     }
     await tester.pump(const Duration(milliseconds: 600));
 
+    // Kode sesi dari push-order ditunjukkan dulu; pemantauan dibuka
+    // dengan kode itu dari daftar charge box.
+    await reopenChargingSession(tester);
     expect(find.text('Sedang Mengisi'), findsOneWidget);
 
-    // Polling pertama membawa 3 Wh.
+    // Polling pertama membawa 0,003 kWh.
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
     expect(find.text('0,003 kWh'), findsOneWidget);

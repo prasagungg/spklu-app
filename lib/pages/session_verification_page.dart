@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../config/env.dart';
+import '../data/charging_scope.dart';
+import '../models/session_check.dart';
+import '../services/api_exception.dart';
+import '../services/response_code.dart';
 import '../theme/app_colors.dart';
 import '../widgets/asset_slot.dart';
 import '../widgets/page_scaffold.dart';
@@ -10,18 +14,32 @@ import 'card_payment_page.dart';
 /// Frame Figma 73:4752 — "Verifikasi Sesi".
 ///
 /// Ditampilkan sebelum pengguna boleh menyentuh konektor yang statusnya
-/// bukan "Available": konektor itu sudah diklaim orang lain, jadi hanya
-/// pemilik sesi — yang memegang kode sesi — yang boleh melanjutkan.
+/// bukan "Available": konektor itu sudah diklaim, jadi hanya pemilik
+/// sesi — yang memegang kode sesi dari halaman "Pengisian Dimulai" —
+/// yang boleh melanjutkan.
 ///
-/// Mengembalikan `true` lewat Navigator bila kodenya benar.
+/// Kodenya diperiksa backend lewat `POST /manage-sessioncode`. Kode
+/// sesi melekat pada order, jadi aplikasi tidak bisa — dan tidak boleh
+/// — memutuskannya sendiri.
+///
+/// Mengembalikan [SessionCheck] lewat Navigator bila kodenya benar,
+/// atau null bila pengguna membatalkan.
 class SessionVerificationPage extends StatefulWidget {
   /// Key tombol hapus pada keypad, dipakai test.
   static const eraseKey = Key('keypad-erase');
 
-  const SessionVerificationPage({super.key, this.expectedCode});
+  const SessionVerificationPage({
+    super.key,
+    required this.chargeBoxId,
+    required this.connectorId,
+    this.expectedCode,
+  });
 
-  /// Kode yang diterima. Default mengambil [Env.sessionPin], yang untuk
-  /// sekarang masih nilai tetap.
+  final String chargeBoxId;
+  final int connectorId;
+
+  /// Kode yang diterima saat tidak ada backend — mode offline untuk
+  /// test. Default [Env.sessionPin].
   final String? expectedCode;
 
   @override
@@ -35,35 +53,78 @@ class _SessionVerificationPageState extends State<SessionVerificationPage> {
 
   String _entered = '';
   bool _wrong = false;
+  bool _checking = false;
+
+  /// Alasan penolakan dari backend, bila ada.
+  String? _reason;
 
   String get _expected => widget.expectedCode ?? Env.sessionPin;
 
   bool get _complete => _entered.length == _length;
 
   void _press(String digit) {
-    if (_complete) return;
+    if (_complete || _checking) return;
     setState(() {
       _entered += digit;
       _wrong = false;
+      _reason = null;
     });
   }
 
   void _erase() {
-    if (_entered.isEmpty) return;
+    if (_entered.isEmpty || _checking) return;
     setState(() {
       _entered = _entered.substring(0, _entered.length - 1);
       _wrong = false;
+      _reason = null;
     });
   }
 
-  void _verify() {
-    if (_entered == _expected) {
-      Navigator.of(context).pop(true);
+  Future<void> _verify() async {
+    if (_checking) return;
+
+    final repository = ChargingScope.maybeOf(context)?.repository;
+
+    // Mode offline: tidak ada yang bisa memeriksa, jadi dibandingkan
+    // dengan kode yang diketahui aplikasi.
+    if (repository == null) {
+      if (_entered == _expected) {
+        Navigator.of(context).pop(SessionCheck(sessionCode: _entered));
+        return;
+      }
+      _reject();
       return;
     }
+
+    setState(() => _checking = true);
+
+    try {
+      final check = await repository.verifySessionCode(
+        chargeBoxId: widget.chargeBoxId,
+        connectorId: widget.connectorId,
+        sessionCode: _entered,
+      );
+      if (!mounted) return;
+      debugPrint('[FLOW] Kode sesi diterima: $check');
+      Navigator.of(context).pop(check);
+    } on ApiException catch (e) {
+      _reject(
+        e.responseCode == ResponseCode.transactionNotFound
+            ? 'Kode sesi tidak cocok, atau sesinya sudah berakhir'
+            : e.message,
+      );
+    } on Object catch (e) {
+      _reject('Kode gagal diperiksa: $e');
+    }
+  }
+
+  void _reject([String? reason]) {
+    if (!mounted) return;
     setState(() {
       _wrong = true;
+      _checking = false;
       _entered = '';
+      _reason = reason;
     });
   }
 
@@ -71,18 +132,20 @@ class _SessionVerificationPageState extends State<SessionVerificationPage> {
   Widget build(BuildContext context) {
     return PageScaffold(
       title: 'Verifikasi Sesi',
-      subtitle: _wrong
-          ? 'Kode sesi salah, coba lagi'
-          : 'Masukkan $_length digit kode sesi',
+      subtitle: switch ((_checking, _wrong)) {
+        (true, _) => 'Memeriksa kode sesi…',
+        (_, true) => _reason ?? 'Kode sesi salah, coba lagi',
+        _ => 'Masukkan $_length digit kode sesi',
+      },
       titleAlign: TextAlign.center,
       backgroundColor: AppColors.pageBackgroundPlain,
       bottomBar: BottomActionBar(
         opaque: false,
         children: [
           PrimaryButton(
-            label: 'Verifikasi',
+            label: _checking ? 'Memeriksa…' : 'Verifikasi',
             trailingAsset: null,
-            onPressed: _complete ? _verify : null,
+            onPressed: _complete && !_checking ? _verify : null,
           ),
           Row(
             children: [
@@ -90,7 +153,7 @@ class _SessionVerificationPageState extends State<SessionVerificationPage> {
                 child: SecondaryButton(
                   label: 'Kembali',
                   leadingAsset: 'assets/icons/ic_arrow_left.svg',
-                  onPressed: () => Navigator.of(context).pop(false),
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
               ),
               const SizedBox(width: 12),

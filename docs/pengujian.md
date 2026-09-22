@@ -6,7 +6,7 @@ flutter test test/host_test.dart
 dart analyze lib test
 ```
 
-Suite-nya 204 test di 26 berkas dan berjalan sekitar lima detik. Tidak
+Suite-nya 217 test di 27 berkas dan berjalan sekitar lima detik. Tidak
 ada yang menyentuh jaringan.
 
 ## Cara test menghindari jaringan
@@ -62,6 +62,14 @@ lain lewat `compute()`, dan panggilannya dibungkus `tester.runAsync()` —
 di zona async palsu milik widget test, Future milik Dio tidak pernah
 selesai.
 
+**Membuka kembali sesi yang sedang mengisi.** `reopenChargingSession`
+di `test/flow_helpers.dart` menempuh jalan yang sama seperti pengguna:
+pulang dari layar kode sesi, tekan konektornya lagi, lalu masukkan
+kodenya. Agar itu bisa jalan, stub harus melaporkan konektornya
+berstatus `3` setelah melihat perintah start — mode offline tidak bisa
+menirunya karena daftar dummy-nya statis, jadi bagian ini diuji di test
+yang memakai backend tiruan.
+
 **Menyuntik `FakeCardReader`.** Lingkungan test tidak punya NFC, jadi
 alur pembayaran memerlukan pembaca palsu yang tap-nya dipicu manual.
 Pasang lewat `CardReaderScope`, atau lewat parameter `cardReader` pada
@@ -112,15 +120,16 @@ ikut dijalankan sebagai suite.
 | `widget_test.dart` | Render daftar charge box dan data dummy |
 | `nominal_page_test.dart` | Pilihan dari `/list-kwh`, tidak ada yang terpilih di awal, perhitungan lewat `/count-kwh`, pembuatan order lewat `/transaction/push-order`, dan penanganan kode `16` |
 | `booking_test.dart` | R0 mengunci konektor dan menghentikan alur saat ditolak, urutan tahap R0→R1→R2→R3, serta pelepasan konektor saat alur ditinggalkan |
+| `connector_detection_poll_test.dart` | Polling `manage-sessioncode` tiap detik, tombol start mati selama menunggu, dan status tak dikenal tidak dianggap tercolok |
 | `connector_sheet_test.dart` | Status ditanyakan sekali per konektor saat sheet dibuka, status daftar ditimpa hasilnya, label tiap status, dan tidak ada polling |
 | `charge_box_list_render_test.dart` | Dua charge box dari `/list` keduanya tampil |
 | `charge_box_reload_test.dart` | `/list` dipanggil ulang tiap kembali ke daftar |
 | `charge_box_refresh_test.dart` | Tarik-ke-bawah memuat ulang daftar, dan daftar tidak menyegarkan diri sendiri |
 | `connector_routing_test.dart` | Tujuan tiap angka status, termasuk verifikasi sesi untuk konektor yang sudah diklaim |
-| `charging_flow_test.dart` | Alur lengkap, pembatalan stop, tombol Home di tiap halaman |
+| `charging_flow_test.dart` | Alur lengkap sampai layar kode sesi, pemantauan dan penghentian, tombol Home di tiap halaman |
 | `charging_status_seed_test.dart` | Energi mulai dari nol lalu diisi polling `ongoing-kwh` pertama, dan sesi tanpa `orderId` tidak menanyakan apa pun |
 | `final_energy_test.dart` | kWh akhir diambil dari `/progress` terakhir, bukan saat tombol ditekan |
-| `session_verification_test.dart` | Keypad dua digit, kode salah, tombol hapus |
+| `session_verification_test.dart` | Keypad dua digit, verifikasi ke `POST /manage-sessioncode`, `orderId` yang dikembalikan, dan mode offline |
 | `app_wiring_test.dart` | `/start` dan `/stop` benar-benar terkirim dengan body yang benar |
 | `charging_scope_test.dart` | Scope harus di atas `MaterialApp` agar terlihat rute lanjutan |
 

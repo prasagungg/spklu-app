@@ -125,6 +125,8 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
   /// Sesi berakhir di sisi charger, bukan lewat tombol di aplikasi.
   void _finish(double energyKwh) {
     _ticker?.cancel();
+    // Sesinya sudah tamat; tidak ada lagi yang perlu diingat.
+    _scope?.booking.forget();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
         builder: (_) => ChargingFinishedPage(

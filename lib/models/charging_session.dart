@@ -72,14 +72,15 @@ class ChargingSession {
     required ChargeBox chargeBox,
     required Connector connector,
     required DateTime now,
-    int? transactionId,
+    String orderId = '',
   }) {
     return ChargingSession(
       chargeBox: chargeBox,
       connector: connector,
-      sessionCode: transactionId?.toString() ?? '-',
+      sessionCode: '-',
       reference: '-',
       createdAt: now,
+      orderId: orderId,
     );
   }
 

@@ -8,6 +8,7 @@ import '../models/booking.dart';
 import '../models/charging_progress.dart';
 import '../models/kwh_price.dart';
 import '../models/order.dart';
+import '../models/session_check.dart';
 import '../models/spklu.dart';
 import '../services/api_client.dart';
 import '../services/api_exception.dart';
@@ -268,6 +269,41 @@ class ChargePointRepository {
     );
 
     return BillingInquiry.fromJson(_unwrap(json));
+  }
+
+  /// `POST /manage-sessioncode`
+  ///
+  /// Memeriksa kode sesi yang diketik pengguna pada konektor yang
+  /// sedang dipakai. Backend yang memutuskan cocok atau tidak — kode
+  /// sesinya milik order, bukan sesuatu yang bisa ditebak aplikasi.
+  ///
+  /// ```json
+  /// { "chargeBoxId": "CB-SMR-01", "connectorId": "1",
+  ///   "sessionCode": "29" }
+  /// ```
+  ///
+  /// Jawabannya juga membawa `statusProcess`, yang dipakai halaman
+  /// Hubungkan Konektor untuk memantau apakah nozzle sudah tercolok.
+  ///
+  /// Gagal dengan [ResponseCode.transactionNotFound] bila kodenya tidak
+  /// cocok atau sesinya sudah berakhir, dan
+  /// [ResponseCode.missingField] tanpa `sessionCode`.
+  Future<SessionCheck> verifySessionCode({
+    required String chargeBoxId,
+    required int connectorId,
+    required String sessionCode,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/manage-sessioncode',
+      body: {
+        'chargeBoxId': chargeBoxId,
+        'connectorId': connectorId.toString(),
+        'sessionCode': sessionCode,
+      },
+      cancelToken: cancelToken,
+    );
+    return SessionCheck.fromJson(_unwrap(json));
   }
 
   /// `POST /booked-connector`

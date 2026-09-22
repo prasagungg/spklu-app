@@ -92,7 +92,11 @@ class Env {
     defaultValue: '00',
   );
 
-  /// Jeda antar polling `GET /progress` di halaman status pengisian.
+  /// Jeda antar pemeriksaan `POST /manage-sessioncode` saat menunggu
+  /// konektor dipasang ke kendaraan.
+  static const Duration connectorPollInterval = Duration(seconds: 1);
+
+  /// Jeda antar polling kemajuan di halaman status pengisian.
   static const Duration progressPollInterval = Duration(seconds: 1);
 
   /// Tulis request/response ke konsol. Otomatis mati di release.

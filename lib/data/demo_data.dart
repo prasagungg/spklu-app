@@ -1,3 +1,4 @@
+import '../config/env.dart';
 import '../models/charge_box.dart';
 import '../models/connector.dart';
 import '../models/kwh_price.dart';
@@ -134,7 +135,9 @@ class DemoData {
   static Order orderFor(KwhPrice price) {
     return Order(
       orderId: 'DEMO-ORDER',
-      sessionCode: '29',
+      // Sama dengan kode yang diterima Verifikasi Sesi saat offline,
+      // supaya kode yang ditunjukkan memang bisa dipakai.
+      sessionCode: Env.sessionPin,
       partnerReference: '81067',
       kwh: price.kwh,
       rpPerKwh: price.rpPerKwh,

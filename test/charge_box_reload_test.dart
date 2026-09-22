@@ -19,6 +19,7 @@ class _Counter extends Interceptor {
         data: switch (options.path) {
           '/list-chargerbox' => _list,
           '/booked-connector' => bookingResponse(),
+          '/manage-sessioncode' => sessionCodeResponse(),
           '/list-kwh' => kwhOptionsResponse(),
           '/count-kwh' => countKwhResponse(),
           '/transaction/push-order' => pushOrderResponse(),

@@ -1,11 +1,11 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kossotrik/data/charge_point_repository.dart';
 import 'package:kossotrik/main.dart';
 import 'package:kossotrik/services/api_client.dart';
 
 import 'fixtures.dart';
+import 'flow_helpers.dart';
 
 class _Stub extends Interceptor {
   _Stub(this.status);
@@ -24,6 +24,7 @@ class _Stub extends Interceptor {
           // Status sebenarnya datang dari sini, bukan dari daftar.
           '/status-konektor' => connectorStatusResponse(status: status),
           '/booked-connector' => bookingResponse(),
+          '/manage-sessioncode' => sessionCodeResponse(),
           '/list-kwh' => kwhOptionsResponse(),
           '/count-kwh' => countKwhResponse(),
           '/transaction/push-order' => pushOrderResponse(),
@@ -62,20 +63,11 @@ Future<void> _tapConnector(WidgetTester tester, int status) async {
   await tester.pumpAndSettle();
 }
 
-/// Konektor yang sudah diklaim orang lain menuntut kode sesi dulu.
+/// Konektor yang sudah diklaim menuntut kode sesi dulu; kodenya
+/// diperiksa backend lewat `/manage-sessioncode`.
 Future<void> _verify(WidgetTester tester) async {
   expect(find.text('Verifikasi Sesi'), findsOneWidget);
-
-  for (final digit in '00'.split('')) {
-    final key = find.widgetWithText(InkWell, digit).last;
-    await tester.ensureVisible(key);
-    await tester.pump();
-    await tester.tap(key);
-    await tester.pump();
-  }
-  await tester.tap(find.text('Verifikasi'));
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 600));
+  await enterSessionCode(tester, '29');
 }
 
 void main() {

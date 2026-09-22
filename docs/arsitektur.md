@@ -80,14 +80,14 @@ diketahui dengan menanyai berkala. Jedanya ada di `Env`:
 
 | Layar | Endpoint | Jeda | Alasan |
 |---|---|---|---|
+| Hubungkan Konektor | `POST /manage-sessioncode` | 1 detik | Menunggu nozzle tercolok; pengguna berdiri di depan charger |
 | Sedang Mengisi | `POST /transaction/charging/ongoing-kwh` | 1 detik | Angka kWh harus terlihat bergerak |
 
-Hanya satu layar yang mem-polling. Daftar charge box dulu menyegarkan
-diri tiap dua detik dan halaman Hubungkan Konektor mem-polling menunggu
-kabel tercolok; keduanya dihapus.
+Daftar charge box dulu ikut menyegarkan diri tiap dua detik; itu
+dihapus karena pemeriksaan statusnya pindah ke layar lain.
 
-Status konektor sekarang ditanyakan **sekali saat dilihat**, bukan
-berkala: `POST /status-konektor` dipanggil ketika bottom sheet daftar
+Status konektor di bottom sheet ditanyakan **sekali saat dilihat**,
+bukan berkala: `POST /status-konektor` dipanggil ketika bottom sheet daftar
 konektor terbuka. Daftar charge box dimuat ulang lewat tarik-ke-bawah
 atau saat pengguna kembali ke halaman itu.
 
@@ -116,10 +116,12 @@ Beberapa hal di kode ini terlihat berlebihan sampai tahu sebabnya.
 
 **Seluruh perintah pengisian berkunci order.** `start`, `stop`, dan
 `ongoing-kwh` cukup membawa `orderId` — charge box, konektor, dan
-kWh-nya melekat pada ordernya. Akibatnya sesi yang dilanjutkan dari
-daftar charge box, yang tidak punya orderId, belum bisa dipantau atau
-dihentikan; halamannya jatuh ke simulasi lokal alih-alih menembak
-backend dengan orderId kosong.
+kWh-nya melekat pada ordernya. Daftar charge box tidak membawa orderId,
+jadi sesi yang dibuka kembali memperolehnya dari jawaban
+`POST /manage-sessioncode` saat kode sesi diverifikasi. `ActiveBooking`
+menyimpannya sebagai cadangan. Tanpa salah satunya, halaman status
+jatuh ke simulasi lokal alih-alih menembak backend dengan orderId
+kosong.
 
 **Energi akhir dibaca ulang setelah stop.** Charger masih menyalurkan
 daya beberapa detik setelah perintah berhenti. `StopConfirmPage`

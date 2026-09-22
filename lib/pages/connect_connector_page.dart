@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../config/env.dart';
 import '../data/booking_progress.dart';
 import '../data/charging_scope.dart';
 import '../models/booking.dart';
@@ -14,7 +15,7 @@ import '../widgets/page_scaffold.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/session_widgets.dart';
 import 'card_payment_page.dart';
-import 'charging_status_page.dart';
+import 'charging_started_page.dart';
 
 /// Frame Figma 73:3470 "Hubungkan Konektor" dan 73:3597 "Konektor
 /// Terhubung" — dua state dari layar yang sama.
@@ -49,6 +50,12 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
   bool _connected = false;
   bool _starting = false;
 
+  /// Satu pemeriksaan berjalan dalam satu waktu, supaya permintaan
+  /// tidak menumpuk saat jaringan lambat.
+  bool _checking = false;
+
+  ChargingScope? _scope;
+
   @override
   void initState() {
     super.initState();
@@ -61,15 +68,47 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
       }
       setState(() => _remaining -= const Duration(seconds: 1));
     });
+  }
 
-    _detection = Timer(_simulationDelay, _markPluggedIn);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scope ??= ChargingScope.maybeOf(context);
+    _detection ??= _scope == null
+        ? Timer(_simulationDelay, _markPluggedIn)
+        : Timer.periodic(Env.connectorPollInterval, (_) => _pollConnector());
+  }
+
+  /// Menanyakan tahap proses sesi ini dan menunggu konektor terpasang.
+  ///
+  /// Kegagalan diabaikan: pengguna masih memasang kabel, dan percobaan
+  /// berikutnya menyusul sedetik kemudian.
+  Future<void> _pollConnector() async {
+    if (_checking || _connected || !mounted) return;
+    _checking = true;
+
+    try {
+      final check = await _scope!.repository.verifySessionCode(
+        chargeBoxId: widget.session.chargeBox.id,
+        connectorId: widget.session.connector.id,
+        sessionCode: widget.session.sessionCode,
+      );
+      if (!mounted) return;
+
+      debugPrint('[FLOW] Tahap proses: ${check.statusProcess}');
+      if (check.isPluggedIn) _markPluggedIn();
+    } on Object catch (_) {
+      // Dicoba lagi pada pemeriksaan berikutnya.
+    } finally {
+      _checking = false;
+    }
   }
 
   void _markPluggedIn() {
     if (!mounted || _connected) return;
     _detection?.cancel();
     debugPrint(
-      '[FLOW] Jeda deteksi habis — tombol "Mulai Pengisian" diaktifkan',
+      '[FLOW] Konektor terpasang — tombol "Mulai Pengisian" aktif',
     );
     setState(() => _connected = true);
   }
@@ -81,9 +120,8 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
     super.dispose();
   }
 
-  /// Meminta charger memulai sesi, lalu langsung ke layar status.
-  /// Interstitial "Pengisian Dimulai" (73:3667) dilewati agar start,
-  /// stop, dan pemantauan berada dalam satu alur.
+  /// Meminta charger memulai sesi, lalu ke halaman "Pengisian Dimulai"
+  /// yang menampilkan kode sesinya.
   Future<void> _start() async {
     debugPrint(
       '[FLOW] "Mulai Pengisian" ditekan di Konektor Terhubung — '
@@ -125,7 +163,11 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
 
         // Konektornya sekarang sedang dipakai, bukan sekadar dipesan —
         // kembalinya pengguna ke daftar tidak boleh melepasnya.
-        scope.booking.forget();
+        // Ordernya tetap diingat supaya sesinya bisa dibuka lagi.
+        scope.booking.startedCharging(
+          orderId: widget.session.orderId,
+          sessionCode: widget.session.sessionCode,
+        );
       } on ApiException catch (e) {
         if (!mounted) return;
         setState(() => _starting = false);
@@ -141,7 +183,7 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => ChargingStatusPage(session: widget.session),
+        builder: (_) => ChargingStartedPage(session: widget.session),
       ),
     );
   }

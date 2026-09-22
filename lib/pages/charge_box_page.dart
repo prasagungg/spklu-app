@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../models/session_check.dart';
+
 import '../app_route_observer.dart';
 import '../data/charge_point_repository.dart';
 import '../data/charging_scope.dart';
@@ -106,6 +108,10 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
     final booking = scope?.booking;
     if (scope == null || booking == null || !booking.isHeld) return;
 
+    // Sesi yang sudah mengisi bukan booking yang ditinggalkan —
+    // membatalkannya akan menghentikan pengisian orang.
+    if (booking.isCharging) return;
+
     final chargeBoxId = booking.chargeBoxId!;
     final connectorId = booking.connectorId!;
     final stage = booking.stage;
@@ -170,15 +176,27 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
     final connector = await showConnectorSheet(context, box);
     if (connector == null || !mounted) return;
 
-    // Konektor yang bukan "Available" sudah diklaim orang lain, jadi
-    // pengguna harus membuktikan kepemilikan sesi lebih dulu.
+    // Konektor yang bukan "Available" sudah diklaim, jadi pengguna
+    // harus membuktikan kepemilikan sesi lebih dulu dengan kode yang
+    // ditunjukkan di halaman "Pengisian Dimulai".
+    var verifiedOrderId = '';
     if (!connector.isAvailable) {
-      final verified = await Navigator.of(context).push<bool>(
-        MaterialPageRoute<bool>(
-          builder: (_) => const SessionVerificationPage(),
+      final expected = ChargingScope.maybeOf(context)?.booking.sessionCodeOn(
+            chargeBoxId: box.id,
+            connectorId: connector.id,
+          );
+
+      final check = await Navigator.of(context).push<SessionCheck>(
+        MaterialPageRoute<SessionCheck>(
+          builder: (_) => SessionVerificationPage(
+            chargeBoxId: box.id,
+            connectorId: connector.id,
+            expectedCode: expected,
+          ),
         ),
       );
-      if (verified != true || !mounted) return;
+      if (check == null || !mounted) return;
+      verifiedOrderId = check.orderId;
     } else {
       // Konektor bebas: kunci dulu atas nama pengguna ini sebelum ia
       // menghabiskan waktu memilih nominal dan membayar.
@@ -198,10 +216,10 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
           connector: connector,
         ),
       ConnectorStatus.preparing => ConnectConnectorPage(
-          session: _resume(box, connector),
+          session: _resume(box, connector, verifiedOrderId),
         ),
       ConnectorStatus.inUse || ConnectorStatus.finished => ChargingStatusPage(
-          session: _resume(box, connector),
+          session: _resume(box, connector, verifiedOrderId),
         ),
       // Status tak dikenal tidak bisa ditekan, jadi cabang ini tak
       // terpakai.
@@ -268,11 +286,30 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
 
   /// Sesi tanpa data pembelian — aplikasi tidak tahu berapa yang sudah
   /// dibayarkan pengguna sebelumnya.
-  ChargingSession _resume(ChargeBox box, Connector connector) {
+  ///
+  /// orderId-nya diambil dari ingatan unit ini.
+  ///
+  /// `POST /manage-sessioncode` membuktikan kode sesinya benar tetapi
+  /// tidak mengirim ordernya, sedangkan semua perintah pengisian
+  /// berkunci order. Akibatnya sesi yang dimulai dari unit lain belum
+  /// bisa dipantau maupun dihentikan dari sini. Tanpa itu kemajuannya tidak
+  /// bisa ditanyakan dan pengisiannya tidak bisa dihentikan, karena
+  /// semua endpoint pengisian berkunci order.
+  ChargingSession _resume(
+    ChargeBox box,
+    Connector connector,
+    String verifiedOrderId,
+  ) {
+    final remembered = ChargingScope.maybeOf(context)?.booking.orderOn(
+          chargeBoxId: box.id,
+          connectorId: connector.id,
+        );
+
     return ChargingSession.resumed(
       chargeBox: box,
       connector: connector,
       now: DateTime.now(),
+      orderId: verifiedOrderId.isNotEmpty ? verifiedOrderId : remembered ?? '',
     );
   }
 

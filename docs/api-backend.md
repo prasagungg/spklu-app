@@ -264,6 +264,7 @@ ditekan di halaman Pilih Nominal.
     "chargeBoxName": "Kempower Satellite 200 kW",
     "connectorName": "Gun 1", "connectorId": "1",
     "partnerReference": "81067", "sessionCode": "29",
+    "sessionExpiredTime": "2026-09-22T04:22:14Z",
     "kwh": 10, "rpPerKwh": 2466, "rpPpj": 740, "rpPpn": 0,
     "rpTotal": 25400, "rpLayanan": 0, "rpMaterai": 0,
     "rpKwh": 24660, "idleFee": 0, "serviceFee": 0
@@ -290,8 +291,12 @@ konsisten — 24.660 + 740 = 25.400.
   `responseCode` `16` "Processing Another Request" (HTTP 409).
 - **`POST /cancelled-connector` tidak melepas order yang tertunda.**
   Setelah konektor dibatalkan, push berikutnya tetap dibalas `16`.
-- `orderId` baru setiap order; `partnerReference` dan `sessionCode`
+- `orderId` dan `sessionCode` baru setiap order; `partnerReference`
   tetap pada playground.
+- `sessionExpiredTime` menyebut kapan ordernya kedaluwarsa. Lewat dari
+  itu backend membalas `21` — baik saat menagih maupun saat memulai
+  pengisian. Diurai ke `Order.sessionExpiredAt`, tetapi belum
+  ditampilkan di layar mana pun.
 - Angkanya **berbeda dari `/count-kwh`** untuk kWh yang sama — 2466 vs
   2466,78 per kWh, PPJ 740 vs 2467, total 25.400 vs 27.135. Yang
   berlaku adalah angka order, dan itulah yang ditampilkan sejak halaman
@@ -421,6 +426,68 @@ Isinya bukti transaksi dari mesin kartu; masih nilai tetap dari
   konektor yang sama tetap dibalas `16`.
 - Order kedaluwarsa cukup cepat: order yang dibuat beberapa menit
   sebelumnya sudah dibalas `21` "Transaction Not Found".
+
+## `POST /manage-sessioncode`
+
+```json
+{ "chargeBoxId": "CB-SMR-01", "connectorId": "1", "sessionCode": "29" }
+```
+
+```json
+{
+  "responseCode": "00", "responseMessage": "Success",
+  "data": {
+    "chargeboxId": "delta_sensi",
+    "chargeboxName": "Delta DC Wallbox",
+    "connectorName": "AC TYPE 2 - 7.0",
+    "connectorId": "1",
+    "sessionCode": "29",
+    "statusProcess": 1
+  }
+}
+```
+
+Dipakai dua tempat yang berbeda.
+
+### Memeriksa kode sesi
+
+Saat pengguna menekan konektor yang sedang dipakai, kode yang ia ketik
+diperiksa di sini. Kode sesi melekat pada order, jadi aplikasi tidak
+bisa — dan tidak boleh — memutuskannya sendiri. Sebelum endpoint ini
+ada, verifikasi membandingkan dengan `SPKLU_SESSION_PIN` yang tetap,
+sehingga kode yang ditunjukkan di layar "Pengisian Dimulai" sebenarnya
+tidak membuka apa-apa.
+
+### Memantau nozzle
+
+`statusProcess` memakai kosakata angka yang sama dengan status konektor:
+`1` belum bayar, `2` menunggu konektor dihubungkan, `3` sedang mengisi,
+`4` selesai.
+
+Halaman Hubungkan Konektor memanggil endpoint ini **tiap detik** dan
+menunggu angkanya berpindah dari `2`. Selama masih `2`, tombol "Mulai
+Pengisian" tetap mati. Inilah deteksi kabel tercolok yang sebelumnya
+tidak ada penggantinya sejak `/list` diganti.
+
+Angka yang **tidak dikenal tidak dianggap tercolok**. Menebaknya akan
+mengirim perintah start yang pasti ditolak charger.
+
+### Ejaan `chargeBoxId`
+
+Endpoint ini sempat mengeja `chargeboxId` dengan b kecil sebelum
+dirapikan. Penguraiannya menerima kedua ejaan, supaya versi backend
+yang berbeda tidak memecahkan aplikasi.
+
+### `orderId` menutup alurnya
+
+Jawabannya menyertakan `orderId`, sehingga sesi yang dibuka kembali bisa
+dipantau dan dihentikan — semua perintah pengisian berkunci order,
+sedangkan daftar charge box tidak membawanya. Order yang diingat
+`ActiveBooking` hanya dipakai sebagai cadangan bila field itu kosong.
+
+Terkonfirmasi lewat pengujian: `sessionCode` wajib (`07` tanpa itu),
+kode yang tidak cocok dibalas `21`, dan kode yang benar mengembalikan
+order beserta `statusProcess`.
 
 ## `POST /booked-connector`
 

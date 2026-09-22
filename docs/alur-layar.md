@@ -23,9 +23,13 @@ Pilih Charge Box  (charge_box_page.dart)  ← rute pertama
         │                                         │
         │                              Pembayaran Berhasil
         │                                         │
-        │                              Hubungkan Konektor  ← POST /start di sini
+        │                              Hubungkan Konektor  ← perintah start di sini
         │                                         │
+        │                              Pengisian Dimulai  ← kode sesi ditunjukkan
+        │                                         │  pulang ke daftar
+        │                                         ▼
         └─ Charging ──────────────────► Sedang Mengisi
+             (verifikasi kode sesi)
                                                   │
                             ┌─────────────────────┴───────────────┐
                             │                                     │
@@ -86,6 +90,7 @@ Ini bagian yang paling mudah salah baca.
 | Pemicu | Layar | Yang terjadi |
 |---|---|---|
 | Konektor ditekan | Daftar Konektor | `POST /booked-connector` **R0** mengunci konektor. Ditolak → alur berhenti di sini. |
+| Menunggu di Hubungkan Konektor | Hubungkan Konektor | `POST /manage-sessioncode` tiap detik sampai `statusProcess` menandakan nozzle tercolok. |
 | Pilihan kWh ditekan | Pilih Nominal | `POST /count-kwh` menghitung harganya. |
 | "Lanjutkan" | Pilih Nominal | Booking naik ke **R1**, lalu `POST /transaction/push-order` membuat ordernya. |
 | Kartu ditempelkan | Pembayaran Kartu | `inquiry-billing` menanyakan tagihan, lalu `payment-billing` membayarnya. Keduanya berhasil → booking naik ke **R2** lalu pindah ke Pembayaran Berhasil; gagal di salah satunya → tetap di sini dan kartu bisa ditempelkan ulang. |
@@ -97,12 +102,9 @@ Ini bagian yang paling mudah salah baca.
 `/start` sengaja dikirim dari **Hubungkan Konektor**, bukan lebih awal,
 supaya perintahnya berangkat sesudah kabel terpasang.
 
-**Deteksi kabel tercolok belum berjalan.** Dulu halaman itu mem-polling
-`/list` sampai status konektor berubah menjadi `Preparing`. Status `2`
-pada endpoint baru berarti pengguna sedang *diminta* menghubungkan
-konektor — bukan bahwa kabelnya sudah tercolok — dan endpoint pengecekan
-penggantinya belum tersedia, jadi untuk sementara tombolnya aktif
-setelah jeda tiga detik. Alurnya tetap utuh, tetapi tidak ada jaminan kabel benar-benar
+Halaman itu memanggil `POST /manage-sessioncode` tiap detik dan
+menunggu `statusProcess` berpindah dari `2` ("hubungkan konektor") ke
+`3`. Selama masih `2`, tombolnya mati. Alurnya tetap utuh, tetapi tidak ada jaminan kabel benar-benar
 terpasang; charger yang menolak `/start` muncul sebagai pesan error.
 
 Perlu diingat `POST /start` membalas `state: "starting"`, bukan
@@ -163,10 +165,19 @@ Keduanya berujung ke `ChargingFinishedPage` dengan angka kWh final.
 - **Hitung mundur 10 menit** muncul di Pembayaran Kartu dan Hubungkan
   Konektor sebagai `CountdownPill`.
 
-## Halaman yang tidak dipakai
+## Kode sesi
 
-`charging_started_page.dart` (frame "Pengisian Dimulai") tidak ada di
-alur. Setelah `/start` aplikasi langsung menuju Sedang Mengisi agar
-start, stop, dan pemantauan berada dalam satu layar. Halamannya
-dipertahankan karena merupakan satu-satunya tempat kode sesi ditampilkan
-besar — pasang kembali bila layar itu dibutuhkan.
+Setelah perintah start berhasil, alur berakhir di **Pengisian Dimulai**
+(73:3667) — satu-satunya tempat kode sesi ditampilkan besar. Kodenya
+datang dari `POST /transaction/push-order`.
+
+Satu-satunya jalan keluarnya adalah pulang ke daftar charge box,
+mengikuti desain. Untuk memantau atau menghentikan pengisiannya,
+pengguna menekan konektornya lagi dari daftar itu dan memasukkan kode
+tersebut; `POST /manage-sessioncode` yang memeriksanya, dan `orderId`
+dari jawabannya dipakai untuk memantau serta menghentikan sesi — jadi
+sesi yang dimulai dari unit mana pun bisa dibuka kembali.
+
+Itulah sebabnya layar ini ada: tanpa kode sesi yang benar-benar
+membuka sesinya lagi, pengguna tidak akan pernah bisa mengakhiri
+pengisiannya sendiri.

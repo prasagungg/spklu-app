@@ -126,6 +126,7 @@ Map<String, dynamic> pushOrderResponse({
         'connectorId': '1',
         'partnerReference': partnerReference,
         'sessionCode': sessionCode,
+        'sessionExpiredTime': '2026-09-22T04:22:14Z',
         'kwh': kwh,
         'rpPerKwh': 2466,
         'rpPpj': 740,
@@ -181,6 +182,30 @@ Map<String, dynamic> paymentBillingResponse({
 
   return body;
 }
+
+/// Amplop `POST /manage-sessioncode`.
+Map<String, dynamic> sessionCodeResponse({
+  String orderId = 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
+  String sessionCode = '29',
+  // Bawaannya "sedang mengisi": kebanyakan test hanya ingin melewati
+  // tahap menunggu konektor. Kirim 2 untuk menguji penungguannya.
+  int statusProcess = 3,
+  String chargeBoxId = 'CB-SMR-01',
+  String connectorId = '1',
+}) =>
+    {
+      'responseCode': '00',
+      'responseMessage': 'Success',
+      'data': {
+        'orderId': orderId,
+        'chargeBoxId': chargeBoxId,
+        'chargeBoxName': 'Kempower Satellite 200 kW',
+        'connectorName': 'Gun $connectorId',
+        'connectorId': connectorId,
+        'sessionCode': sessionCode,
+        'statusProcess': statusProcess,
+      },
+    };
 
 /// Amplop `POST /booked-connector`.
 ///

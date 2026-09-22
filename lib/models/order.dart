@@ -14,6 +14,7 @@ class Order implements PriceBreakdown {
     required this.orderId,
     required this.sessionCode,
     required this.partnerReference,
+    this.sessionExpiredAt,
     required this.kwh,
     required this.rpTotal,
     this.chargeBoxId = '',
@@ -39,6 +40,12 @@ class Order implements PriceBreakdown {
 
   /// Nomor referensi yang ditampilkan pada detail transaksi.
   final String partnerReference;
+
+  /// Batas waktu berlakunya order, dari `sessionExpiredTime`.
+  ///
+  /// Lewat dari ini backend membalas `21` untuk order tersebut — baik
+  /// saat menagih maupun saat memulai pengisian.
+  final DateTime? sessionExpiredAt;
 
   final String chargeBoxId;
   final String chargeBoxName;
@@ -80,6 +87,10 @@ class Order implements PriceBreakdown {
       orderId: json?['orderId'] as String? ?? '',
       sessionCode: json?['sessionCode'] as String? ?? '-',
       partnerReference: json?['partnerReference'] as String? ?? '-',
+      sessionExpiredAt: switch (json?['sessionExpiredTime']) {
+        final String value => DateTime.tryParse(value),
+        _ => null,
+      },
       chargeBoxId: json?['chargeBoxId'] as String? ?? '',
       chargeBoxName: json?['chargeBoxName'] as String? ?? '',
       connectorId: json?['connectorId'] as String? ?? '',

@@ -104,6 +104,9 @@ class _StopConfirmPageState extends State<StopConfirmPage> {
   }
 
   void _goToFinished(double finalEnergyKwh) {
+    // Sesinya sudah tamat; tidak ada lagi yang perlu diingat.
+    ChargingScope.maybeOf(context)?.booking.forget();
+
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<bool>(
         builder: (_) => ChargingFinishedPage(

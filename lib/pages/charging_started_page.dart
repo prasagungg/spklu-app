@@ -9,11 +9,15 @@ import '../widgets/session_widgets.dart';
 
 /// Frame Figma 73:3667 — "Pengisian Dimulai".
 ///
-/// Saat ini TIDAK dipakai di alur: setelah "Mulai Pengisian" aplikasi
-/// langsung menuju [ChargingStatusPage] agar start, stop, dan pemantauan
-/// status berada dalam satu layar. Halaman ini dipertahankan karena
-/// merupakan satu-satunya tempat kode sesi ditampilkan besar — pasang
-/// kembali bila layar itu dibutuhkan.
+/// Muncul setelah perintah start berhasil, dan satu-satunya tempat kode
+/// sesi ditampilkan besar. Kodenya datang dari
+/// `POST /transaction/push-order` — pengguna memerlukannya untuk
+/// mengakhiri sesinya nanti, jadi inilah alasan layar ini ada.
+///
+/// Satu-satunya jalan keluarnya adalah pulang ke daftar charge box,
+/// mengikuti desain. Untuk memantau atau menghentikan pengisiannya,
+/// pengguna menekan konektornya lagi dari daftar itu dan memasukkan
+/// kode sesi ini.
 class ChargingStartedPage extends StatelessWidget {
   const ChargingStartedPage({super.key, required this.session});
 

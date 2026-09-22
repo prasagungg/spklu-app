@@ -9,6 +9,7 @@ import 'package:kossotrik/widgets/page_scaffold.dart';
 
 import 'fake_card_reader.dart';
 import 'fixtures.dart';
+import 'flow_helpers.dart';
 
 /// Merekam setiap request dan menjawabnya; booking bisa dibuat ditolak.
 class _Recorder extends Interceptor {
@@ -17,9 +18,14 @@ class _Recorder extends Interceptor {
   final bool bookingAccepted;
   final List<RequestOptions> requests = [];
 
+  /// Setelah perintah start, konektornya melapor sedang mengisi —
+  /// seperti backend sungguhan.
+  bool _charging = false;
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     requests.add(options);
+    if (options.path == '/transaction/charging/start') _charging = true;
     handler.resolve(
       Response<Map<String, dynamic>>(
         requestOptions: options,
@@ -28,8 +34,11 @@ class _Recorder extends Interceptor {
           '/list-chargerbox' => listResponse([
               chargeBoxJson(id: 'CB-SMR-01', nama: 'CB-SMR-01'),
             ]),
-          '/status-konektor' => connectorStatusResponse(),
+          '/status-konektor' => connectorStatusResponse(
+              status: _charging ? 3 : 1,
+            ),
           '/booked-connector' => bookingResponse(accepted: bookingAccepted),
+          '/manage-sessioncode' => sessionCodeResponse(),
           '/cancelled-connector' => cancellationResponse(),
           '/list-kwh' => kwhOptionsResponse(),
           '/count-kwh' => countKwhResponse(),
@@ -165,7 +174,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
 
     expect(recorder.stages, ['R0', 'R1', 'R2', 'R3']);
-    expect(find.text('Sedang Mengisi'), findsOneWidget);
+    expect(find.text('Pengisian Dimulai'), findsOneWidget);
   });
 
   group('pembatalan saat alur ditinggalkan', () {
@@ -244,7 +253,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 50));
       }
       await tester.pump(const Duration(milliseconds: 600));
-      expect(find.text('Sedang Mengisi'), findsOneWidget);
+      expect(find.text('Pengisian Dimulai'), findsOneWidget);
 
       await tester.tap(find.text('Kembali ke Halaman Awal'));
       await tester.pumpAndSettle();
@@ -304,6 +313,62 @@ void main() {
     await tester.tap(find.text('Detail Transaksi'));
     await tester.pumpAndSettle();
     expect(find.text('81067'), findsOneWidget);
+  });
+
+  /// Kode sesi ada supaya pengguna bisa kembali ke sesinya sendiri;
+  /// kalau kodenya tidak membuka apa-apa, layar itu tidak ada gunanya.
+  testWidgets('kode sesi membuka kembali sesi yang sedang mengisi',
+      (tester) async {
+    final recorder = _Recorder();
+    await _pickConnector(tester, recorder);
+
+    await tester.tap(find.text('10,0 kWh'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lanjutkan'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Konfirmasi & Bayar'));
+    await _settle(tester);
+
+    final reader = tester
+        .widget<SPKLUApp>(find.byType(SPKLUApp))
+        .cardReader as FakeCardReader;
+    reader.tap();
+    await _settle(tester);
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
+
+    await tester.tap(find.text('Mulai Pengisian'));
+    await _settle(tester);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+    await tester.tap(find.text('Mulai Pengisian').last);
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
+
+    await reopenChargingSession(tester);
+
+    // Kodenya diperiksa backend, bukan ditebak aplikasi. Endpoint yang
+    // sama juga dipakai memantau nozzle, jadi yang diperiksa di sini
+    // panggilan terakhir — yaitu verifikasinya.
+    final check = recorder.to('/manage-sessioncode').last;
+    expect(check.data, {
+      'chargeBoxId': 'CB-SMR-01',
+      'connectorId': '1',
+      'sessionCode': '29',
+    });
+    expect(find.text('Sedang Mengisi'), findsOneWidget);
+
+    // Pemantauan memakai order dari hasil verifikasi itu — bukan
+    // ingatan lokal, sehingga sesi dari unit lain pun bisa dibuka.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    final polls = recorder.to('/transaction/charging/ongoing-kwh');
+    expect(polls, isNotEmpty);
+    expect(polls.last.data, {'orderId': 'YZ00ZG5SP9HUNVRPTZH69Y7POW'});
   });
 
   group('BookingStage', () {

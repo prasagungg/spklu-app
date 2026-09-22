@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kossotrik/data/card_reader_scope.dart';
 import 'package:kossotrik/data/demo_data.dart';
+import 'package:kossotrik/models/charging_session.dart';
 import 'package:kossotrik/pages/charge_box_page.dart';
+import 'package:kossotrik/pages/charging_status_page.dart';
 import 'package:kossotrik/theme/app_theme.dart';
 import 'package:kossotrik/widgets/page_scaffold.dart';
 import 'package:kossotrik/widgets/primary_button.dart';
@@ -37,6 +39,29 @@ Future<FakeCardReader> pumpFlow(WidgetTester tester) async {
   await tester.pumpAndSettle();
 
   return reader;
+}
+
+/// Layar pemantauan dengan sesi demo, dipompa langsung.
+///
+/// Tanpa ChargingScope halaman ini menyimulasikan kenaikan kWh sendiri,
+/// jadi cukup untuk menguji perilaku layarnya.
+Future<void> pumpStatus(WidgetTester tester) async {
+  final box = DemoData.chargeBoxes[3];
+
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: AppTheme.build(),
+      home: ChargingStatusPage(
+        session: ChargingSession.fromOrder(
+          chargeBox: box,
+          connector: box.connectors.first,
+          order: DemoData.orderFor(DemoData.priceFor(10)),
+          now: DateTime(2026),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -115,12 +140,32 @@ void main() {
     await tester.tap(find.text('Mulai Pengisian'));
     await settle(tester);
 
-    // 9. Langsung ke layar status, bukan interstitial Pengisian Dimulai.
+    // 9. Kode sesi dari order ditunjukkan — inilah yang diperlukan
+    // pengguna untuk kembali mengakhiri sesinya.
+    expect(find.text('Pengisian Dimulai'), findsOneWidget);
+    expect(find.text('Simpan Kode Sesi Anda'), findsOneWidget);
+    expect(find.text('00'), findsOneWidget);
+
+    // 10. Pulang ke daftar — satu-satunya jalan keluar dari layar ini.
+    //
+    // Membuka sesinya lagi butuh konektor yang melapor "sedang
+    // mengisi"; daftar dummy di mode offline selalu "tersedia", jadi
+    // bagian itu diuji di test yang memakai backend tiruan
+    // (app_wiring_test dan final_energy_test).
+    await tester.tap(find.text('Kembali ke Halaman Awal'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pilih Charge Box'), findsOneWidget);
+  });
+
+  /// Layar pemantauan dan penghentian, dipompa langsung karena mode
+  /// offline tidak bisa melaporkan konektor yang sedang mengisi.
+  testWidgets('memantau lalu mengakhiri pengisian', (tester) async {
+    await pumpStatus(tester);
+
     expect(find.text('Sedang Mengisi'), findsOneWidget);
     expect(find.text('Energi tersalur'), findsOneWidget);
-    expect(find.text('Pengisian Dimulai'), findsNothing);
 
-    // 10. Energi bertambah seiring waktu — inilah "cek status".
+    // Energi bertambah seiring waktu — inilah "cek status".
     // Di bawah 1 kWh dipakai tiga desimal agar pergerakannya terlihat.
     expect(find.text('0,000 kWh'), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
@@ -128,7 +173,7 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(find.text('0,800 kWh'), findsOneWidget);
 
-    // 11. Akhiri pengisian -> layar konfirmasi.
+    // Akhiri pengisian -> layar konfirmasi.
     await tester.tap(find.text('Akhiri Pengisian'));
     await settle(tester);
     expect(find.text('Akhiri Pengisian?'), findsOneWidget);
@@ -138,7 +183,7 @@ void main() {
       findsOneWidget,
     );
 
-    // 12. Konfirmasi -> Pengisian Selesai dengan rincian akhir.
+    // Konfirmasi -> Pengisian Selesai dengan rincian akhir.
     await tester.tap(find.text('Ya, Akhiri Pengisian'));
     await settle(tester);
     expect(find.text('Pengisian Selesai'), findsOneWidget);
@@ -148,41 +193,10 @@ void main() {
       find.text('Lepas dan kembalikan konektor ke tempatnya'),
       findsOneWidget,
     );
-
-    // 13. Kembali ke halaman awal.
-    await tester.tap(find.text('Kembali ke Halaman Awal'));
-    await tester.pumpAndSettle();
-    expect(find.text('Pilih Charge Box'), findsOneWidget);
   });
 
   testWidgets('Lanjut Pengisian membatalkan penghentian sesi', (tester) async {
-    final reader = await pumpFlow(tester);
-
-    await tester.tap(find.text('04'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Gun 1'));
-    await tester.pumpAndSettle();
-    // Tidak ada pilihan yang tercentang sejak awal.
-    await tester.tap(find.text('10,0 kWh'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Lanjutkan'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Konfirmasi & Bayar'));
-    await settle(tester);
-    // Kartu e-Money ditempelkan — inilah yang memajukan alur sekarang.
-    reader.tap();
-    await settle(tester);
-    // Inquiry tagihan menambah satu hop async sebelum halaman pindah.
-    for (var i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
-    await tester.pump(const Duration(milliseconds: 600));
-    await tester.tap(find.text('Mulai Pengisian'));
-    await settle(tester);
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pump();
-    await tester.tap(find.text('Mulai Pengisian'));
-    await settle(tester);
+    await pumpStatus(tester);
 
     await tester.tap(find.text('Akhiri Pengisian'));
     await settle(tester);
@@ -288,6 +302,17 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Mulai Pengisian'));
     await settle(tester);
+    await expectHome('Pengisian Dimulai');
+  });
+
+  testWidgets('halaman pengisian juga punya tombol Home', (tester) async {
+    await pumpStatus(tester);
+
+    Future<void> expectHome(String title) async {
+      expect(find.text(title), findsOneWidget, reason: title);
+      expect(find.byType(HomeButton), findsWidgets, reason: title);
+    }
+
     await expectHome('Sedang Mengisi');
 
     await tester.tap(find.text('Akhiri Pengisian'));

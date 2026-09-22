@@ -38,7 +38,7 @@ Daftar lengkap `--dart-define` ada di [docs/konfigurasi.md](docs/konfigurasi.md)
 ## Periksa
 
 ```sh
-flutter test     # 204 test
+flutter test     # 217 test
 dart analyze lib test
 ```
 
