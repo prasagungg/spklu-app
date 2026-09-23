@@ -48,3 +48,23 @@ String formatEnergy(double kwh) {
   final text = kwh.toStringAsFixed(digits).replaceAll('.', ',');
   return '$text kWh';
 }
+
+/// Nama bulan ringkas gaya Indonesia.
+const _monthNames = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+  'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+];
+
+/// "21 Sep 2026, 16:42".
+///
+/// Waktu dari backend berformat UTC; yang ditampilkan adalah waktu
+/// setempat, karena itulah jam yang dilihat pengguna di lokasi.
+String formatDateTime(DateTime? time) {
+  if (time == null) return '-';
+
+  final local = time.toLocal();
+  String two(int v) => v.toString().padLeft(2, '0');
+
+  return '${local.day} ${_monthNames[local.month - 1]} ${local.year}, '
+      '${two(local.hour)}:${two(local.minute)}';
+}

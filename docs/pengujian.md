@@ -6,7 +6,7 @@ flutter test test/host_test.dart
 dart analyze lib test
 ```
 
-Suite-nya 217 test di 27 berkas dan berjalan sekitar lima detik. Tidak
+Suite-nya 237 test di 28 berkas dan berjalan sekitar lima detik. Tidak
 ada yang menyentuh jaringan.
 
 ## Cara test menghindari jaringan
@@ -37,7 +37,9 @@ final repo = ChargePointRepository(
 
 Menyimpan `options` yang lewat memungkinkan test memeriksa path, query,
 dan body yang benar-benar dikirim — itulah cara
-`test/progress_test.dart` mengunci ejaan `connectorId`.
+`test/charge_point_repository_test.dart` mengunci ejaan `connectorId`,
+termasuk `chargeboxId` dengan b kecil yang hanya dipakai
+`detail-chargerbox` dan `push-order`.
 
 **Tidak memasang `ChargingScope`.** Tanpa scope, halaman berjalan dalam
 mode offline: `/start` dan `/stop` dilewati dan kWh disimulasikan
@@ -106,7 +108,7 @@ ikut dijalankan sebagai suite.
 
 | Berkas | Menguji |
 |---|---|
-| `charge_point_repository_test.dart` | `POST /list-chargerbox` beserta body `idSpklu`, `POST /status-konektor`, perintah pengisian berkunci `orderId`, penguraian `ongoing-kwh`, dan penanganan amplop gagal |
+| `charge_point_repository_test.dart` | `POST /list-chargerbox` beserta body `idSpklu`, `POST /detail-chargerbox`, perintah pengisian berkunci `orderId`, penguraian `ongoing-kwh`, dan penanganan amplop gagal |
 | `api_log_test.dart` | Perekam mencatat method/path/body/status/kode, kegagalan jaringan, kapasitas riwayat, serta halaman inspektur dan penyaringnya |
 | `api_client_base_url_test.dart` | Setter base URL: normalisasi, ganti berkali-kali, adapter diperbarui |
 | `signature_test.dart` | Header `client-id`/`timestamp`/`signature`, format timestamp, dan tanda tangan dibandingkan dengan vektor acuan |
@@ -119,16 +121,17 @@ ikut dijalankan sebagai suite.
 | `card_payment_test.dart` | Tap kartu menanyakan tagihan lalu membayarnya dengan nominal dari inquiry, kegagalan menahan alur dan membuka lagi pembacaan kartu, pemetaan prefix kartu ke penerbit, serta keadaan NFC mati dan tanpa NFC |
 | `widget_test.dart` | Render daftar charge box dan data dummy |
 | `nominal_page_test.dart` | Pilihan dari `/list-kwh`, tidak ada yang terpilih di awal, perhitungan lewat `/count-kwh`, pembuatan order lewat `/transaction/push-order`, dan penanganan kode `16` |
-| `booking_test.dart` | R0 mengunci konektor dan menghentikan alur saat ditolak, urutan tahap R0→R1→R2→R3, serta pelepasan konektor saat alur ditinggalkan |
+| `booking_test.dart` | pemesanan konektor saat nozzle dipilih dan penghentian alur saat ditolak, kode sesi yang ditunjukkan sebelum nominal, `reservationId` yang dibawa `push-order` dan pembatalan, serta pelepasan konektor saat alur ditinggalkan |
 | `connector_detection_poll_test.dart` | Polling `manage-sessioncode` tiap detik, tombol start mati selama menunggu, dan status tak dikenal tidak dianggap tercolok |
-| `connector_sheet_test.dart` | Status ditanyakan sekali per konektor saat sheet dibuka, status daftar ditimpa hasilnya, label tiap status, dan tidak ada polling |
+| `transaction_history_test.dart` | Penguraian entri riwayat, penyamaran nomor kartu, format tanggal, dan tampilan halamannya |
+| `connector_sheet_test.dart` | Isi charge box diambil sekali saat sheet dibuka, status daftar ditimpa hasilnya, label tiap status, detail kosong tidak mengosongkan sheet, dan tidak ada polling |
 | `charge_box_list_render_test.dart` | Dua charge box dari `/list` keduanya tampil |
 | `charge_box_reload_test.dart` | `/list` dipanggil ulang tiap kembali ke daftar |
 | `charge_box_refresh_test.dart` | Tarik-ke-bawah memuat ulang daftar, dan daftar tidak menyegarkan diri sendiri |
 | `connector_routing_test.dart` | Tujuan tiap angka status, termasuk verifikasi sesi untuk konektor yang sudah diklaim |
 | `charging_flow_test.dart` | Alur lengkap sampai layar kode sesi, pemantauan dan penghentian, tombol Home di tiap halaman |
 | `charging_status_seed_test.dart` | Energi mulai dari nol lalu diisi polling `ongoing-kwh` pertama, dan sesi tanpa `orderId` tidak menanyakan apa pun |
-| `final_energy_test.dart` | kWh akhir diambil dari `/progress` terakhir, bukan saat tombol ditekan |
+| `final_energy_test.dart` | kWh akhir diambil dari `ongoing-kwh` terakhir, bukan saat tombol ditekan |
 | `session_verification_test.dart` | Keypad dua digit, verifikasi ke `POST /manage-sessioncode`, `orderId` yang dikembalikan, dan mode offline |
 | `app_wiring_test.dart` | `/start` dan `/stop` benar-benar terkirim dengan body yang benar |
 | `charging_scope_test.dart` | Scope harus di atas `MaterialApp` agar terlihat rute lanjutan |
@@ -136,7 +139,7 @@ ikut dijalankan sebagai suite.
 ## Konvensi
 
 **Nama test adalah kalimat yang menjelaskan perilaku**, bukan nama
-method. `'kWh akhir diambil dari /progress terakhir, bukan saat
+method. `'kWh akhir diambil dari ongoing-kwh terakhir, bukan saat
 ditekan'` memberi tahu mengapa kodenya begitu; `'testFinalEnergy'`
 tidak.
 

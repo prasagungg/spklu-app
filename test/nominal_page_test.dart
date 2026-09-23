@@ -214,8 +214,12 @@ void main() {
       final call = stub.to('/transaction/push-order').single;
       expect(call.method, 'POST');
       expect(call.data, {
-        'chargeBoxId': 'CB-SMR-01',
+        // Endpoint ini mengeja `chargeboxId` dengan b kecil.
+        'chargeboxId': 'CB-SMR-01',
         'connectorId': '1',
+        // Tanpa ChargingScope yang memegang pemesanan, id-nya kosong;
+        // alur sungguhan mengisinya dari `booked-connector`.
+        'reservationId': '',
         'kwh': 20,
       });
       expect(find.text('Konfirmasi Pengisian'), findsOneWidget);

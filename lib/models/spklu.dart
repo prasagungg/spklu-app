@@ -35,7 +35,8 @@ class Spklu {
   /// `alamatSpklu`.
   final String alamat;
 
-  /// `dayaSpklu`, mis. "200 kW". Teks apa adanya, bukan angka.
+  /// `dayaSpklu`, mis. "200 kW". Kosong sejak daya pindah ke tiap
+  /// charge box.
   final String daya;
 
   /// Angka `status` apa adanya dari backend.
@@ -44,7 +45,8 @@ class Spklu {
   final List<ChargeBox> chargeBoxes;
 
   factory Spklu.fromJson(Map<String, dynamic> json) {
-    final raw = json['chargeBoxes'];
+    // `chargeBoxs` ejaan sekarang; `chargeBoxes` versi sebelumnya.
+    final raw = json['chargeBoxs'] ?? json['chargeBoxes'];
     final items =
         raw is List ? raw.whereType<Map<String, dynamic>>().toList() : const [];
 

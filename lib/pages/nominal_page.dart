@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../data/booking_progress.dart';
 import '../data/charge_point_repository.dart';
 import '../data/charging_scope.dart';
 import '../data/demo_data.dart';
 import '../data/formatters.dart';
-import '../models/booking.dart';
 import '../models/charge_box.dart';
 import '../models/connector.dart';
 import '../models/kwh_price.dart';
@@ -147,14 +145,6 @@ class _NominalPageState extends State<NominalPage> {
     final price = _price;
     if (price == null || _pushing) return;
 
-    // Nominal sudah dipilih: ordernya sedang dibuat.
-    reportBookingStage(
-      context,
-      chargeBoxId: widget.chargeBox.id,
-      connectorId: widget.connector.id,
-      stage: BookingStage.ordering,
-    );
-
     final repository = _repository;
     if (repository == null) {
       _openConfirmation(DemoData.orderFor(price));
@@ -167,6 +157,10 @@ class _NominalPageState extends State<NominalPage> {
       final order = await repository.pushOrder(
         chargeBoxId: widget.chargeBox.id,
         connectorId: widget.connector.id,
+        // Ordernya menempel pada pemesanan yang dibuat saat konektor
+        // dipilih; tanpa itu backend menolak.
+        reservationId:
+            ChargingScope.maybeOf(context)?.booking.reservationId ?? '',
         kwh: price.kwh,
       );
       if (!mounted) return;

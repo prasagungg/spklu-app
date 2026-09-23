@@ -16,28 +16,52 @@ Map<String, dynamic> connectorJson({
 }) =>
     {
       'connectorId': id,
-      'chargeBoxId': chargeBoxId,
+      'chargeboxId': chargeBoxId,
       'status': status,
       'namaKonektor': nama,
       'typeConnector': type,
       'connectorTypeCurrent': arus,
-      'estimationAvailable': estimasi,
+      'estimatimationAvailable': estimasi,
     };
 
 Map<String, dynamic> chargeBoxJson({
   String id = 'CB-SMR-01',
   String nama = 'Kempower Satellite 200 kW',
   String merek = 'Kempower',
-  int status = 1,
+  String daya = '200 kW',
+  bool isActive = true,
   List<Map<String, dynamic>>? connectors,
-}) =>
-    {
-      'chargeBoxId': id,
-      'merek': merek,
-      'status': status,
-      'namaChargeBox': nama,
-      'connectors': connectors ?? [connectorJson(chargeBoxId: id)],
-    };
+}) {
+  final list = connectors ?? [connectorJson(chargeBoxId: id)];
+
+  return {
+    'chargeboxId': id,
+    'merek': merek,
+    'daya': daya,
+    'isActive': isActive,
+    'namaChargebox': nama,
+    'connectorTotal': list.length,
+    'connectors': list,
+  };
+}
+
+/// Amplop `POST /detail-chargerbox`.
+///
+/// Sengaja tanpa `daya` — hanya daftar yang mengirimnya.
+Map<String, dynamic> chargeBoxDetailResponse({
+  String id = 'CB-SMR-01',
+  String nama = 'Kempower Satellite 200 kW',
+  List<Map<String, dynamic>>? connectors,
+}) {
+  final box = chargeBoxJson(id: id, nama: nama, connectors: connectors)
+    ..remove('daya');
+
+  return {
+    'responseCode': '00',
+    'responseMessage': 'Success',
+    'data': box,
+  };
+}
 
 /// Amplop lengkap `POST /list-chargerbox`.
 Map<String, dynamic> listResponse([List<Map<String, dynamic>>? chargeBoxes]) => {
@@ -47,28 +71,7 @@ Map<String, dynamic> listResponse([List<Map<String, dynamic>>? chargeBoxes]) => 
         'idSpklu': 'SPKLU-SMR',
         'namaSpklu': 'PLN Charging Station Sisingamangaraja',
         'alamatSpklu': 'Jl. Sisingamangaraja No. 1, Jakarta Selatan',
-        'status': 1,
-        'dayaSpklu': '200 kW',
-        'chargeBoxes': chargeBoxes ?? [chargeBoxJson()],
-      },
-    };
-
-/// Amplop `POST /status-konektor`.
-Map<String, dynamic> connectorStatusResponse({
-  int status = 1,
-  String chargeBoxId = 'CB-SMR-01',
-  String connectorId = '1',
-}) =>
-    {
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {
-        'spkluId': 'SPKLU-SMR',
-        'chargeBoxId': chargeBoxId,
-        'chargeBoxName': 'Kempower Satellite 200 kW',
-        'connectorName': 'Gun $connectorId',
-        'connectorId': connectorId,
-        'connectorStatus': status,
+        'chargeBoxs': chargeBoxes ?? [chargeBoxJson()],
       },
     };
 
@@ -212,7 +215,8 @@ Map<String, dynamic> sessionCodeResponse({
 /// [accepted] mengisi field `status`: konektornya bersedia atau tidak.
 Map<String, dynamic> bookingResponse({
   bool accepted = true,
-  String stage = 'R0',
+  String reservationId = 'RESV-1',
+  String sessionCode = '29',
   String chargeBoxId = 'CB-SMR-01',
   String connectorId = '1',
 }) =>
@@ -221,10 +225,14 @@ Map<String, dynamic> bookingResponse({
       'responseMessage': 'Success',
       'data': {
         'chargeBoxId': chargeBoxId,
-        'chargeBoxName': 'Kempower Satellite 200 kW',
+        'chargeboxName': 'Kempower Satellite 200 kW',
         'connectorName': 'Gun $connectorId',
         'connectorId': connectorId,
-        'connectorStatus': stage,
+        // Tahapnya ditetapkan backend sendiri.
+        'connectorStatus': 'R0',
+        'sessionExpired': '2026-09-23T09:56:04Z',
+        'reservationId': reservationId,
+        'sessionCode': sessionCode,
         'status': accepted,
       },
     };
@@ -277,6 +285,45 @@ Map<String, dynamic> ongoingKwhResponse({
         'powerActiveImport': 0,
         'estimatedCharged': 0,
       },
+    };
+
+/// Amplop `POST /transaction/history-transaction`.
+Map<String, dynamic> historyResponse([
+  List<Map<String, dynamic>>? list,
+]) =>
+    {
+      'responseCode': '00',
+      'responseMessage': 'Success',
+      'data': {
+        'chargeboxId': 'CB-SMR-01',
+        'connectorId': '1',
+        'list': list ??
+            [
+              historyEntryJson(),
+              historyEntryJson(
+                orderId: '5SZJ9T6XLDUVP26LNPN89PDNA4',
+                totalAmount: 50000,
+                createdDate: '2026-09-21T09:42:00Z',
+              ),
+            ],
+      },
+    };
+
+/// Satu entri riwayat. `pspId` dan `cardNumber` kosong berarti
+/// transaksinya tidak pernah sampai dibayar.
+Map<String, dynamic> historyEntryJson({
+  String orderId = '8XWS0G9RULEYBLHS48ULF6OFH7',
+  String pspId = 'EM-BNI',
+  String cardNumber = '6012345678907890',
+  int totalAmount = 12700,
+  String createdDate = '2026-09-23T09:28:44Z',
+}) =>
+    {
+      'pspId': pspId,
+      'cardNumber': cardNumber,
+      'orderId': orderId,
+      'totalAmount': totalAmount,
+      'createdDate': createdDate,
     };
 
 /// Balasan sukses tanpa isi, untuk `/start` dan `/stop`.

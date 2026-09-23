@@ -1,4 +1,3 @@
-import '../models/booking.dart';
 
 /// Booking konektor yang sedang dipegang unit ini.
 ///
@@ -21,7 +20,7 @@ import '../models/booking.dart';
 class ActiveBooking {
   String? _chargeBoxId;
   int? _connectorId;
-  BookingStage _stage = BookingStage.selected;
+  String? _reservationId;
   String? _orderId;
   String? _sessionCode;
   bool _charging = false;
@@ -42,21 +41,23 @@ class ActiveBooking {
   String? get chargeBoxId => _chargeBoxId;
   int? get connectorId => _connectorId;
 
-  /// Tahap terakhir yang dilaporkan.
-  BookingStage get stage => _stage;
+  /// Pemesanan yang sedang dipegang. Wajib dibawa `push-order` dan
+  /// `cancelled-connector`.
+  String? get reservationId => _reservationId;
 
-  /// Mencatat booking yang baru saja berhasil dikunci (R0).
-  void hold({required String chargeBoxId, required int connectorId}) {
+  /// Mencatat pemesanan yang baru saja berhasil dibuat.
+  void hold({
+    required String chargeBoxId,
+    required int connectorId,
+    required String reservationId,
+    required String sessionCode,
+  }) {
     _chargeBoxId = chargeBoxId;
     _connectorId = connectorId;
-    _stage = BookingStage.selected;
+    _reservationId = reservationId;
+    _sessionCode = sessionCode;
     _orderId = null;
     _charging = false;
-  }
-
-  /// Menaikkan tahap yang diingat, mengikuti laporan kemajuan.
-  void advance(BookingStage stage) {
-    if (isHeld) _stage = stage;
   }
 
   /// Menandai pengisiannya sudah dimulai.
@@ -64,9 +65,8 @@ class ActiveBooking {
   /// Sejak saat itu konektornya sedang dipakai, bukan sekadar dipesan,
   /// jadi kembalinya pengguna ke daftar tidak boleh melepasnya —
   /// tetapi [orderId] tetap diingat supaya sesinya bisa dibuka lagi.
-  void startedCharging({required String orderId, required String sessionCode}) {
+  void startedCharging({required String orderId}) {
     _orderId = orderId;
-    _sessionCode = sessionCode;
     _charging = true;
   }
 
@@ -97,7 +97,7 @@ class ActiveBooking {
   void forget() {
     _chargeBoxId = null;
     _connectorId = null;
-    _stage = BookingStage.selected;
+    _reservationId = null;
     _orderId = null;
     _sessionCode = null;
     _charging = false;

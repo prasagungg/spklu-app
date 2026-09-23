@@ -10,6 +10,7 @@ import 'package:kossotrik/widgets/page_scaffold.dart';
 import 'package:kossotrik/widgets/primary_button.dart';
 
 import 'fake_card_reader.dart';
+import 'flow_helpers.dart';
 
 /// Halaman dengan hitung mundur dan spinner memakai timer berulang,
 /// sehingga pumpAndSettle tidak akan pernah selesai. Dipakai pump
@@ -77,7 +78,7 @@ void main() {
     // 2. Daftar Konektor — pilih konektor yang tersedia.
     expect(find.text('Daftar Konektor'), findsOneWidget);
     await tester.tap(find.text('Gun 1'));
-    await tester.pumpAndSettle();
+    await passSessionCode(tester);
 
     // 3. Pilih Nominal — tidak ada yang tercentang sejak awal, jadi
     // rincian harga baru muncul setelah salah satu ditekan.
@@ -219,7 +220,7 @@ void main() {
     await tester.tap(find.text('04'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
-    await tester.pumpAndSettle();
+    await passSessionCode(tester);
     // Tidak ada pilihan yang tercentang sejak awal.
     await tester.tap(find.text('10,0 kWh'));
     await tester.pumpAndSettle();
@@ -270,7 +271,7 @@ void main() {
     await tester.tap(find.text('04'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
-    await tester.pumpAndSettle();
+    await passSessionCode(tester);
     await expectHome('Pilih Nominal');
 
     // Tidak ada pilihan yang tercentang sejak awal.
@@ -331,7 +332,7 @@ void main() {
     await tester.tap(find.text('04'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
-    await tester.pumpAndSettle();
+    await passSessionCode(tester);
     // Tidak ada pilihan yang tercentang sejak awal.
     await tester.tap(find.text('10,0 kWh'));
     await tester.pumpAndSettle();

@@ -6,6 +6,7 @@ import 'package:kossotrik/services/api_client.dart';
 import 'package:kossotrik/widgets/page_scaffold.dart';
 
 import 'fixtures.dart';
+import 'flow_helpers.dart';
 
 class _Counter extends Interceptor {
   int listCalls = 0;
@@ -19,6 +20,7 @@ class _Counter extends Interceptor {
         data: switch (options.path) {
           '/list-chargerbox' => _list,
           '/booked-connector' => bookingResponse(),
+          '/detail-chargerbox' => chargeBoxDetailResponse(nama: 'CB-SMR-01'),
           '/manage-sessioncode' => sessionCodeResponse(),
           '/list-kwh' => kwhOptionsResponse(),
           '/count-kwh' => countKwhResponse(),
@@ -58,12 +60,14 @@ void main() {
     await tester.tap(find.text('01'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
-    await tester.pumpAndSettle();
+    await passSessionCode(tester);
     expect(find.text('Pilih Nominal'), findsOneWidget);
     final beforeBack = counter.listCalls;
 
-    // Kembali lewat tombol Kembali.
+    // Kembali lewat tombol Kembali, lalu keluar dari halaman kode sesi.
     await tester.tap(find.text('Kembali'));
+    await settleFrames(tester);
+    await tester.tap(find.text('Batalkan Transaksi'));
     await tester.pumpAndSettle();
     expect(find.text('Pilih Charge Box'), findsOneWidget);
     expect(counter.listCalls, greaterThan(beforeBack),
@@ -73,7 +77,7 @@ void main() {
     await tester.tap(find.text('01'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
-    await tester.pumpAndSettle();
+    await passSessionCode(tester);
     // Tidak ada pilihan yang tercentang sejak awal.
     await tester.tap(find.text('10,0 kWh'));
     await tester.pumpAndSettle();

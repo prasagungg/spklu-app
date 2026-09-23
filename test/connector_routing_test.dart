@@ -22,7 +22,9 @@ class _Stub extends Interceptor {
               status: 3,
             ),
           // Status sebenarnya datang dari sini, bukan dari daftar.
-          '/status-konektor' => connectorStatusResponse(status: status),
+          '/detail-chargerbox' => chargeBoxDetailResponse(
+              connectors: [connectorJson(status: status)],
+            ),
           '/booked-connector' => bookingResponse(),
           '/manage-sessioncode' => sessionCodeResponse(),
           '/list-kwh' => kwhOptionsResponse(),
@@ -60,7 +62,7 @@ Future<void> _tapConnector(WidgetTester tester, int status) async {
   expect(find.text('Memeriksa…'), findsNothing);
 
   await tester.tap(find.text('Gun 1'));
-  await tester.pumpAndSettle();
+  await settleFrames(tester);
 }
 
 /// Konektor yang sudah diklaim menuntut kode sesi dulu; kodenya
@@ -76,6 +78,8 @@ void main() {
     await _tapConnector(tester, 1);
 
     expect(find.text('Verifikasi Sesi'), findsNothing);
+    // Kode sesinya ditunjukkan dulu, baru pemilihan kWh.
+    await passSessionCode(tester);
     expect(find.text('Pilih Nominal'), findsOneWidget);
   });
 
@@ -93,9 +97,20 @@ void main() {
     expect(find.text('Sedang Mengisi'), findsOneWidget);
   });
 
-  /// "Selesai" ikut ke layar pemantauan; `/progress` yang menentukan,
-  /// dan begitu ia melaporkan `finished` halaman itu berpindah sendiri
-  /// ke rincian akhir.
+  testWidgets('status 0 melanjutkan pemesanan yang sudah ada',
+      (tester) async {
+    await _tapConnector(tester, 0);
+    await _verify(tester);
+
+    // Pemesanan sudah ada; kodenya ditunjukkan lalu memilih kWh.
+    await passSessionCode(tester);
+    expect(find.text('Pilih Nominal'), findsOneWidget);
+  });
+
+  /// "Selesai" ikut ke layar pemantauan; `ongoing-kwh` yang menentukan,
+  /// dan begitu ia melaporkan selesai halaman itu berpindah sendiri ke
+  /// rincian akhir.
+
   testWidgets('status 4 juga lewat layar pemantauan', (tester) async {
     await _tapConnector(tester, 4);
     await _verify(tester);
@@ -106,7 +121,7 @@ void main() {
   testWidgets('status tak dikenal membuat konektornya tidak bisa ditekan',
       (tester) async {
     final repo = ChargePointRepository(
-      client: ApiClient.withDio(Dio()..interceptors.add(_Stub(0))),
+      client: ApiClient.withDio(Dio()..interceptors.add(_Stub(9))),
     );
 
     await tester.pumpWidget(SPKLUApp(repository: repo));
@@ -121,7 +136,7 @@ void main() {
     expect(find.text('Tidak Tersedia'), findsOneWidget);
 
     await tester.tap(find.text('Gun 1'));
-    await tester.pumpAndSettle();
+    await settleFrames(tester);
 
     // Tidak ke mana-mana: sheet-nya masih terbuka.
     expect(find.text('Daftar Konektor'), findsOneWidget);

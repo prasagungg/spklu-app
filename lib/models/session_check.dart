@@ -19,6 +19,7 @@ import 'backend_status.dart';
 class SessionCheck {
   const SessionCheck({
     this.orderId = '',
+    this.reservationId = '',
     this.chargeBoxId = '',
     this.chargeBoxName = '',
     this.connectorId = '',
@@ -31,6 +32,10 @@ class SessionCheck {
   /// dan menghentikan pengisian — semua perintah pengisian berkunci
   /// order, sedangkan daftar charge box tidak membawanya.
   final String orderId;
+
+  /// Pemesanan milik sesi itu, bila backend menyertakannya. Diperlukan
+  /// `push-order` bagi sesi yang belum sampai tahap pembayaran.
+  final String reservationId;
 
   final String chargeBoxId;
   final String chargeBoxName;
@@ -51,6 +56,7 @@ class SessionCheck {
 
     return SessionCheck(
       orderId: json?['orderId'] as String? ?? '',
+      reservationId: json?['reservationId'] as String? ?? '',
       chargeBoxId: id as String? ?? '',
       chargeBoxName: name as String? ?? '',
       connectorId: json?['connectorId'] as String? ?? '',

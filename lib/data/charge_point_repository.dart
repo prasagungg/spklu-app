@@ -2,13 +2,13 @@ import 'package:dio/dio.dart';
 
 import '../config/env.dart';
 import '../models/charge_box.dart';
-import '../models/backend_status.dart';
 import '../models/billing.dart';
-import '../models/booking.dart';
 import '../models/charging_progress.dart';
 import '../models/kwh_price.dart';
 import '../models/order.dart';
+import '../models/reservation.dart';
 import '../models/session_check.dart';
+import '../models/transaction_history.dart';
 import '../models/spklu.dart';
 import '../services/api_client.dart';
 import '../services/api_exception.dart';
@@ -72,49 +72,32 @@ class ChargePointRepository {
     return null;
   }
 
-  /// `POST /status-konektor`
+  /// `POST /detail-chargerbox`
   ///
-  /// Status sebenarnya satu konektor. Daftar charge box tidak
-  /// memperlihatkannya — statusnya baru ketahuan setelah ditanyakan,
-  /// jadi ini dipanggil ketika pengguna membuka daftar konektor sebuah
-  /// charge box, bukan berkala.
+  /// Isi satu charge box beserta status konektornya saat ini.
   ///
   /// ```json
-  /// { "spkluId": "SPKLU-SMR", "chargeBoxId": "CB-SMR-01",
-  ///   "connectorId": "1" }
+  /// { "chargeboxId": "CB-SMR-01" }
   /// ```
   ///
-  /// Balasannya memuat `connectorStatus` dengan kosakata angka yang
-  /// sama seperti daftar — lihat [BackendStatus]:
+  /// Dipanggil sekali ketika pengguna menekan sebuah charge box —
+  /// status konektor tidak terlihat dari daftar, dan satu panggilan di
+  /// sini menggantikan satu panggilan per konektor.
   ///
-  /// ```json
-  /// { "spkluId": "SPKLU-SMR", "chargeBoxId": "CB-SMR-01",
-  ///   "chargeBoxName": "Kempower Satellite 200 kW",
-  ///   "connectorName": "Gun 1", "connectorId": "1",
-  ///   "connectorStatus": 1 }
-  /// ```
-  ///
-  /// Konektor yang tidak dikenal dibalas 404. Mengembalikan null bila
-  /// backend tidak mengirim `data`.
-  Future<int?> fetchConnectorStatus({
+  /// Jawabannya **tidak membawa `daya`**; yang punya hanya daftar.
+  /// Pemanggil karena itu menyalin daya dari charge box di daftar.
+  Future<ChargeBox> fetchChargeBoxDetail({
     required String chargeBoxId,
-    required int connectorId,
-    String? idSpklu,
+    required int number,
     CancelToken? cancelToken,
   }) async {
     final json = await _client.post<Map<String, dynamic>>(
-      '/status-konektor',
-      body: {
-        'spkluId': idSpklu ?? Env.idSpklu,
-        'chargeBoxId': chargeBoxId,
-        // Backend memakai teks untuk nomor konektor, seperti di daftar.
-        'connectorId': connectorId.toString(),
-      },
+      '/detail-chargerbox',
+      body: {'chargeboxId': chargeBoxId},
       cancelToken: cancelToken,
     );
-    final data = _unwrap(json);
 
-    return BackendStatus.parse(data?['connectorStatus']);
+    return ChargeBox.fromJson(_unwrap(json) ?? const {}, number: number);
   }
 
   /// `GET /list-kwh`
@@ -166,34 +149,76 @@ class ChargePointRepository {
 
   /// `POST /transaction/push-order`
   ///
-  /// Membuat order di backend untuk kWh yang dipilih. Inilah yang
-  /// memberi [Order.orderId], [Order.sessionCode], dan
-  /// [Order.partnerReference] — tiga hal yang sebelumnya dikarang
-  /// aplikasi.
+  /// Membuat order untuk kWh yang dipilih pada pemesanan yang sudah
+  /// ada. Inilah yang memberi [Order.orderId] dan
+  /// [Order.partnerReference].
   ///
   /// ```json
-  /// { "chargeBoxId": "CB-SMR-01", "connectorId": "1", "kwh": 10 }
+  /// { "chargeboxId": "CB-SMR-01", "connectorId": "1",
+  ///   "reservationId": "U33tiFAl0Yj5TkCQyoUmU", "kwh": 10 }
   /// ```
+  ///
+  /// [reservationId] wajib — tanpa itu backend membalas
+  /// [ResponseCode.missingField].
   ///
   /// Gagal dengan [ResponseCode.processingAnotherRequest] bila masih
   /// ada order tertunda pada konektor itu.
   Future<Order> pushOrder({
     required String chargeBoxId,
     required int connectorId,
+    required String reservationId,
     required double kwh,
     CancelToken? cancelToken,
   }) async {
     final json = await _client.post<Map<String, dynamic>>(
       '/transaction/push-order',
       body: {
-        'chargeBoxId': chargeBoxId,
+        // Endpoint ini mengeja `chargeboxId` dengan b kecil.
+        'chargeboxId': chargeBoxId,
         'connectorId': connectorId.toString(),
+        'reservationId': reservationId,
         'kwh': kwh == kwh.roundToDouble() ? kwh.round() : kwh,
       },
       cancelToken: cancelToken,
     );
 
     return Order.fromJson(_unwrap(json));
+  }
+
+  /// `POST /transaction/history-transaction`
+  ///
+  /// Transaksi yang pernah terjadi pada sebuah konektor, terbaru lebih
+  /// dulu.
+  ///
+  /// ```json
+  /// { "chargeBoxId": "CB-SMR-01", "connectorId": "1" }
+  /// ```
+  ///
+  /// Tiap entri hanya membawa nomor order, kartu, nominal, dan waktu —
+  /// nama charge box serta konektornya diketahui dari konteks tempat
+  /// riwayat itu dibuka.
+  Future<List<TransactionHistoryEntry>> fetchTransactionHistory({
+    required String chargeBoxId,
+    required int connectorId,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/transaction/history-transaction',
+      body: {
+        'chargeBoxId': chargeBoxId,
+        'connectorId': connectorId.toString(),
+      },
+      cancelToken: cancelToken,
+    );
+    final data = _unwrap(json);
+    final list = data?['list'];
+
+    if (list is! List) return const [];
+
+    return [
+      for (final item in list.whereType<Map<String, dynamic>>())
+        TransactionHistoryEntry.fromJson(item),
+    ];
   }
 
   /// `POST /transaction/inquiry-billing`
@@ -308,25 +333,22 @@ class ChargePointRepository {
 
   /// `POST /booked-connector`
   ///
-  /// Mengunci konektor atas nama pengguna yang sedang memakai unit ini,
-  /// lalu menaikkan tahapnya seiring alur pembelian.
+  /// Memesan konektor atas nama pengguna yang sedang memakai unit ini.
   ///
   /// ```json
-  /// { "chargeBoxId": "CB-SMR-01", "connectorId": "1",
-  ///   "connectorStatus": "R0" }
+  /// { "chargeBoxId": "CB-SMR-01", "connectorId": "1" }
   /// ```
   ///
-  /// [BookingStage.selected] yang dibalas
-  /// [BookingResult.accepted] false berarti konektornya sudah diambil
-  /// orang lain. Tahap berikutnya selalu dibalas false dan itu wajar —
-  /// lihat [BookingResult.accepted].
+  /// Tahapnya **tidak dikirim aplikasi** — backend yang menetapkannya
+  /// sendiri ("R0" di sini, lalu "R1" begitu ordernya dibuat).
+  /// Memanggil endpoint ini lagi tidak menaikkan tahap, melainkan
+  /// membuat pemesanan baru.
   ///
-  /// Konektor yang tidak dikenal, dan kode tahap di luar R0–R3, dibalas
-  /// 404.
-  Future<BookingResult> bookConnector({
+  /// [Reservation.accepted] false berarti konektornya sudah diambil
+  /// orang lain dan alur tidak boleh lanjut.
+  Future<Reservation> bookConnector({
     required String chargeBoxId,
     required int connectorId,
-    required BookingStage stage,
     CancelToken? cancelToken,
   }) async {
     final json = await _client.post<Map<String, dynamic>>(
@@ -335,12 +357,11 @@ class ChargePointRepository {
         'chargeBoxId': chargeBoxId,
         // Backend memakai teks untuk nomor konektor, seperti di daftar.
         'connectorId': connectorId.toString(),
-        'connectorStatus': stage.code,
       },
       cancelToken: cancelToken,
     );
 
-    return BookingResult.fromJson(_unwrap(json));
+    return Reservation.fromJson(_unwrap(json));
   }
 
   /// `POST /cancelled-connector`
@@ -349,18 +370,16 @@ class ChargePointRepository {
   ///
   /// ```json
   /// { "chargeBoxId": "CB-SMR-01", "connectorId": "1",
-  ///   "connectorStatus": "R0" }
+  ///   "reservationId": "U33tiFAl0Yj5TkCQyoUmU" }
   /// ```
   ///
-  /// [stage] wajib disertakan — tanpa `connectorStatus` backend membalas
-  /// [ResponseCode.missingField]. Nilainya sendiri tidak menentukan
-  /// apa pun: booking di tahap mana pun terlepas, dan membatalkan
-  /// konektor yang memang tidak dibooking tetap dibalas sukses. Konektor
-  /// yang tidak dikenal dibalas 404.
+  /// [reservationId] wajib — tanpa itu backend membalas
+  /// [ResponseCode.missingField]. Membatalkan pemesanan di tahap mana
+  /// pun berhasil, dan konektor yang tidak dikenal dibalas 404.
   Future<CancellationResult> cancelConnector({
     required String chargeBoxId,
     required int connectorId,
-    BookingStage stage = BookingStage.selected,
+    required String reservationId,
     CancelToken? cancelToken,
   }) async {
     final json = await _client.post<Map<String, dynamic>>(
@@ -368,7 +387,7 @@ class ChargePointRepository {
       body: {
         'chargeBoxId': chargeBoxId,
         'connectorId': connectorId.toString(),
-        'connectorStatus': stage.code,
+        'reservationId': reservationId,
       },
       cancelToken: cancelToken,
     );

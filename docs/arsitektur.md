@@ -86,9 +86,9 @@ diketahui dengan menanyai berkala. Jedanya ada di `Env`:
 Daftar charge box dulu ikut menyegarkan diri tiap dua detik; itu
 dihapus karena pemeriksaan statusnya pindah ke layar lain.
 
-Status konektor di bottom sheet ditanyakan **sekali saat dilihat**,
-bukan berkala: `POST /status-konektor` dipanggil ketika bottom sheet daftar
-konektor terbuka. Daftar charge box dimuat ulang lewat tarik-ke-bawah
+Isi charge box di bottom sheet diambil **sekali saat dilihat**, bukan
+berkala: `POST /detail-chargerbox` dipanggil ketika bottom sheet daftar
+konektor terbuka — satu panggilan untuk seluruh konektornya. Daftar charge box dimuat ulang lewat tarik-ke-bawah
 atau saat pengguna kembali ke halaman itu.
 
 Aturan yang dipakai:
@@ -125,8 +125,8 @@ kosong.
 
 **Energi akhir dibaca ulang setelah stop.** Charger masih menyalurkan
 daya beberapa detik setelah perintah berhenti. `StopConfirmPage`
-memanggil `/progress` sampai lima kali sampai `state` menjadi
-`"finished"`, alih-alih memakai angka saat tombol ditekan.
+memanggil `ongoing-kwh` sampai lima kali sampai statusnya `4`, alih-alih
+memakai angka saat tombol ditekan.
 
 **Desimal kWh menyesuaikan.** Di bawah 1 kWh dipakai tiga desimal.
 Dengan satu desimal, 127 Wh tampil "0,1 kWh" dan 3 Wh tampil "0,0 kWh",
@@ -158,24 +158,33 @@ menolak perintah". Lihat
 cukup diikuti di satu tempat. `Connector.mapStatus` satu-satunya yang
 menerjemahkannya ke `ConnectorStatus`.
 
-## Booking konektor
+## Pemesanan konektor
 
-Konektor dikunci atas nama pengguna sejak ia memilih nozzle, supaya
+Konektor dipesan atas nama pengguna sejak ia memilih nozzle, supaya
 tidak diambil orang lain selama ia memilih nominal dan membayar.
-Tahapnya dinaikkan mengikuti alur: R0 dipilih, R1 order dibuat, R2
-dibayar, R3 mulai mengisi.
+`POST /booked-connector` dipanggil **sekali** di situ, dan jawabannya
+membawa tiga hal yang dipakai sisa alur: `reservationId` untuk
+`push-order` dan pembatalan, `sessionCode` yang langsung ditunjukkan di
+halaman Kode Sesi, dan `sessionExpired` sebagai hitung mundurnya.
+
+Tahap `connectorStatus` ("R0", lalu "R1" setelah ordernya dibuat)
+ditetapkan backend sendiri. Aplikasi dulu mengirimkannya empat kali
+untuk menaikkan tahap; sekarang tidak pernah mengirimnya sama sekali,
+karena memanggil endpoint itu lagi berarti membuat pemesanan baru.
 
 Yang menahan bug di sini adalah **melepasnya lagi**. Konektor yang
-dikunci tidak lepas sendiri, jadi pengguna yang pergi di tengah jalan
-akan membuatnya terkunci selamanya. `ActiveBooking` — dipegang
+dipesan tidak lepas sendiri, jadi pengguna yang pergi di tengah jalan
+akan membuatnya terkunci sampai kedaluwarsa. `ActiveBooking` — dipegang
 `ChargingScope`, bukan variabel global, supaya tiap test punya miliknya
-sendiri — mencatat booking yang sedang dipegang, dan `didPopNext()` di
-halaman Pilih Charge Box melepasnya begitu pengguna kembali ke sana.
+sendiri — mencatat pemesanan yang sedang dipegang beserta kode sesinya,
+dan `didPopNext()` di halaman Pilih Charge Box melepasnya begitu
+pengguna kembali ke sana.
 
-Satu tempat itu menangkap semua jalan keluar: "Kembali", tombol Home,
-dan tombol kembali perangkat semuanya berujung ke halaman daftar.
-Bookingnya dilupakan tanpa dibatalkan begitu `/start` berhasil, sehingga
-sesi yang sedang berjalan tidak ikut dilepas.
+Satu tempat itu menangkap semua jalan keluar: "Kembali", "Batalkan
+Transaksi" di halaman Kode Sesi, tombol Home, dan tombol kembali
+perangkat semuanya berujung ke halaman daftar. Pemesanannya dilupakan
+tanpa dibatalkan begitu perintah start berhasil, sehingga sesi yang
+sedang berjalan tidak ikut dilepas.
 
 **Harga tidak pernah dihitung di aplikasi.** `POST /count-kwh` yang
 berwenang; `KwhPrice` menyimpan angkanya apa adanya dan `CostRows`

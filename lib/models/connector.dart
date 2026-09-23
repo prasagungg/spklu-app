@@ -3,6 +3,7 @@ import 'backend_status.dart';
 /// Status konektor yang dipakai UI, sejalan dengan angka `status` dari
 /// backend (lihat [BackendStatus]).
 ///
+/// - [reserved]    Sedang dipesan; belum sampai tahap pembayaran.
 /// - [available]   Bebas, bisa langsung dibeli.
 /// - [preparing]   Sudah dibayar, menunggu konektor dihubungkan.
 /// - [inUse]       Sedang mengisi daya.
@@ -11,7 +12,14 @@ import 'backend_status.dart';
 ///
 /// Semua kecuali [available] berarti konektornya sudah diklaim orang
 /// lain, jadi pengguna harus membuktikan kepemilikan sesi lebih dulu.
-enum ConnectorStatus { available, preparing, inUse, finished, unavailable }
+enum ConnectorStatus {
+  reserved,
+  available,
+  preparing,
+  inUse,
+  finished,
+  unavailable,
+}
 
 /// Satu konektor pada charge box, dari `POST /list-chargerbox`.
 ///
@@ -71,7 +79,11 @@ class Connector {
       displayName: json['namaKonektor'] as String?,
       typeConnector: json['typeConnector'] as String? ?? '',
       currentType: json['connectorTypeCurrent'] as String? ?? '',
-      estimatedMinutes: BackendStatus.parse(json['estimationAvailable']),
+      // `estimatimationAvailable` ejaan backend sekarang; ejaan tanpa
+      // salah ketiknya tetap diterima.
+      estimatedMinutes: BackendStatus.parse(
+        json['estimatimationAvailable'] ?? json['estimationAvailable'],
+      ),
     );
   }
 
@@ -81,6 +93,7 @@ class Connector {
   /// [BackendStatus.isUsable].
   static ConnectorStatus mapStatus(int? code) => switch (code) {
         null || BackendStatus.available => ConnectorStatus.available,
+        BackendStatus.reserved => ConnectorStatus.reserved,
         BackendStatus.awaitingConnector => ConnectorStatus.preparing,
         BackendStatus.charging => ConnectorStatus.inUse,
         BackendStatus.finished => ConnectorStatus.finished,
@@ -89,6 +102,9 @@ class Connector {
 
   /// Bebas sepenuhnya, belum ada kabel tercolok.
   bool get isAvailable => status == ConnectorStatus.available;
+
+  /// Sudah dipesan orang lain, belum dibayar.
+  bool get isReserved => status == ConnectorStatus.reserved;
 
   /// Sudah dibayar, menunggu konektor dihubungkan.
   bool get isPreparing => status == ConnectorStatus.preparing;
@@ -124,4 +140,18 @@ class Connector {
   /// "CCS2 · DC". Kosong bila backend tidak mengirim keduanya.
   String get typeLabel =>
       [typeConnector, currentType].where((p) => p.isNotEmpty).join(' · ');
+
+  /// "CCS2 - 200 kW DC", memakai daya charge box tempat konektor ini
+  /// berada — dayanya milik charge box, bukan konektornya.
+  ///
+  /// Jatuh ke [typeLabel] bila dayanya tidak diketahui, dan ke [name]
+  /// bila tipenya pun tidak dikirim.
+  String describeWith(String daya) {
+    if (daya.isEmpty) return typeLabel.isEmpty ? name : typeLabel;
+    if (typeConnector.isEmpty) return daya;
+
+    return [typeConnector, '-', daya, currentType]
+        .where((p) => p.isNotEmpty)
+        .join(' ');
+  }
 }

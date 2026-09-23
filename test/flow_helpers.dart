@@ -10,6 +10,18 @@ Future<void> settleFrames(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 600));
 }
 
+/// Melewati halaman "Kode Sesi" yang muncul begitu konektor dipesan.
+///
+/// Halaman itu punya hitung mundur yang berjalan terus, jadi
+/// pumpAndSettle tidak akan pernah selesai di sana.
+Future<void> passSessionCode(WidgetTester tester) async {
+  await settleFrames(tester);
+  expect(find.text('Kode Sesi'), findsOneWidget);
+
+  await tester.tap(find.text('Lanjutkan'));
+  await settleFrames(tester);
+}
+
 /// Mengetikkan kode sesi pada keypad Verifikasi Sesi.
 Future<void> enterSessionCode(WidgetTester tester, String code) async {
   for (final digit in code.split('')) {

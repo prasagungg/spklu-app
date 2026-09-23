@@ -20,6 +20,7 @@ dalam satu berkas.
 | **Edge controller** | Server yang dipanggil aplikasi. Ia yang berbicara OCPP ke charger. |
 | **Charge point / charge box** | Satu unit charger, punya id seperti `SIM-456`. |
 | **Konektor** | Satu colokan pada charge box. Satu charge box bisa punya beberapa. |
-| **Sesi** | Satu transaksi pengisian pada satu konektor, punya `transactionId`. |
-| **Kode sesi** | Angka pendek yang dipegang pengguna untuk mengakhiri sesinya. |
+| **Pemesanan** | Kunci atas satu konektor, punya `reservationId`. Dibuat saat nozzle dipilih, dilepas saat alurnya ditinggalkan. |
+| **Order** | Pembelian sejumlah kWh pada pemesanan itu, punya `orderId`. Semua perintah pengisian berkunci order. |
+| **Kode sesi** | Angka pendek dari pemesanan, dipegang pengguna untuk kembali ke sesinya dan mengakhirinya. |
 | **OCPP** | Protokol antara controller dan charger. Aplikasi tidak bicara OCPP langsung, tetapi status konektornya memakai istilah OCPP 1.6. |

@@ -72,7 +72,10 @@ class PageScaffold extends StatelessWidget {
     // Tinggi status bar / notch. Dipakai untuk menggeser ilustrasi
     // station agar tidak menindih jam dan ikon baterai.
     final topInset = MediaQuery.viewPaddingOf(context).top;
-    final hasTitleBlock = title != null || subtitle != null;
+    // headerExtra ikut dihitung: ada halaman yang hanya memakai pil
+    // hitung mundur, tanpa judul apa pun.
+    final hasTitleBlock =
+        title != null || subtitle != null || headerExtra != null;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: _overlayStyle,

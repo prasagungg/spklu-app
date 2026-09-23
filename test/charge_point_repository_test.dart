@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kossotrik/config/env.dart';
+import 'package:kossotrik/models/connector.dart';
 import 'package:kossotrik/data/charge_point_repository.dart';
 import 'package:kossotrik/services/response_code.dart';
 import 'package:kossotrik/services/api_client.dart';
@@ -100,8 +101,10 @@ void main() {
     expect(spklu.id, 'SPKLU-SMR');
     expect(spklu.nama, 'PLN Charging Station Sisingamangaraja');
     expect(spklu.alamat, contains('Sisingamangaraja'));
-    expect(spklu.daya, '200 kW');
-    expect(spklu.statusCode, 1);
+    // Daya pindah ke tiap charge box; SPKLU tidak lagi mengirimnya.
+    expect(spklu.daya, isEmpty);
+    expect(spklu.chargeBoxes.single.daya, '200 kW');
+    expect(spklu.chargeBoxes.single.isActive, isTrue);
   });
 
   test('daftar diminta lewat POST /list-chargerbox dengan idSpklu',
@@ -179,42 +182,48 @@ void main() {
     expect(await repo.fetchChargeBox('CB-TIDAK-ADA'), isNull);
   });
 
-  group('status konektor', () {
-    test('ditanyakan lewat POST /status-konektor', () async {
+  group('detail charge box', () {
+    test('diminta lewat POST /detail-chargerbox', () async {
       final captured = <RequestOptions>[];
       final dio = Dio()
         ..interceptors.add(
-          _StubAdapter(connectorStatusResponse(status: 3), captured: captured),
+          _StubAdapter(chargeBoxDetailResponse(), captured: captured),
         );
 
-      final status = await ChargePointRepository(client: ApiClient.withDio(dio))
-          .fetchConnectorStatus(chargeBoxId: 'CB-SMR-01', connectorId: 1);
+      await ChargePointRepository(client: ApiClient.withDio(dio))
+          .fetchChargeBoxDetail(chargeBoxId: 'CB-SMR-01', number: 1);
 
-      expect(status, 3);
       expect(captured.single.method, 'POST');
-      expect(captured.single.path, '/status-konektor');
-      expect(captured.single.data, {
-        'spkluId': Env.idSpklu,
-        'chargeBoxId': 'CB-SMR-01',
-        // Backend memakai teks untuk nomor konektor.
-        'connectorId': '1',
-      });
+      expect(captured.single.path, '/detail-chargerbox');
+      // Ejaan b kecil, mengikuti backend.
+      expect(captured.single.data, {'chargeboxId': 'CB-SMR-01'});
     });
 
-    test('tanpa data mengembalikan null, bukan melempar', () async {
-      final repo = _repositoryReturning(const {
-        'responseCode': '00',
-        'responseMessage': 'Success',
-        'data': null,
-      });
-
-      expect(
-        await repo.fetchConnectorStatus(
-          chargeBoxId: 'CB-SMR-01',
-          connectorId: 1,
+    test('status tiap konektor ikut terurai', () async {
+      final box = await _repositoryReturning(
+        chargeBoxDetailResponse(
+          connectors: [
+            connectorJson(id: '1', status: 1),
+            connectorJson(id: '2', nama: 'Gun 2', status: 3),
+          ],
         ),
-        isNull,
-      );
+      ).fetchChargeBoxDetail(chargeBoxId: 'CB-SMR-01', number: 4);
+
+      expect(box.id, 'CB-SMR-01');
+      expect(box.badge, '04');
+      expect(box.connectors.map((c) => c.status), [
+        ConnectorStatus.available,
+        ConnectorStatus.inUse,
+      ]);
+    });
+
+    /// Hanya daftar yang mengirim `daya`; pemanggil menyalinnya sendiri.
+    test('detail tidak membawa daya', () async {
+      final box = await _repositoryReturning(
+        chargeBoxDetailResponse(),
+      ).fetchChargeBoxDetail(chargeBoxId: 'CB-SMR-01', number: 1);
+
+      expect(box.daya, isEmpty);
     });
   });
 

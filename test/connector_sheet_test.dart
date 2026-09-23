@@ -19,27 +19,26 @@ class _Stub extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    if (options.path != '/status-konektor') {
-      handler.resolve(
-        Response<Map<String, dynamic>>(
-          requestOptions: options,
-          data: listResponse(),
-          statusCode: 200,
-        ),
-      );
-      return;
-    }
+    if (options.path == '/detail-chargerbox') statusCalls++;
 
-    statusCalls++;
-    final id = (options.data as Map)['connectorId'] as String;
     handler.resolve(
       Response<Map<String, dynamic>>(
         requestOptions: options,
-        data: connectorStatusResponse(
-          status: statusOf[id] ?? 1,
-          connectorId: id,
-        ),
         statusCode: 200,
+        data: switch (options.path) {
+          '/detail-chargerbox' => chargeBoxDetailResponse(
+              connectors: [
+                for (final id in ['1', '2'])
+                  connectorJson(
+                    id: id,
+                    nama: 'Gun $id',
+                    status: statusOf[id] ?? 1,
+                  ),
+              ],
+            ),
+          '/transaction/history-transaction' => historyResponse(const []),
+          _ => listResponse(),
+        },
       ),
     );
   }
@@ -85,12 +84,30 @@ Future<_Stub> _openSheet(
   return stub;
 }
 
+/// Menjawab detail tanpa satu pun konektor.
+class _EmptyDetail extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    handler.resolve(
+      Response<Map<String, dynamic>>(
+        requestOptions: options,
+        statusCode: 200,
+        data: options.path == '/detail-chargerbox'
+            ? chargeBoxDetailResponse(connectors: const [])
+            : okResponse,
+      ),
+    );
+  }
+}
+
 void main() {
-  testWidgets('status ditanyakan sekali per konektor saat sheet dibuka',
+  /// Satu panggilan detail memberi seluruh konektor sekaligus —
+  /// sebelumnya satu panggilan per konektor.
+  testWidgets('isi charge box diambil sekali saat sheet dibuka',
       (tester) async {
     final stub = await _openSheet(tester);
 
-    expect(stub.statusCalls, 2);
+    expect(stub.statusCalls, 1);
   });
 
   /// Daftar charge box melaporkan 1 untuk kedua konektor; yang benar
@@ -115,6 +132,56 @@ void main() {
       expect(find.text(label), findsNWidgets(2));
     });
   }
+
+  testWidgets('tiap konektor punya jalan ke riwayat transaksinya',
+      (tester) async {
+    await _openSheet(tester);
+
+    // Satu tombol per konektor — endpoint riwayat memang per konektor.
+    for (final id in [1, 2]) {
+      expect(
+        find.byKey(Key('riwayat-konektor-$id')),
+        findsOneWidget,
+        reason: 'konektor $id',
+      );
+    }
+
+    await tester.tap(find.byKey(const Key('riwayat-konektor-2')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Riwayat Transaksi'), findsOneWidget);
+    // Subjudulnya menyebut konektor yang dibuka, bukan yang pertama.
+    expect(find.textContaining('Gun 2'), findsOneWidget);
+  });
+
+  /// Sheet yang dikosongkan oleh jawaban aneh jauh lebih buruk
+  /// daripada sheet yang menampilkan data daftar apa adanya.
+  testWidgets('detail tanpa konektor tidak mengosongkan sheet',
+      (tester) async {
+    await tester.pumpWidget(
+      ChargingScope(
+        repository: ChargePointRepository(
+          client: ApiClient.withDio(
+            Dio()..interceptors.add(_EmptyDetail()),
+          ),
+        ),
+        child: MaterialApp(
+          theme: AppTheme.build(),
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showConnectorSheet(context, _box),
+              child: const Text('buka'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('buka'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Gun 1'), findsOneWidget);
+    expect(find.text('Gun 2'), findsOneWidget);
+  });
 
   testWidgets('tidak ada polling setelah pemeriksaan pertama',
       (tester) async {

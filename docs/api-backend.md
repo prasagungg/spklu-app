@@ -84,24 +84,24 @@ Response:
   "data": {
     "idSpklu": "SPKLU-SMR",
     "namaSpklu": "PLN Charging Station Sisingamangaraja",
-    "alamatSpklu": "Jl. Sisingamangaraja No. 1, Jakarta Selatan",
-    "status": 1,
-    "dayaSpklu": "200 kW",
-    "chargeBoxes": [
+    "alamatSpklu": "Jl. Sisingamangaraja No. 1, Kebayoran Baru, Jakarta Selatan",
+    "chargeBoxs": [
       {
-        "chargeBoxId": "CB-SMR-01",
+        "chargeboxId": "CB-SMR-01",
         "merek": "Kempower",
-        "status": 1,
-        "namaChargeBox": "Kempower Satellite 200 kW",
+        "daya": "200 kW",
+        "isActive": true,
+        "namaChargebox": "Kempower Satellite 200 kW",
+        "connectorTotal": 2,
         "connectors": [
           {
             "connectorId": "1",
-            "chargeBoxId": "CB-SMR-01",
+            "chargeboxId": "CB-SMR-01",
             "status": 1,
             "namaKonektor": "Gun 1",
             "typeConnector": "CCS2",
             "connectorTypeCurrent": "DC",
-            "estimationAvailable": null
+            "estimatimationAvailable": null
           }
         ]
       }
@@ -114,10 +114,23 @@ Diurai menjadi `Spklu` → `ChargeBox` → `Connector`.
 
 Catatan:
 
+- **Ejaan berubah antar versi backend.** Yang berlaku sekarang:
+  `chargeBoxs` (bukan `chargeBoxes`), `chargeboxId`, `namaChargebox`,
+  dan `estimatimationAvailable` — dua yang terakhir dengan b kecil dan
+  salah ketik. Penguraiannya menerima ejaan lama maupun baru supaya
+  versi backend yang berbeda tidak memecahkan aplikasi.
+- **`daya` ada di tiap charge box**, bukan lagi `dayaSpklu` di tingkat
+  lokasi. Itulah sumber "200 kW" pada keterangan konektor
+  "CCS2 - 200 kW DC".
+- **`isActive`** menggantikan `status` di tingkat charge box, dan
+  inilah yang menentukan kartunya bisa ditekan atau tidak.
+- `connectorTotal` dipakai untuk label "2 Konektor" bila daftar
+  konektornya ternyata tidak lengkap.
 - **Angka `status` pada konektor** menggambarkan perjalanan satu sesi:
 
   | `status` | Arti | `ConnectorStatus` |
   |---|---|---|
+  | `0` | Sedang dipesan, belum dibayar | `reserved` |
   | `1` | Belum dibayar atau masih bisa dipakai | `available` |
   | `2` | Sudah dibayar, menunggu konektor dihubungkan | `preparing` |
   | `3` | Sedang mengisi | `inUse` |
@@ -126,21 +139,18 @@ Catatan:
 
   Seluruh aplikasi menafsirkannya lewat `lib/models/backend_status.dart`
   saja, jadi perubahan kosakata cukup diikuti di satu tempat.
-- **`status` pada charge box dan SPKLU belum dipakai.** Keempat angka di
-  atas menggambarkan keadaan sesi pada satu konektor, dan belum
-  diketahui apakah kosakata yang sama berlaku di tingkat charge box.
-  Ketersediaan kartu karena itu ditentukan konektornya saja — memakai
-  angka yang belum pasti di sini berisiko mematikan kartu yang
-  sebenarnya sedang melayani pengisian.
-- **`connectorId` dikirim sebagai teks** (`"1"`), sedangkan `/start`,
-  `/stop`, dan `/progress` menerimanya sebagai angka. Diurai sekali di
-  `Connector.fromJson`.
+- **Angka `status` di tingkat charge box tidak dipakai.** Keempat angka
+  di atas menggambarkan keadaan sesi pada satu konektor; untuk charge
+  box yang menentukan adalah `isActive`.
+- **`connectorId` dikirim sebagai teks** (`"1"`). Diurai sekali di
+  `Connector.fromJson`, dan dikirim balik sebagai teks juga.
 - **Tidak ada objek `session`.** Endpoint ini tidak membawa kemajuan
-  sesi yang sedang berjalan; angka kWh selalu datang dari `/progress`.
+  sesi yang sedang berjalan; angka kWh selalu datang dari
+  `ongoing-kwh`.
 - **Status `2` tidak berarti kabel sudah tercolok** — artinya pengguna
-  sedang *diminta* menghubungkannya. Deteksi kabel tercolok di halaman
-  Hubungkan Konektor karena itu masih menunggu endpoint pengecekan
-  terpisah.
+  sedang *diminta* menghubungkannya. Yang memastikan kabel terpasang
+  adalah `manage-sessioncode` yang dipanggil tiap detik di halaman
+  Hubungkan Konektor.
 - **Nomor charge box tidak dikirim backend.** Urutan tampil (01, 02, …)
   diambil dari posisi di daftar.
 - `chargeBoxes` kosong adalah kondisi normal dan menghasilkan daftar
@@ -148,12 +158,56 @@ Catatan:
 - Keterangan lokasi — `namaSpklu`, `alamatSpklu`, `dayaSpklu` — diurai
   ke `Spklu` tetapi belum ditampilkan di layar mana pun.
 
-## `POST /status-konektor`
+## `POST /detail-chargerbox`
 
-Status sebenarnya satu konektor.
+Isi satu charge box beserta status konektornya saat ini.
 
 ```json
-{ "spkluId": "SPKLU-SMR", "chargeBoxId": "CB-SMR-01", "connectorId": "1" }
+{ "chargeboxId": "CB-SMR-01" }
+```
+
+```json
+{
+  "responseCode": "00", "responseMessage": "Success",
+  "data": {
+    "chargeboxId": "CB-SMR-01", "merek": "Kempower",
+    "isActive": true, "namaChargebox": "Kempower Satellite 200 kW",
+    "connectorTotal": 2,
+    "connectors": [
+      { "connectorId": "1", "chargeboxId": "CB-SMR-01", "status": 1,
+        "namaKonektor": "Gun 1", "typeConnector": "CCS2",
+        "connectorTypeCurrent": "DC", "estimatimationAvailable": null }
+    ]
+  }
+}
+```
+
+**Kapan dipanggil.** Sekali, ketika pengguna menekan sebuah charge box
+dan bottom sheet daftar konektor terbuka. Status konektor tidak terlihat
+dari daftar, dan satu panggilan di sini menggantikan satu panggilan per
+konektor — endpoint lama `POST /status-konektor` sudah dihapus backend
+(dibalas `04`).
+
+Selama jawabannya belum datang, konektor menampilkan chip "Memeriksa…"
+dan belum bisa ditekan: tujuannya ditentukan status, jadi menekannya
+lebih awal bisa salah arah.
+
+**Jawabannya tidak membawa `daya`** — hanya daftar yang punya. Aplikasi
+menyalin daya dari charge box di daftar untuk keterangan
+"CCS2 - 200 kW DC".
+
+Detail yang gagal diambil, atau yang datang tanpa satu pun konektor,
+memakai data dari daftar apa adanya. Mengosongkan sheet karena satu
+jawaban aneh jauh lebih merugikan daripada menampilkan data yang sedikit
+basi.
+## `POST /booked-connector`
+
+Memesan konektor atas nama pengguna yang sedang memakai unit ini.
+Dipanggil begitu sebuah konektor ditekan di bottom sheet, sebelum alur
+pembelian dimulai.
+
+```json
+{ "chargeBoxId": "CB-SMR-01", "connectorId": "1" }
 ```
 
 ```json
@@ -161,31 +215,107 @@ Status sebenarnya satu konektor.
   "responseCode": "00",
   "responseMessage": "Success",
   "data": {
-    "spkluId": "SPKLU-SMR",
     "chargeBoxId": "CB-SMR-01",
-    "chargeBoxName": "Kempower Satellite 200 kW",
+    "chargeboxName": "Kempower Satellite 200 kW",
     "connectorName": "Gun 1",
     "connectorId": "1",
-    "connectorStatus": 1
+    "connectorStatus": "R0",
+    "sessionExpired": "2026-09-23T09:56:04Z",
+    "reservationId": "U33tiFAl0Yj5TkCQyoUmU",
+    "sessionCode": "05",
+    "status": true
   }
 }
 ```
 
-`connectorStatus` memakai kosakata angka yang sama seperti tabel di
-`POST /list-chargerbox` di atas.
+Tiga field jawabannya yang menggerakkan sisa alur:
 
-**Kapan dipanggil.** Status konektor tidak terlihat dari daftar charge
-box, jadi ini dipanggil ketika pengguna membuka daftar konektor sebuah
-charge box — satu permintaan per konektor, sekali saja. Tidak ada
-polling: status cukup diperiksa saat pengguna melihatnya.
+| Field | Dipakai sebagai |
+|---|---|
+| `reservationId` | Identitas pemesanan; wajib dibawa `push-order` dan `cancelled-connector` |
+| `sessionCode` | Kode yang ditunjukkan di halaman Kode Sesi |
+| `sessionExpired` | Batas waktu pemesanan, jadi hitung mundur di halaman itu |
 
-Selama jawabannya belum datang, konektor menampilkan chip "Memeriksa…"
-dan belum bisa ditekan — tujuannya ditentukan status, jadi menekannya
-lebih awal bisa salah arah. Konektor yang gagal diperiksa memakai status
-dari daftar, supaya satu permintaan yang meleset tidak mengosongkan
-seluruh sheet.
+### Tahapnya ditetapkan backend
 
-Konektor yang tidak dikenal dibalas 404 dengan `responseCode` `04`.
+`connectorStatus` — "R0" saat dipesan, "R1" begitu ordernya dibuat —
+**tidak pernah dikirim aplikasi**. Dulu aplikasi memanggil endpoint ini
+empat kali untuk menaikkan tahap R0→R1→R2→R3; sekarang endpoint ini
+dipanggil **sekali**, dan memanggilnya lagi berarti membuat pemesanan
+baru, bukan menaikkan tahap.
+
+### Arti `status`
+
+`status` berarti konektornya **bersedia** (true) atau tidak (false).
+False berarti sudah diambil orang lain: alurnya berhenti di situ dan
+daftar konektor dimuat ulang, supaya pengguna tidak menghabiskan waktu
+memilih nominal dan membayar untuk konektor yang tidak akan ia dapatkan.
+
+### Kode sesi sejak memilih nozzle
+
+Kode sesi dulu datang dari `push-order`, jadi pengguna baru melihatnya
+setelah membayar. Sekarang pemesanan yang memberikannya, dan halaman
+Kode Sesi muncul tepat setelah endpoint ini berhasil — sebelum nominal
+dipilih.
+
+Konektor berstatus `0` ("dipesan") melewati Verifikasi Sesi lebih dulu;
+`reservationId` dan `sessionCode` miliknya datang dari
+`manage-sessioncode`, bukan dari pemesanan baru.
+
+## `POST /cancelled-connector`
+
+Melepas pemesanan sehingga konektornya bisa diambil orang lain lagi.
+
+```json
+{ "chargeBoxId": "CB-SMR-01", "connectorId": "1",
+  "reservationId": "U33tiFAl0Yj5TkCQyoUmU" }
+```
+
+```json
+{
+  "responseCode": "00",
+  "responseMessage": "Success",
+  "data": {
+    "chargeBoxId": "CB-SMR-01",
+    "chargeBoxName": "Kempower Satellite 200 kW",
+    "connectorName": "Gun 1",
+    "connectorId": "1",
+    "statusMessage": "Connector Cancelled"
+  }
+}
+```
+
+Tidak ada field `status`: pembatalan selalu berhasil selama konektornya
+dikenal.
+
+Yang diamati saat pengujian:
+
+- `reservationId` **wajib ada** — tanpa itu dibalas `responseCode` `07`,
+  "Missing Field". Yang dilepas adalah pemesanan itu, bukan konektornya
+  secara umum.
+- Melepas pemesanan **dari tahap mana pun**, termasuk yang sudah punya
+  order.
+- Konektor yang tidak dikenal dibalas 404.
+
+### Kapan dipanggil
+
+Saat pengguna kembali ke halaman Pilih Charge Box sementara masih
+memegang pemesanan — entah lewat "Kembali", "Batalkan Transaksi" di
+halaman Kode Sesi, tombol Home, atau tombol kembali perangkat. Satu
+tempat, `didPopNext()` di `ChargeBoxPage`, menangkap semua jalan keluar
+itu sekaligus.
+
+Mundur dari Pilih Nominal ke Kode Sesi **tidak** membatalkan apa pun:
+pemesanannya masih dipegang pengguna yang sama.
+
+Pemesanan **dilupakan tanpa dibatalkan** begitu
+`POST /transaction/charging/start` berhasil: sejak saat itu konektornya
+sedang dipakai, bukan sekadar dipesan, jadi pulangnya pengguna ke daftar
+tidak boleh melepasnya.
+
+Kegagalan pembatalan hanya dicatat ke log. Pengguna sudah pergi dari
+alur itu; memunculkan error atas sesuatu yang tidak ia minta hanya
+membingungkan.
 
 ## `GET /list-kwh`
 
@@ -247,11 +377,12 @@ melebihi total yang dikirim backend.
 
 ## `POST /transaction/push-order`
 
-Membuat order untuk kWh yang dipilih. Dipanggil saat "Lanjutkan"
-ditekan di halaman Pilih Nominal.
+Membuat order untuk kWh yang dipilih pada pemesanan yang sudah ada.
+Dipanggil saat "Lanjutkan" ditekan di halaman Pilih Nominal.
 
 ```json
-{ "chargeBoxId": "CB-SMR-01", "connectorId": "1", "kwh": 10 }
+{ "chargeboxId": "CB-SMR-01", "connectorId": "1",
+  "reservationId": "U33tiFAl0Yj5TkCQyoUmU", "kwh": 10 }
 ```
 
 ```json
@@ -272,13 +403,22 @@ ditekan di halaman Pilih Nominal.
 }
 ```
 
-Inilah sumber tiga hal yang sebelumnya **dikarang aplikasi**:
+Dua hal pada permintaannya yang mudah terlewat:
+
+- **`chargeboxId` dengan b kecil.** Hanya endpoint ini dan
+  `detail-chargerbox` yang mengejanya begitu; sisanya `chargeBoxId`.
+- **`reservationId` wajib.** Tanpa itu dibalas `07` "Missing Field":
+  order selalu melekat pada pemesanan yang dibuat lebih dulu.
+
+Jawabannya memberi dua hal yang sebelumnya **dikarang aplikasi**:
 
 | Field | Dipakai sebagai |
 |---|---|
 | `orderId` | Identitas order, disimpan di `ChargingSession.orderId` |
-| `sessionCode` | Kode yang dipakai pengguna mengakhiri sesinya |
 | `partnerReference` | "No Reference" pada Detail Transaksi |
+
+`sessionCode` di sini sama dengan yang sudah ditunjukkan halaman Kode
+Sesi sejak pemesanan; yang dipakai aplikasi adalah kode dari pemesanan.
 
 Rinciannya juga lebih lengkap daripada `/count-kwh`: ada **`rpKwh`**,
 biaya energi sebagai angka tersendiri, jadi baris "Biaya Listrik" muncul
@@ -289,10 +429,7 @@ konsisten — 24.660 + 740 = 25.400.
 
 - **Hanya satu order tertunda per konektor.** Push kedua dibalas
   `responseCode` `16` "Processing Another Request" (HTTP 409).
-- **`POST /cancelled-connector` tidak melepas order yang tertunda.**
-  Setelah konektor dibatalkan, push berikutnya tetap dibalas `16`.
-- `orderId` dan `sessionCode` baru setiap order; `partnerReference`
-  tetap pada playground.
+- `orderId` baru setiap order; `partnerReference` tetap pada playground.
 - `sessionExpiredTime` menyebut kapan ordernya kedaluwarsa. Lewat dari
   itu backend membalas `21` — baik saat menagih maupun saat memulai
   pengisian. Diurai ke `Order.sessionExpiredAt`, tetapi belum
@@ -357,17 +494,12 @@ Bawaannya `0123456789012345` (EM-BNI).
 - Panjang nomor tidak diperiksa; yang penting prefiksnya.
 - Order yang tidak ditemukan dibalas `responseCode` `21`, "Transaction
   Not Found" (404).
-- **`sessionCode` di sini dikirim kosong.** Yang berlaku adalah
-  `sessionCode` dari `push-order`, dan aplikasi tidak menimpanya dengan
-  nilai dari sini.
+- **`sessionCode` di sini dikirim kosong.** Yang berlaku adalah kode
+  dari pemesanan, dan aplikasi tidak menimpanya dengan nilai dari sini.
 
 Kegagalan menahan alur: pengguna tidak dibiarkan maju ke "Pembayaran
 Berhasil" untuk tagihan yang tidak pernah terverifikasi. Sesi NFC dibuka
 lagi supaya kartu bisa ditempelkan ulang.
-
-Saldonya sendiri **belum dipotong** — penagihan sungguhan menyusul
-setelah inquiry, dan tempat memanggilnya sudah ditandai di
-`CardPaymentPage._settleBilling`.
 
 ## `POST /transaction/payment-billing`
 
@@ -427,6 +559,35 @@ Isinya bukti transaksi dari mesin kartu; masih nilai tetap dari
 - Order kedaluwarsa cukup cepat: order yang dibuat beberapa menit
   sebelumnya sudah dibalas `21` "Transaction Not Found".
 
+## `POST /transaction/history-transaction`
+
+Transaksi yang pernah terjadi pada sebuah konektor, terbaru lebih dulu.
+Dipanggil saat tombol riwayat di daftar konektor ditekan.
+
+```json
+{ "chargeBoxId": "CB-SMR-01", "connectorId": "1" }
+```
+
+```json
+{
+  "responseCode": "00", "responseMessage": "Success",
+  "data": { "list": [
+    { "pspId": "EM-BNI", "cardNumber": "0123456789012345",
+      "orderId": "8XWS0G9RULEYBLHS48ULF6OFH7",
+      "totalAmount": 12700, "createdDate": "2026-09-23T09:28:44Z" }
+  ] }
+}
+```
+
+Tiap entri hanya membawa nomor order, kartu, nominal, dan waktu — nama
+charge box serta konektornya sudah diketahui dari tempat riwayat itu
+dibuka.
+
+`pspId` dan `cardNumber` bisa kosong: order yang tidak pernah sampai
+dibayar tetap tercatat. Nomor kartunya **tidak pernah ditampilkan
+utuh** — `TransactionHistoryEntry.maskedCard` menyisakan empat digit
+pertama dan terakhir, "6012 **** **** 7890".
+
 ## `POST /manage-sessioncode`
 
 ```json
@@ -452,11 +613,10 @@ Dipakai dua tempat yang berbeda.
 ### Memeriksa kode sesi
 
 Saat pengguna menekan konektor yang sedang dipakai, kode yang ia ketik
-diperiksa di sini. Kode sesi melekat pada order, jadi aplikasi tidak
+diperiksa di sini. Kode sesi melekat pada pemesanan, jadi aplikasi tidak
 bisa — dan tidak boleh — memutuskannya sendiri. Sebelum endpoint ini
 ada, verifikasi membandingkan dengan `SPKLU_SESSION_PIN` yang tetap,
-sehingga kode yang ditunjukkan di layar "Pengisian Dimulai" sebenarnya
-tidak membuka apa-apa.
+sehingga kode yang ditunjukkan di layar sebenarnya tidak membuka apa-apa.
 
 ### Memantau nozzle
 
@@ -478,128 +638,17 @@ Endpoint ini sempat mengeja `chargeboxId` dengan b kecil sebelum
 dirapikan. Penguraiannya menerima kedua ejaan, supaya versi backend
 yang berbeda tidak memecahkan aplikasi.
 
-### `orderId` menutup alurnya
+### `orderId` dan `reservationId` menutup alurnya
 
 Jawabannya menyertakan `orderId`, sehingga sesi yang dibuka kembali bisa
 dipantau dan dihentikan — semua perintah pengisian berkunci order,
-sedangkan daftar charge box tidak membawanya. Order yang diingat
-`ActiveBooking` hanya dipakai sebagai cadangan bila field itu kosong.
+sedangkan daftar charge box tidak membawanya. Bila ada,
+`reservationId`-nya juga dipakai: sesi berstatus `0` yang belum sampai
+membayar melanjutkan pemesanan itu, bukan membuat yang baru.
 
 Terkonfirmasi lewat pengujian: `sessionCode` wajib (`07` tanpa itu),
 kode yang tidak cocok dibalas `21`, dan kode yang benar mengembalikan
 order beserta `statusProcess`.
-
-## `POST /booked-connector`
-
-Mengunci konektor atas nama pengguna yang sedang memakai unit ini, lalu
-menaikkan tahapnya seiring alur pembelian.
-
-```json
-{ "chargeBoxId": "CB-SMR-01", "connectorId": "1", "connectorStatus": "R0" }
-```
-
-```json
-{
-  "responseCode": "00",
-  "responseMessage": "Success",
-  "data": {
-    "chargeBoxId": "CB-SMR-01",
-    "chargeBoxName": "Kempower Satellite 200 kW",
-    "connectorName": "Gun 1",
-    "connectorId": "1",
-    "connectorStatus": "R0",
-    "status": true
-  }
-}
-```
-
-| Tahap | Arti | Dikirim saat |
-|---|---|---|
-| `R0` | Nozzle dipilih — konektor dikunci | Konektor ditekan di bottom sheet |
-| `R1` | Order sedang dibuat | "Lanjutkan" di Pilih Nominal |
-| `R2` | Pembayaran dikonfirmasi | Kartu e-Money terbaca |
-| `R3` | Pengisian dimulai | "Mulai Pengisian" di Hubungkan Konektor |
-
-### Arti `status`
-
-`status` berarti konektornya **bersedia** (true) atau tidak (false).
-
-Yang perlu diperhatikan: nilainya hanya bermakna pada **R0**. Di situ
-false berarti konektornya sudah diambil orang lain, dan alur harus
-berhenti — pengguna tidak boleh menghabiskan waktu memilih nominal dan
-membayar untuk konektor yang tidak akan ia dapatkan.
-
-Pada R1–R3 nilainya **selalu false**, dan itu wajar: bookingnya sudah
-dipegang pengguna ini, jadi konektornya memang tidak lagi bersedia.
-Permintaannya tidak membawa identitas pemesan, sehingga backend tidak
-bisa membedakan "diambil Anda" dari "diambil orang lain". Karena itu
-R1–R3 diperlakukan sebagai laporan kemajuan: kegagalannya dicatat ke log
-dan alurnya jalan terus.
-
-### Yang diamati saat pengujian
-
-- Urutannya **tidak dipaksakan**. Konektor yang belum pernah dibooking
-  menerima `R2` langsung dengan `status: true`; panggilan pertama yang
-  menang, apa pun kodenya.
-- Booking **tidak ikut mengubah** `connectorStatus` pada
-  `POST /status-konektor` — sesudah R0 nilainya tetap `1`.
-- Kode tahap di luar R0–R3, dan konektor yang tidak dikenal, dibalas
-  404 dengan `responseCode` `04`.
-- **Belum ada cara melepas booking.** Sesudah R3 pun konektor tetap
-  terkunci, dan `R0` berikutnya dibalas `status: false`. Lihat catatan
-  di bawah.
-
-## `POST /cancelled-connector`
-
-Melepas booking sehingga konektornya bisa diambil orang lain lagi.
-
-```json
-{ "chargeBoxId": "CB-SMR-01", "connectorId": "1", "connectorStatus": "R0" }
-```
-
-```json
-{
-  "responseCode": "00",
-  "responseMessage": "Success",
-  "data": {
-    "chargeBoxId": "CB-SMR-01",
-    "chargeBoxName": "Kempower Satellite 200 kW",
-    "connectorName": "Gun 1",
-    "connectorId": "1",
-    "statusMessage": "Connector Cancelled"
-  }
-}
-```
-
-Tidak ada field `status`: pembatalan selalu berhasil selama konektornya
-dikenal.
-
-Yang diamati saat pengujian:
-
-- Melepas booking **dari tahap mana pun**. Booking yang sudah sampai R3
-  pun terlepas, dan `R0` sesudahnya kembali dibalas `status: true`.
-- **Idempoten**: membatalkan konektor yang memang tidak dibooking tetap
-  dibalas sukses.
-- `connectorStatus` **wajib ada** — tanpa itu dibalas `responseCode`
-  `07`, "Missing Field: connectorStatus" — tetapi nilainya tidak
-  menentukan apa pun. Aplikasi mengirim tahap terakhir yang sempat
-  dilaporkan.
-- Konektor yang tidak dikenal dibalas 404.
-
-### Kapan dipanggil
-
-Saat pengguna kembali ke halaman Pilih Charge Box sementara masih
-memegang booking — entah lewat "Kembali", tombol Home, atau tombol
-kembali perangkat. Satu tempat, `didPopNext()` di `ChargeBoxPage`,
-menangkap semua jalan keluar itu sekaligus.
-
-Booking **dilupakan tanpa dibatalkan** begitu `POST /start` berhasil:
-sejak saat itu konektornya sedang dipakai, bukan sekadar dipesan, jadi
-pulangnya pengguna ke daftar tidak boleh melepasnya.
-
-Kegagalan pembatalan hanya dicatat ke log. Pengguna sudah pergi dari
-alur itu; memunculkan error atas sesuatu yang tidak ia minta hanya
-membingungkan.
 
 ## `POST /transaction/charging/start`
 
@@ -651,7 +700,8 @@ Kemajuan pengisian. Di-polling tiap detik oleh halaman Sedang Mengisi.
 }
 ```
 
-Dua hal yang berbeda dari `GET /progress` yang lama:
+Dua hal yang berbeda dari `GET /progress` yang dipakai sebelum backend
+ini:
 
 - **`charged` sudah dalam kWh**, bukan Wh. Angkanya dipakai apa adanya,
   tidak dibagi seribu.
@@ -667,12 +717,10 @@ dan bisa null bila charger tidak melaporkannya.
 
 Ketiga endpoint ini berkunci `orderId`. Sesi yang dilanjutkan dari
 daftar charge box — konektor berstatus 2, 3, atau 4 milik orang lain —
-tidak membawa orderId, jadi kemajuannya tidak bisa ditanyakan dan
-pengisiannya tidak bisa dihentikan lewat aplikasi. Halaman status jatuh
-ke simulasi lokal untuk sesi seperti itu.
-
-Melanjutkan sesi orang lain baru benar-benar bisa jalan bila ada cara
-memulihkan `orderId` dari sebuah konektor.
+tidak membawa orderId kecuali `manage-sessioncode` menyebutkannya, jadi
+kemajuannya tidak bisa ditanyakan dan pengisiannya tidak bisa
+dihentikan lewat aplikasi. Halaman status jatuh ke simulasi lokal untuk
+sesi seperti itu.
 
 ## Kode `responseCode`
 
@@ -763,11 +811,14 @@ Pesan dari backend didahulukan bila ada, dicari berurutan pada
 Saat debug, `ApiLogger` mencetak satu baris per panggilan:
 
 ```
-[API] → POST /start {"chargePointId":"SIM-456","connectorId":1}
-[API] ← 200 POST /start (312ms) code=00 Success
-[API] ✗ 503 POST /start (118ms) code=12 Charging station SIM-456 is not connected
+[API] → POST /booked-connector {"chargeBoxId":"CB-SMR-01","connectorId":"1"}
+[API] ← 200 POST /booked-connector (312ms) code=00 Success
+[API] ✗ 503 POST /transaction/charging/start (118ms) code=31 Charging station CB-SMR-01 is not connected
 ```
 
-Body dipotong di 400 karakter supaya response `/list` yang panjang tidak
-membanjiri konsol. Log otomatis mati di build release; bisa dimatikan
-lebih awal lewat `--dart-define=SPKLU_API_LOG=false`.
+Body dipotong di 400 karakter supaya response `/list-chargerbox` yang
+panjang tidak membanjiri konsol. Log otomatis mati di build release;
+bisa dimatikan lebih awal lewat `--dart-define=SPKLU_API_LOG=false`.
+
+Seluruhnya juga tercatat di dalam aplikasi — lihat
+[Inspector API](arsitektur.md#inspector-api).

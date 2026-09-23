@@ -58,7 +58,7 @@ void main() {
       (path) => switch (path) {
         '/list-chargerbox' => _list(),
         '/booked-connector' => bookingResponse(),
-        '/status-konektor' => connectorStatusResponse(),
+        '/detail-chargerbox' => chargeBoxDetailResponse(),
         '/manage-sessioncode' => sessionCodeResponse(),
         '/list-kwh' => kwhOptionsResponse(),
         '/count-kwh' => countKwhResponse(),
@@ -93,7 +93,7 @@ void main() {
 
     // Pilih konektor yang hidup.
     await tester.tap(find.text('Gun 1'));
-    await tester.pumpAndSettle();
+    await passSessionCode(tester);
 
     // Tidak ada pilihan yang tercentang sejak awal.
     await tester.tap(find.text('10,0 kWh'));
@@ -157,8 +157,10 @@ void main() {
 
     final recorder = _Recorder((path) {
       if (path == '/transaction/charging/start') charging = true;
-      if (path == '/status-konektor') {
-        return connectorStatusResponse(status: charging ? 3 : 1);
+      if (path == '/detail-chargerbox') {
+        return chargeBoxDetailResponse(
+          connectors: [connectorJson(status: charging ? 3 : 1)],
+        );
       }
       if (path == '/list-chargerbox') return _list();
       if (path == '/booked-connector') return bookingResponse();
@@ -197,7 +199,7 @@ void main() {
     await tester.tap(find.text('01'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
-    await tester.pumpAndSettle();
+    await passSessionCode(tester);
     // Tidak ada pilihan yang tercentang sejak awal.
     await tester.tap(find.text('10,0 kWh'));
     await tester.pumpAndSettle();
@@ -267,8 +269,10 @@ void main() {
 
     final recorder = _Recorder((path) {
       if (path == '/transaction/charging/start') charging = true;
-      if (path == '/status-konektor') {
-        return connectorStatusResponse(status: charging ? 3 : 1);
+      if (path == '/detail-chargerbox') {
+        return chargeBoxDetailResponse(
+          connectors: [connectorJson(status: charging ? 3 : 1)],
+        );
       }
       if (path == '/list-chargerbox') return _list();
       if (path == '/booked-connector') return bookingResponse();
@@ -316,7 +320,7 @@ void main() {
     await tester.tap(find.text('01'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
-    await tester.pumpAndSettle();
+    await passSessionCode(tester);
     // Tidak ada pilihan yang tercentang sejak awal.
     await tester.tap(find.text('10,0 kWh'));
     await tester.pumpAndSettle();

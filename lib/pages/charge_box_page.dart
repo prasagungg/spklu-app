@@ -2,13 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../config/env.dart';
+import '../models/reservation.dart';
 import '../models/session_check.dart';
 
 import '../app_route_observer.dart';
 import '../data/charge_point_repository.dart';
 import '../data/charging_scope.dart';
 import '../models/charge_box.dart';
-import '../models/booking.dart';
 import '../models/charging_session.dart';
 import '../models/connector.dart';
 import '../services/api_exception.dart';
@@ -22,7 +23,7 @@ import '../widgets/status_chip.dart';
 import 'api_config_page.dart';
 import 'charging_status_page.dart';
 import 'connect_connector_page.dart';
-import 'nominal_page.dart';
+import 'session_code_page.dart';
 import 'session_verification_page.dart';
 
 /// Frame Figma 70:1901 — "Pilih Charge Box".
@@ -114,14 +115,14 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
 
     final chargeBoxId = booking.chargeBoxId!;
     final connectorId = booking.connectorId!;
-    final stage = booking.stage;
+    final reservationId = booking.reservationId ?? '';
     booking.forget();
 
     try {
       final result = await scope.repository.cancelConnector(
         chargeBoxId: chargeBoxId,
         connectorId: connectorId,
-        stage: stage,
+        reservationId: reservationId,
       );
       debugPrint('[FLOW] Booking ditinggalkan, dilepas: $result');
     } on Object catch (e) {
@@ -180,6 +181,8 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
     // harus membuktikan kepemilikan sesi lebih dulu dengan kode yang
     // ditunjukkan di halaman "Pengisian Dimulai".
     var verifiedOrderId = '';
+    Reservation? reservation;
+
     if (!connector.isAvailable) {
       final expected = ChargingScope.maybeOf(context)?.booking.sessionCodeOn(
             chargeBoxId: box.id,
@@ -197,11 +200,18 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
       );
       if (check == null || !mounted) return;
       verifiedOrderId = check.orderId;
+      // Konektor yang sudah dipesan orang lain dilanjutkan dengan
+      // pemesanan yang sudah ada, bukan dipesan ulang.
+      reservation = Reservation(
+        accepted: true,
+        reservationId: check.reservationId,
+        sessionCode: check.sessionCode,
+      );
     } else {
-      // Konektor bebas: kunci dulu atas nama pengguna ini sebelum ia
+      // Konektor bebas: pesan dulu atas nama pengguna ini sebelum ia
       // menghabiskan waktu memilih nominal dan membayar.
-      final booked = await _book(box, connector);
-      if (!booked || !mounted) return;
+      reservation = await _book(box, connector);
+      if (reservation == null || !mounted) return;
     }
 
     // Tujuannya ditentukan status konektor: yang masih bebas memulai
@@ -211,9 +221,14 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
     // penentu: begitu ia melaporkan `finished`, halaman itu langsung
     // berpindah ke rincian akhir dengan angka energi yang benar.
     final destination = switch (connector.status) {
-      ConnectorStatus.available => NominalPage(
+      // Kode sesinya ditunjukkan dulu — pengguna memerlukannya untuk
+      // kembali ke sesi ini. "Dipesan" berarti pemesanan sudah ada
+      // tetapi belum dibayar, jadi jalurnya sama.
+      ConnectorStatus.available || ConnectorStatus.reserved =>
+        SessionCodePage(
           chargeBox: box,
           connector: connector,
+          reservation: reservation,
         ),
       ConnectorStatus.preparing => ConnectConnectorPage(
           session: _resume(box, connector, verifiedOrderId),
@@ -238,36 +253,43 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
     // Pemuatan ulang ditangani didPopNext saat rute di atas ditutup.
   }
 
-  /// Mengunci konektor lewat `POST /booked-connector` tahap R0.
+  /// Memesan konektor lewat `POST /booked-connector`.
   ///
-  /// Mengembalikan false bila konektornya baru saja diambil orang lain
+  /// Mengembalikan null bila konektornya baru saja diambil orang lain
   /// atau permintaannya gagal — dua-duanya berarti alur tidak boleh
-  /// lanjut. Tanpa repository (mode offline untuk test) langsung
-  /// dianggap berhasil.
-  Future<bool> _book(ChargeBox box, Connector connector) async {
+  /// lanjut.
+  Future<Reservation?> _book(ChargeBox box, Connector connector) async {
     final repository = _repository;
-    if (repository == null) return true;
+
+    // Mode offline: pemesanan ditiru supaya alurnya tetap bisa diuji.
+    if (repository == null) {
+      return Reservation(accepted: true, sessionCode: Env.sessionPin);
+    }
 
     // Diambil sebelum await: sesudahnya context belum tentu masih hidup.
     final booking = ChargingScope.maybeOf(context)?.booking;
 
     try {
-      final result = await repository.bookConnector(
+      final reservation = await repository.bookConnector(
         chargeBoxId: box.id,
         connectorId: connector.id,
-        stage: BookingStage.selected,
       );
-      debugPrint('[FLOW] Booking R0: $result');
-      if (result.accepted) {
-        booking?.hold(chargeBoxId: box.id, connectorId: connector.id);
-        return true;
+      debugPrint('[FLOW] Pemesanan: $reservation');
+      if (reservation.accepted) {
+        booking?.hold(
+          chargeBoxId: box.id,
+          connectorId: connector.id,
+          reservationId: reservation.reservationId,
+          sessionCode: reservation.sessionCode,
+        );
+        return reservation;
       }
     } on ApiException catch (e) {
       _complain(e.message);
-      return false;
+      return null;
     } on Object catch (e) {
       _complain('Konektor gagal dipesan: $e');
-      return false;
+      return null;
     }
 
     _complain(
@@ -276,7 +298,7 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
     );
     // Daftarnya sudah basi kalau konektor ini ternyata sudah terpakai.
     _load();
-    return false;
+    return null;
   }
 
   void _complain(String message) {

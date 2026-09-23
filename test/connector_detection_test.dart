@@ -52,8 +52,18 @@ void main() {
       expect(c.isSelectable, isTrue);
     });
 
-    test('angka di luar keempatnya tidak bisa ditekan', () {
-      for (final status in [0, 5, 9, 99]) {
+    test('status 0 berarti sedang dipesan', () {
+      final c = _connector(status: 0);
+
+      expect(c.status, ConnectorStatus.reserved);
+      expect(c.isReserved, isTrue);
+      // Sudah diklaim, tapi pemiliknya harus bisa kembali.
+      expect(c.isAvailable, isFalse);
+      expect(c.isSelectable, isTrue);
+    });
+
+    test('angka di luar kelimanya tidak bisa ditekan', () {
+      for (final status in [5, 9, 99]) {
         final c = _connector(status: status);
         expect(c.status, ConnectorStatus.unavailable, reason: '$status');
         expect(c.isSelectable, isFalse, reason: '$status');
@@ -112,7 +122,7 @@ void main() {
       final box = ChargeBox.fromJson(
         chargeBoxJson(
           connectors: [
-            connectorJson(id: '1', status: 0),
+            connectorJson(id: '1', status: 5),
             connectorJson(id: '2', status: 9),
           ],
         ),
@@ -126,7 +136,7 @@ void main() {
       final box = ChargeBox.fromJson(
         chargeBoxJson(
           connectors: [
-            connectorJson(id: '1', status: 0),
+            connectorJson(id: '1', status: 9),
             connectorJson(id: '2', status: 1),
           ],
         ),
@@ -147,14 +157,55 @@ void main() {
       expect(box.isAvailable, isTrue);
     });
 
-    test('nama dan merek dibaca dari backend', () {
+    test('charge box yang dimatikan tidak bisa dipakai', () {
+      final box = ChargeBox.fromJson(
+        chargeBoxJson(isActive: false),
+        number: 1,
+      );
+
+      expect(box.isAvailable, isFalse);
+    });
+
+    test('nama, merek, dan daya dibaca dari backend', () {
       final box = ChargeBox.fromJson(chargeBoxJson(), number: 4);
 
       expect(box.id, 'CB-SMR-01');
       expect(box.name, 'Kempower Satellite 200 kW');
       expect(box.merek, 'Kempower');
+      expect(box.daya, '200 kW');
       expect(box.badge, '04');
       expect(box.connectorLabel, '1 Konektor');
+    });
+
+    /// Ejaan `chargeBoxId`/`namaChargeBox` dipakai versi backend
+    /// sebelumnya; keduanya harus tetap terbaca.
+    test('ejaan lama masih diterima', () {
+      final box = ChargeBox.fromJson(const {
+        'chargeBoxId': 'CB-LAMA',
+        'namaChargeBox': 'Charger Lama',
+        'connectors': [
+          {'connectorId': '1', 'status': 1, 'estimationAvailable': 15},
+        ],
+      }, number: 1);
+
+      expect(box.id, 'CB-LAMA');
+      expect(box.name, 'Charger Lama');
+      expect(box.connectors.single.estimatedMinutes, 15);
+    });
+
+    test('keterangan konektor memakai daya charge box', () {
+      final box = ChargeBox.fromJson(chargeBoxJson(), number: 1);
+
+      expect(
+        box.connectors.single.describeWith(box.daya),
+        'CCS2 - 200 kW DC',
+      );
+    });
+
+    test('tanpa daya, jatuh ke tipe dan arusnya saja', () {
+      final box = ChargeBox.fromJson(chargeBoxJson(daya: ''), number: 1);
+
+      expect(box.connectors.single.describeWith(box.daya), 'CCS2 · DC');
     });
   });
 

@@ -29,8 +29,8 @@ class _Stub extends Interceptor {
             ]),
           '/booked-connector' => bookingResponse(),
           '/manage-sessioncode' => sessionCodeResponse(),
-          '/status-konektor' => connectorStatusResponse(
-              status: _charging ? 3 : 1,
+          '/detail-chargerbox' => chargeBoxDetailResponse(
+              connectors: [connectorJson(status: _charging ? 3 : 1)],
             ),
           '/list-kwh' => kwhOptionsResponse(),
           '/count-kwh' => countKwhResponse(),
@@ -76,7 +76,7 @@ void main() {
     await tester.tap(find.text('01'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
-    await tester.pumpAndSettle();
+    await passSessionCode(tester);
     // Tidak ada pilihan yang tercentang sejak awal.
     await tester.tap(find.text('10,0 kWh'));
     await tester.pumpAndSettle();

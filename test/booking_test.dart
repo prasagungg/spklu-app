@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kossotrik/data/charge_point_repository.dart';
 import 'package:kossotrik/main.dart';
-import 'package:kossotrik/models/booking.dart';
+import 'package:kossotrik/models/reservation.dart';
 import 'package:kossotrik/pages/charge_box_page.dart';
 import 'package:kossotrik/services/api_client.dart';
 import 'package:kossotrik/widgets/page_scaffold.dart';
@@ -34,8 +34,8 @@ class _Recorder extends Interceptor {
           '/list-chargerbox' => listResponse([
               chargeBoxJson(id: 'CB-SMR-01', nama: 'CB-SMR-01'),
             ]),
-          '/status-konektor' => connectorStatusResponse(
-              status: _charging ? 3 : 1,
+          '/detail-chargerbox' => chargeBoxDetailResponse(
+              connectors: [connectorJson(status: _charging ? 3 : 1)],
             ),
           '/booked-connector' => bookingResponse(accepted: bookingAccepted),
           '/manage-sessioncode' => sessionCodeResponse(),
@@ -57,12 +57,9 @@ class _Recorder extends Interceptor {
   List<RequestOptions> to(String path) =>
       requests.where((r) => r.path == path).toList();
 
-  /// Tahap booking yang terkirim, berurutan.
-  List<String> get stages => [
-        for (final r in requests)
-          if (r.path == '/booked-connector')
-            (r.data as Map)['connectorStatus'] as String,
-      ];
+  /// Berapa kali konektor dipesan. Memanggilnya lagi bukan menaikkan
+  /// tahap, melainkan membuat pemesanan baru.
+  int get bookings => to('/booked-connector').length;
 }
 
 Future<void> _settle(WidgetTester tester) async {
@@ -84,7 +81,7 @@ Future<void> _pickConnector(WidgetTester tester, _Recorder recorder) async {
   await tester.tap(find.text('01'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Gun 1'));
-  await tester.pumpAndSettle();
+  await settleFrames(tester);
 }
 
 void main() {
@@ -94,6 +91,8 @@ void main() {
       final recorder = _Recorder();
       await _pickConnector(tester, recorder);
 
+      await passSessionCode(tester);
+
       final booking = recorder.requests
           .firstWhere((r) => r.path == '/booked-connector');
       expect(booking.method, 'POST');
@@ -101,7 +100,6 @@ void main() {
         'chargeBoxId': 'CB-SMR-01',
         // Backend memakai teks untuk nomor konektor.
         'connectorId': '1',
-        'connectorStatus': 'R0',
       });
       expect(find.text('Pilih Nominal'), findsOneWidget);
     });
@@ -133,20 +131,28 @@ void main() {
     });
   });
 
-  testWidgets('tahapnya naik mengikuti alur pembelian', (tester) async {
+  /// Tahap dinaikkan backend sendiri; aplikasi memesan sekali saja.
+  /// Memanggil `booked-connector` lagi akan membuat pemesanan baru,
+  /// bukan menaikkan tahap.
+  testWidgets('konektor dipesan sekali saja sepanjang alur',
+      (tester) async {
     final recorder = _Recorder();
     await _pickConnector(tester, recorder);
-    expect(recorder.stages, ['R0']);
+    expect(recorder.bookings, 1);
 
-    // R1 — order dibuat.
+    await passSessionCode(tester);
+
     // Tidak ada pilihan yang tercentang sejak awal.
     await tester.tap(find.text('10,0 kWh'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
-    expect(recorder.stages, ['R0', 'R1']);
 
-    // R2 — pembayaran dikonfirmasi lewat tap kartu.
+    // Ordernya menempel pada pemesanan itu.
+    final order = recorder.to('/transaction/push-order').single;
+    expect((order.data as Map)['reservationId'], 'RESV-1');
+
+
     await tester.tap(find.text('Konfirmasi & Bayar'));
     await _settle(tester);
 
@@ -160,9 +166,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     }
     await tester.pump(const Duration(milliseconds: 600));
-    expect(recorder.stages, ['R0', 'R1', 'R2']);
 
-    // R3 — pengisian dimulai.
+
     await tester.tap(find.text('Mulai Pengisian'));
     await _settle(tester);
     await tester.pump(const Duration(seconds: 3));
@@ -173,28 +178,38 @@ void main() {
     }
     await tester.pump(const Duration(milliseconds: 600));
 
-    expect(recorder.stages, ['R0', 'R1', 'R2', 'R3']);
+    expect(recorder.bookings, 1, reason: 'tidak ada pemesanan tambahan');
     expect(find.text('Pengisian Dimulai'), findsOneWidget);
   });
 
   group('pembatalan saat alur ditinggalkan', () {
-    testWidgets('kembali dari Pilih Nominal melepas konektor',
+    testWidgets('keluar dari alur pembelian melepas konektor',
         (tester) async {
       final recorder = _Recorder();
       await _pickConnector(tester, recorder);
+      await passSessionCode(tester);
       expect(find.text('Pilih Nominal'), findsOneWidget);
       expect(recorder.to('/cancelled-connector'), isEmpty);
 
+      // Kembali dari Pilih Nominal hanya mundur satu langkah, ke kode
+      // sesinya: pemesanannya masih dipegang pengguna ini.
       await tester.tap(find.text('Kembali'));
+      await settleFrames(tester);
+      expect(find.text('Kode Sesi'), findsOneWidget);
+      expect(recorder.to('/cancelled-connector'), isEmpty);
+
+      // Yang melepasnya adalah keluar dari alurnya sama sekali.
+      await tester.tap(find.text('Batalkan Transaksi'));
       await tester.pumpAndSettle();
+      expect(find.text('Pilih Charge Box'), findsOneWidget);
 
       final cancel = recorder.to('/cancelled-connector').single;
       expect(cancel.method, 'POST');
       expect(cancel.data, {
         'chargeBoxId': 'CB-SMR-01',
         'connectorId': '1',
-        // Tahap terakhir yang sempat dilaporkan.
-        'connectorStatus': 'R0',
+        // Pemesanan yang dibatalkan, bukan tahapnya.
+        'reservationId': 'RESV-1',
       });
     });
 
@@ -202,6 +217,7 @@ void main() {
         (tester) async {
       final recorder = _Recorder();
       await _pickConnector(tester, recorder);
+      await passSessionCode(tester);
 
       // Tidak ada pilihan yang tercentang sejak awal.
       await tester.tap(find.text('10,0 kWh'));
@@ -214,8 +230,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final cancel = recorder.to('/cancelled-connector').single;
-      // Tahapnya sudah naik ke R1 sebelum ditinggalkan.
-      expect((cancel.data as Map)['connectorStatus'], 'R1');
+      expect((cancel.data as Map)['reservationId'], 'RESV-1');
       expect(find.text('Pilih Charge Box'), findsOneWidget);
     });
 
@@ -225,6 +240,7 @@ void main() {
         (tester) async {
       final recorder = _Recorder();
       await _pickConnector(tester, recorder);
+      await passSessionCode(tester);
 
       // Tidak ada pilihan yang tercentang sejak awal.
       await tester.tap(find.text('10,0 kWh'));
@@ -288,6 +304,7 @@ void main() {
   testWidgets('kode sesi dan referensi datang dari order', (tester) async {
     final recorder = _Recorder();
     await _pickConnector(tester, recorder);
+    await passSessionCode(tester);
 
     await tester.tap(find.text('10,0 kWh'));
     await tester.pumpAndSettle();
@@ -321,6 +338,7 @@ void main() {
       (tester) async {
     final recorder = _Recorder();
     await _pickConnector(tester, recorder);
+    await passSessionCode(tester);
 
     await tester.tap(find.text('10,0 kWh'));
     await tester.pumpAndSettle();
@@ -371,17 +389,31 @@ void main() {
     expect(polls.last.data, {'orderId': 'YZ00ZG5SP9HUNVRPTZH69Y7POW'});
   });
 
-  group('BookingStage', () {
-    test('kodenya sesuai kosakata backend', () {
-      expect(BookingStage.selected.code, 'R0');
-      expect(BookingStage.ordering.code, 'R1');
-      expect(BookingStage.paid.code, 'R2');
-      expect(BookingStage.starting.code, 'R3');
+  group('Reservation', () {
+    test('diurai dari payload nyata', () {
+      final r = Reservation.fromJson(const {
+        'chargeBoxId': 'CB-SMR-01',
+        'chargeboxName': 'Kempower Satellite 200 kW',
+        'connectorName': 'Gun 1',
+        'connectorId': '1',
+        'connectorStatus': 'R0',
+        'sessionExpired': '2026-09-23T09:56:04Z',
+        'reservationId': 'U33tiFAl0Yj5TkCQyoUmU',
+        'sessionCode': '05',
+        'status': true,
+      });
+
+      expect(r.accepted, isTrue);
+      expect(r.reservationId, 'U33tiFAl0Yj5TkCQyoUmU');
+      expect(r.sessionCode, '05');
+      // Tahapnya ditetapkan backend, bukan dikirim aplikasi.
+      expect(r.connectorStatus, 'R0');
+      expect(r.expiredAt, isNotNull);
     });
 
     test('data yang hilang tidak dianggap bersedia', () {
-      expect(BookingResult.fromJson(null).accepted, isFalse);
-      expect(BookingResult.fromJson(const {}).accepted, isFalse);
+      expect(Reservation.fromJson(null).accepted, isFalse);
+      expect(Reservation.fromJson(const {}).accepted, isFalse);
     });
   });
 }

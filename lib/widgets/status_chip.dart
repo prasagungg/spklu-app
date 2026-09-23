@@ -26,6 +26,13 @@ class StatusChip extends StatelessWidget {
         foreground = AppColors.inUseFg,
         fontSize = 12;
 
+  /// Sedang dipesan orang lain, belum sampai pembayaran.
+  const StatusChip.reserved({super.key})
+      : label = 'Dipesan',
+        background = AppColors.infoTileBg,
+        foreground = AppColors.description,
+        fontSize = 12;
+
   /// Sudah dibayar, menunggu konektor dihubungkan ke kendaraan.
   const StatusChip.preparing({super.key})
       : label = 'Menunggu Konektor',

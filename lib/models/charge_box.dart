@@ -5,13 +5,19 @@ import 'connector.dart';
 ///
 /// ```json
 /// {
-///   "chargeBoxId": "CB-SMR-01",
+///   "chargeboxId": "CB-SMR-01",
 ///   "merek": "Kempower",
-///   "status": 1,
-///   "namaChargeBox": "Kempower Satellite 200 kW",
+///   "daya": "200 kW",
+///   "isActive": true,
+///   "namaChargebox": "Kempower Satellite 200 kW",
+///   "connectorTotal": 2,
 ///   "connectors": [ … ]
 /// }
 /// ```
+///
+/// Ejaan `chargeboxId`/`namaChargebox` sempat berupa
+/// `chargeBoxId`/`namaChargeBox`. Keduanya diterima supaya versi
+/// backend yang berbeda tidak memecahkan aplikasi.
 class ChargeBox {
   const ChargeBox({
     required this.number,
@@ -19,6 +25,9 @@ class ChargeBox {
     required this.connectors,
     this.displayName,
     this.merek = '',
+    this.daya = '',
+    this.isActive = true,
+    this.connectorTotal,
     this.statusCode,
   });
 
@@ -26,29 +35,45 @@ class ChargeBox {
   /// jadi dipakai posisi di daftar.
   final int number;
 
-  /// `chargeBoxId`, mis. "CB-SMR-01". Dipakai apa adanya oleh `/start`,
-  /// `/stop`, dan `/progress`.
+  /// `chargeboxId`, mis. "CB-SMR-01". Dipakai apa adanya oleh seluruh
+  /// endpoint yang menyebut charge box.
   final String id;
 
-  /// `namaChargeBox`, mis. "Kempower Satellite 200 kW".
+  /// `namaChargebox`, mis. "Kempower Satellite 200 kW".
   final String? displayName;
 
   /// `merek`, mis. "Kempower".
   final String merek;
 
-  /// Angka `status` apa adanya dari backend.
+  /// `daya`, mis. "200 kW". Teks apa adanya, bukan angka.
+  final String daya;
+
+  /// `isActive` — charge box yang dimatikan tidak bisa dipakai.
+  final bool isActive;
+
+  /// `connectorTotal` dari backend. Dipakai bila daftar konektornya
+  /// ternyata tidak lengkap.
+  final int? connectorTotal;
+
+  /// Angka `status` apa adanya, dari versi backend yang masih
+  /// mengirimnya.
   final int? statusCode;
 
   final List<Connector> connectors;
 
   factory ChargeBox.fromJson(Map<String, dynamic> json, {required int number}) {
     final rawConnectors = json['connectors'];
+    final id = json['chargeboxId'] ?? json['chargeBoxId'];
+    final name = json['namaChargebox'] ?? json['namaChargeBox'];
 
     return ChargeBox(
       number: number,
-      id: json['chargeBoxId'] as String? ?? '-',
-      displayName: json['namaChargeBox'] as String?,
+      id: id as String? ?? '-',
+      displayName: name as String?,
       merek: json['merek'] as String? ?? '',
+      daya: json['daya'] as String? ?? '',
+      isActive: json['isActive'] as bool? ?? true,
+      connectorTotal: (json['connectorTotal'] as num?)?.toInt(),
       statusCode: BackendStatus.parse(json['status']),
       connectors: rawConnectors is List
           ? rawConnectors
@@ -61,18 +86,19 @@ class ChargeBox {
 
   String get badge => number.toString().padLeft(2, '0');
 
-  String get connectorLabel => '${connectors.length} Konektor';
+  String get connectorLabel =>
+      '${connectorTotal ?? connectors.length} Konektor';
 
   /// Jatuh ke id charge box bila tidak ada nama tampilan.
   String get name => displayName ?? id;
 
-  /// Bisa dipilih selama ada minimal satu konektor yang statusnya
-  /// dikenal.
+  /// Bisa dipilih selama charge box-nya hidup dan ada minimal satu
+  /// konektor yang statusnya dikenal.
   ///
-  /// Sengaja tidak menyertakan [statusCode] milik charge box: keempat
-  /// angka yang terdokumentasi menggambarkan keadaan satu sesi pada
-  /// konektor, dan belum ketahui apakah kosakata yang sama dipakai di
-  /// tingkat charge box. Memakainya di sini berisiko mematikan kartu
-  /// yang sebenarnya sedang melayani pengisian.
-  bool get isAvailable => connectors.any((c) => c.isSelectable);
+  /// Angka `status` milik charge box sengaja tidak ikut: keempat nilai
+  /// yang terdokumentasi menggambarkan keadaan sesi pada konektor, dan
+  /// memakainya di sini berisiko mematikan kartu yang sebenarnya sedang
+  /// melayani pengisian. `isActive` adalah sinyal yang tepat untuk itu.
+  bool get isAvailable =>
+      isActive && connectors.any((c) => c.isSelectable);
 }

@@ -2,11 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../data/booking_progress.dart';
 import '../data/card_reader_scope.dart';
 import '../data/charging_scope.dart';
 import '../data/formatters.dart';
-import '../models/booking.dart';
 import '../models/charging_session.dart';
 import '../services/api_exception.dart';
 import '../services/response_code.dart';
@@ -163,13 +161,6 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
 
   void _proceed(ChargingSession session) {
     _ticker?.cancel();
-
-    reportBookingStage(
-      context,
-      chargeBoxId: widget.session.chargeBox.id,
-      connectorId: widget.session.connector.id,
-      stage: BookingStage.paid,
-    );
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(

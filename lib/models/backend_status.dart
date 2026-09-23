@@ -1,13 +1,16 @@
 /// Angka `status` yang dikirim backend pada konektor.
 ///
-/// Keempat nilainya menggambarkan perjalanan satu sesi pengisian, dari
-/// konektor yang masih bebas sampai sesi yang sudah selesai. Nilai di
+/// Kelima nilainya menggambarkan perjalanan satu sesi pengisian, dari
+/// konektor yang baru dipesan sampai sesi yang sudah selesai. Nilai di
 /// luar daftar ini dianggap tidak bisa dipakai.
 ///
 /// Seluruh aplikasi menafsirkannya lewat berkas ini saja, supaya
 /// perubahan kosakata backend cukup diikuti di satu tempat.
 class BackendStatus {
   const BackendStatus._();
+
+  /// 0 — sedang dipesan orang lain.
+  static const int reserved = 0;
 
   /// 1 — belum dibayar atau masih bisa dipakai.
   static const int available = 1;

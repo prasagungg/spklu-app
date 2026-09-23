@@ -3,9 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../config/env.dart';
-import '../data/booking_progress.dart';
 import '../data/charging_scope.dart';
-import '../models/booking.dart';
 import '../models/charging_session.dart';
 import '../services/api_exception.dart';
 import '../services/response_code.dart';
@@ -131,13 +129,6 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
 
     if (_starting) return;
 
-    reportBookingStage(
-      context,
-      chargeBoxId: widget.session.chargeBox.id,
-      connectorId: widget.session.connector.id,
-      stage: BookingStage.starting,
-    );
-
     final scope = ChargingScope.maybeOf(context);
 
     if (scope == null) {
@@ -164,10 +155,7 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
         // Konektornya sekarang sedang dipakai, bukan sekadar dipesan —
         // kembalinya pengguna ke daftar tidak boleh melepasnya.
         // Ordernya tetap diingat supaya sesinya bisa dibuka lagi.
-        scope.booking.startedCharging(
-          orderId: widget.session.orderId,
-          sessionCode: widget.session.sessionCode,
-        );
+        scope.booking.startedCharging(orderId: widget.session.orderId);
       } on ApiException catch (e) {
         if (!mounted) return;
         setState(() => _starting = false);

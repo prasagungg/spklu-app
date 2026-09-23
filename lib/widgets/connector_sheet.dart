@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../data/charging_scope.dart';
 import '../models/charge_box.dart';
 import '../models/connector.dart';
+import '../pages/transaction_history_page.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import 'asset_slot.dart';
@@ -24,9 +25,10 @@ Future<Connector?> showConnectorSheet(BuildContext context, ChargeBox box) {
 /// Isi bottom sheet.
 ///
 /// Status konektor tidak terlihat dari daftar charge box, jadi begitu
-/// sheet ini terbuka tiap konektornya ditanyakan sekali lewat
-/// `POST /status-konektor`. Tidak ada polling: statusnya cukup diperiksa
-/// saat pengguna membukanya.
+/// sheet ini terbuka isinya diambil ulang lewat
+/// `POST /detail-chargerbox` — satu panggilan untuk seluruh konektor,
+/// bukan satu per konektor. Tidak ada polling: statusnya cukup
+/// diperiksa saat pengguna membukanya.
 ///
 /// Tanpa [ChargingScope] — mode offline untuk test — status dari daftar
 /// dipakai apa adanya.
@@ -54,41 +56,38 @@ class _ConnectorSheetState extends State<_ConnectorSheet> {
     unawaited(_checkStatuses());
   }
 
-  /// Menanyakan status tiap konektor sekali, berbarengan.
+  /// Mengambil isi charge box ini sekali, berikut status konektornya.
   ///
-  /// Konektor yang gagal ditanyakan memakai status dari daftar — lebih
-  /// baik daripada mengosongkan sheet karena satu permintaan meleset.
+  /// Kegagalan memakai data dari daftar apa adanya — lebih baik
+  /// daripada mengosongkan sheet karena satu permintaan meleset.
   Future<void> _checkStatuses() async {
     final repository = ChargingScope.maybeOf(context)?.repository;
     if (repository == null) return;
 
     setState(() => _checking = true);
 
-    final updated = await Future.wait([
-      for (final connector in _connectors)
-        repository
-            .fetchConnectorStatus(
-              chargeBoxId: chargeBox.id,
-              connectorId: connector.id,
-            )
-            .then(connector.withStatusCode)
-            .catchError((Object e) {
-              debugPrint(
-                '[FLOW] Status konektor ${connector.id} gagal diperiksa: $e',
-              );
-              return connector;
-            }),
-    ]);
+    try {
+      final detail = await repository.fetchChargeBoxDetail(
+        chargeBoxId: chargeBox.id,
+        number: chargeBox.number,
+      );
+      if (!mounted) return;
 
-    if (!mounted) return;
-    debugPrint(
-      '[FLOW] Status konektor ${chargeBox.id}: '
-      '${updated.map((c) => '${c.id}=${c.statusCode}').join(', ')}',
-    );
-    setState(() {
-      _connectors = updated;
-      _checking = false;
-    });
+      debugPrint(
+        '[FLOW] Detail ${chargeBox.id}: '
+        '${detail.connectors.map((c) => '${c.id}=${c.statusCode}').join(', ')}',
+      );
+
+      // Detail tanpa konektor tidak boleh mengosongkan sheet — yang
+      // dari daftar lebih berguna daripada layar kosong.
+      if (detail.connectors.isNotEmpty) {
+        setState(() => _connectors = detail.connectors);
+      }
+    } on Object catch (e) {
+      debugPrint('[FLOW] Detail ${chargeBox.id} gagal diambil: $e');
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
   }
 
   @override
@@ -140,6 +139,7 @@ class _ConnectorSheetState extends State<_ConnectorSheet> {
                 final connector = _connectors[index];
                 return _ConnectorCard(
                   connector: connector,
+                  chargeBox: chargeBox,
                   checking: _checking,
                   // Selama status sebenarnya belum datang, konektornya
                   // belum boleh dipilih — tujuannya ditentukan status.
@@ -176,13 +176,22 @@ class _ConnectorSheetState extends State<_ConnectorSheet> {
 class _ConnectorCard extends StatelessWidget {
   const _ConnectorCard({
     required this.connector,
+    required this.chargeBox,
     required this.checking,
     this.onTap,
   });
 
   final Connector connector;
+
+  /// Charge box dari daftar — `POST /detail-chargerbox` tidak mengirim
+  /// `daya`, jadi keterangannya diambil dari sini.
+  final ChargeBox chargeBox;
   final bool checking;
   final VoidCallback? onTap;
+
+  /// Key tombol riwayat, dipakai test.
+  static Key historyKeyFor(Connector connector) =>
+      Key('riwayat-konektor-${connector.id}');
 
   @override
   Widget build(BuildContext context) {
@@ -224,12 +233,12 @@ class _ConnectorCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(connector.name, style: AppTheme.cardTitle),
-                      // "CCS2 · DC" — backend kini mengirim tipe dan
-                      // jenis arusnya, jadi tidak perlu ditebak lagi.
+                      // "CCS2 - 200 kW DC" — tipe dan arus dari
+                      // konektor, dayanya dari charge box.
                       if (connector.typeLabel.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
-                          connector.typeLabel,
+                          connector.describeWith(chargeBox.daya),
                           style: AppTheme.cardCaption.copyWith(
                             color: AppColors.description,
                           ),
@@ -238,6 +247,28 @@ class _ConnectorCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       _StatusRow(connector: connector, checking: checking),
                     ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Riwayat dibuka dari sini karena hanya di tempat ini
+                // nomor charge box dan konektornya sama-sama ada, dan
+                // itulah yang diminta endpoint-nya.
+                //
+                // Ikonnya struk, bukan jam: jam sudah dipakai di kartu
+                // yang sama untuk estimasi waktu, dan satu ikon yang
+                // berarti dua hal hanya membingungkan.
+                CircleIconButton(
+                  key: historyKeyFor(connector),
+                  asset: 'assets/icons/ic_receipt.svg',
+                  size: 32,
+                  iconSize: 16,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => TransactionHistoryPage(
+                        chargeBox: chargeBox,
+                        connector: connector,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -271,6 +302,7 @@ class _StatusRow extends StatelessWidget {
     }
 
     final chip = switch (connector.status) {
+      ConnectorStatus.reserved => const StatusChip.reserved(),
       ConnectorStatus.available => const StatusChip.available(),
       ConnectorStatus.preparing => const StatusChip.preparing(),
       ConnectorStatus.inUse => const StatusChip.inUse(),
