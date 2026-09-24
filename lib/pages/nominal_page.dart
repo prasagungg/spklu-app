@@ -16,10 +16,11 @@ import '../widgets/asset_slot.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/price_breakdown.dart';
 import '../widgets/primary_button.dart';
+import '../widgets/session_widgets.dart';
 import '../widgets/state_view.dart';
 import 'confirmation_page.dart';
 
-/// Frame Figma 70:2231 — "Pilih Nominal".
+/// Frame Figma 204:3670 — "Pilih Nominal".
 ///
 /// Pilihan kWh datang dari `GET /list-kwh`, dan harganya dari
 /// `POST /count-kwh` begitu salah satu dipilih. Keduanya milik backend:
@@ -33,10 +34,16 @@ class NominalPage extends StatefulWidget {
     super.key,
     required this.chargeBox,
     required this.connector,
+    this.expiresAt,
   });
 
   final ChargeBox chargeBox;
   final Connector connector;
+
+  /// Batas waktu pemesanan, dari `sessionExpired`. Hitung mundurnya
+  /// meneruskan sisa waktu yang sama dengan halaman Kode Sesi, bukan
+  /// memulai sepuluh menit baru.
+  final DateTime? expiresAt;
 
   @override
   State<NominalPage> createState() => _NominalPageState();
@@ -200,7 +207,8 @@ class _NominalPageState extends State<NominalPage> {
 
     return PageScaffold(
       title: 'Pilih Nominal',
-      subtitle: 'Pilih jumlah kWh sesuai kebutuhan Anda.',
+      subtitle: 'Pilih nominal kWh pengisian sesuai kebutuhan.',
+      titleTrailing: ExpiryCountdown(expiresAt: widget.expiresAt, compact: true),
       backgroundColor: AppColors.pageBackgroundPlain,
       bottomBar: BottomActionBar(
         children: [
@@ -210,9 +218,13 @@ class _NominalPageState extends State<NominalPage> {
               (_, true) => 'Memproses…',
               _ => 'Lanjutkan',
             },
-            // Mati sampai ada harga: tanpa itu tidak ada yang bisa
-            // dikonfirmasi di halaman berikutnya.
-            onPressed: price == null || _pushing ? null : _continue,
+            // Mati sampai ada harga yang bisa ditagih. Total nol
+            // berarti tarif konektornya belum diatur di server, dan
+            // pembayarannya pasti ditolak — lebih baik berhenti di
+            // sini daripada setelah pengguna menempelkan kartu.
+            onPressed: price == null || price.rpTotal <= 0 || _pushing
+                ? null
+                : _continue,
           ),
           SecondaryButton(
             label: 'Kembali',
@@ -258,16 +270,20 @@ class _NominalPageState extends State<NominalPage> {
       children: [
         _KwhGrid(options: options, selected: _selected, onSelect: _select),
         const SizedBox(height: 16),
-        if (price != null)
-          PriceBreakdownCard(price: price)
-        else
+        if (price != null) ...[
+          PriceBreakdownCard(price: price),
+          if (price.rpTotal <= 0) ...[
+            const SizedBox(height: 12),
+            const _ZeroPriceNote(),
+          ],
+        ] else
           _PricePlaceholder(counting: _counting),
       ],
     );
   }
 }
 
-/// Grid 2 kolom, gap 8 (70:2244).
+/// Grid 3 kolom, gap 8 (204:3715).
 class _KwhGrid extends StatelessWidget {
   const _KwhGrid({
     required this.options,
@@ -281,14 +297,16 @@ class _KwhGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const columns = 3;
+
     return Column(
       children: [
-        for (var row = 0; row < options.length; row += 2)
+        for (var row = 0; row < options.length; row += columns)
           Padding(
             padding: EdgeInsets.only(top: row == 0 ? 0 : 8),
             child: Row(
               children: [
-                for (var col = 0; col < 2; col++) ...[
+                for (var col = 0; col < columns; col++) ...[
                   if (col > 0) const SizedBox(width: 8),
                   Expanded(
                     child: row + col < options.length
@@ -297,8 +315,9 @@ class _KwhGrid extends StatelessWidget {
                             selected: options[row + col] == selected,
                             onTap: () => onSelect(options[row + col]),
                           )
-                        // Baris ganjil: sisi kanan dibiarkan kosong agar
-                        // kartu terakhir tidak melebar sendiri.
+                        // Baris terakhir yang tidak penuh: sisanya
+                        // dibiarkan kosong agar kartu terakhir tidak
+                        // melebar sendiri.
                         : const SizedBox.shrink(),
                   ),
                 ],
@@ -310,7 +329,7 @@ class _KwhGrid extends StatelessWidget {
   }
 }
 
-/// Kartu pilihan 70:2246 — radius 12, px 10, py 12, gap 8.
+/// Kartu pilihan 204:3717 — radius 12, px 10, py 12, gap 8.
 class _KwhCard extends StatelessWidget {
   const _KwhCard({
     required this.kwh,
@@ -355,16 +374,18 @@ class _KwhCard extends StatelessWidget {
                   ),
                   child: AssetSlot(
                     selected
-                        ? 'assets/icons/ic_money_active.svg'
-                        : 'assets/icons/ic_money.svg',
-                    width: 16,
+                        ? 'assets/icons/ic_bolt_active.svg'
+                        : 'assets/icons/ic_bolt.svg',
+                    // Ukuran asli petirnya; menariknya jadi 16×16 akan
+                    // menggepengkannya.
+                    width: 10,
                     height: 16,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    formatKwh(kwh),
+                    formatKwhNumber(kwh),
                     overflow: TextOverflow.ellipsis,
                     style: AppTheme.nominalLabel.copyWith(
                       color: selected ? Colors.white : AppColors.title,
@@ -375,6 +396,35 @@ class _KwhCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Keterangan saat backend menghargai pilihan ini Rp0.
+///
+/// Terjadi pada konektor yang tarifnya belum diatur. Tanpa keterangan
+/// ini, tombol "Lanjutkan" yang mati akan terlihat seperti aplikasi
+/// yang macet.
+class _ZeroPriceNote extends StatelessWidget {
+  const _ZeroPriceNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.infoTileBg,
+        border: Border.all(color: AppColors.infoTileBorder),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Text(
+        'Server menghargai pilihan ini Rp0, jadi tagihannya tidak bisa '
+        'dibayar. Tarif konektor ini belum diatur — pilih konektor lain '
+        'atau hubungi petugas.',
+        textAlign: TextAlign.center,
+        style: AppTheme.pageSubtitle,
       ),
     );
   }

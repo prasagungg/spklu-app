@@ -114,17 +114,18 @@ void main() {
   /// datang dari `POST /status-konektor`.
   testWidgets('status dari daftar ditimpa status hasil pemeriksaan',
       (tester) async {
-    await _openSheet(tester, statusOf: {'1': 3, '2': 1});
+    await _openSheet(tester, statusOf: {'1': 2, '2': 1});
 
     expect(find.text('Sedang Digunakan'), findsOneWidget);
     expect(find.text('Tersedia'), findsOneWidget);
   });
 
   for (final (status, label) in [
+    (0, 'Dipesan'),
     (1, 'Tersedia'),
-    (2, 'Menunggu Konektor'),
-    (3, 'Sedang Digunakan'),
-    (4, 'Selesai'),
+    (2, 'Sedang Digunakan'),
+    (3, 'Menunggu Pembayaran'),
+    (4, 'Tidak Tersedia'),
   ]) {
     testWidgets('status $status berlabel "$label"', (tester) async {
       await _openSheet(tester, statusOf: {'1': status, '2': status});
@@ -133,25 +134,20 @@ void main() {
     });
   }
 
-  testWidgets('tiap konektor punya jalan ke riwayat transaksinya',
+  /// Riwayat dibuka dari header halaman Pilih Charge Box, bukan dari
+  /// tiap kartu konektor: satu pintu masuk untuk seluruh lokasi.
+  testWidgets('kartu konektor tidak lagi membawa tombol riwayat',
       (tester) async {
     await _openSheet(tester);
 
-    // Satu tombol per konektor — endpoint riwayat memang per konektor.
+    expect(find.text('Riwayat Transaksi'), findsNothing);
     for (final id in [1, 2]) {
       expect(
         find.byKey(Key('riwayat-konektor-$id')),
-        findsOneWidget,
+        findsNothing,
         reason: 'konektor $id',
       );
     }
-
-    await tester.tap(find.byKey(const Key('riwayat-konektor-2')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Riwayat Transaksi'), findsOneWidget);
-    // Subjudulnya menyebut konektor yang dibuka, bukan yang pertama.
-    expect(find.textContaining('Gun 2'), findsOneWidget);
   });
 
   /// Sheet yang dikosongkan oleh jawaban aneh jauh lebih buruk

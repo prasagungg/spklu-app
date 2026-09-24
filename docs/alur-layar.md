@@ -11,9 +11,9 @@ Pilih Charge Box  (charge_box_page.dart)  ← rute pertama
         │  keduanya pushReplacement, jadi hanya satu yang ada di tumpukan
         │  tap kartu charge box → bottom sheet Daftar Konektor
         │
-        ├─ konektor bukan "Available" → Verifikasi Sesi
+        ├─ konektor bukan "Tersedia" → Verifikasi Sesi
         │
-        ├─ Available / Reserved ──────────────────┐
+        ├─ Tersedia / Dipesan ────────────────────┐
         │                                         ▼
         │                              Kode Sesi  ← kode ditunjukkan di sini
         │                                         │
@@ -22,7 +22,9 @@ Pilih Charge Box  (charge_box_page.dart)  ← rute pertama
         │                              Konfirmasi Pengisian
         │                                         │
         │                              Pembayaran Kartu  ← maju saat kartu ditempelkan
-        │                                         │
+        │                              ▲          │
+        │        Menunggu Pembayaran ──┘          │
+        │        (verifikasi kode sesi)           │
         │                              Pembayaran Berhasil
         │                                         │
         │                              Hubungkan Konektor  ← perintah start di sini
@@ -30,7 +32,7 @@ Pilih Charge Box  (charge_box_page.dart)  ← rute pertama
         │                              Pengisian Dimulai
         │                                         │  pulang ke daftar
         │                                         ▼
-        └─ Charging ──────────────────► Sedang Mengisi
+        └─ Sedang Digunakan ──────────► Sedang Mengisi
              (verifikasi kode sesi)
                                                   │
                             ┌─────────────────────┴───────────────┐
@@ -64,12 +66,17 @@ langsung ditunjukkan di halaman **Kode Sesi**.
 
 | `status` | Arti | `ConnectorStatus` | Bisa ditekan | Tujuan |
 |---|---|---|---|---|
-| `0` | Sedang dipesan, belum dibayar | `reserved` | ya | Kode Sesi |
-| `1` | Belum dibayar / masih bisa dipakai | `available` | ya | Kode Sesi |
-| `2` | Sudah dibayar, menunggu konektor | `preparing` | ya | Hubungkan Konektor |
-| `3` | Sedang mengisi | `inUse` | ya | Sedang Mengisi |
-| `4` | Pengisian selesai | `finished` | ya | Sedang Mengisi |
+| `0` | Sudah dipesan, belum dibeli | `reserved` | ya | Kode Sesi |
+| `1` | Tersedia | `available` | ya | Kode Sesi |
+| `2` | Sedang digunakan | `inUse` | ya | Sedang Mengisi |
+| `3` | Menunggu pembayaran | `awaitingPayment` | ya | Pembayaran |
+| `4` | Tidak tersedia | `unavailable` | tidak | — |
 | lainnya | Tidak dikenal | `unavailable` | tidak | — |
+
+Sesi yang dilanjutkan masuk **tepat di langkah tempat ia berhenti**:
+yang ordernya belum dibayar kembali ke halaman Pembayaran — nominalnya
+ditanyakan ulang lewat `inquiry-billing` begitu kartu ditempelkan — dan
+yang sedang dipakai langsung ke layar pemantauan.
 
 Sesi yang dilanjutkan dari daftar hanya bisa dipantau dan dihentikan
 bila `manage-sessioncode` menyebutkan `orderId`-nya: semua endpoint
@@ -79,10 +86,6 @@ itu layarnya jatuh ke simulasi lokal.
 Konektor yang **bukan** `1` sudah diklaim orang lain, jadi sebelum
 melanjutkan pengguna harus melewati **Verifikasi Sesi** — keypad dua
 digit yang membuktikan ia pemilik sesi tersebut.
-
-`4` ikut menuju layar pemantauan karena `ongoing-kwh` yang jadi penentu:
-begitu ia melaporkan `finished`, halaman itu berpindah sendiri ke
-rincian akhir dengan angka energi yang benar.
 
 Sesi yang dilanjutkan dari daftar tidak membawa data pembelian —
 aplikasi tidak tahu berapa yang sudah dibayarkan — jadi baris
@@ -100,11 +103,11 @@ Ini bagian yang paling mudah salah baca.
 | Pemicu | Layar | Yang terjadi |
 |---|---|---|
 | Konektor ditekan | Daftar Konektor | `POST /booked-connector` memesan konektor dan memberi kode sesinya. `status: false` → alur berhenti di sini. |
-| Menunggu di Hubungkan Konektor | Hubungkan Konektor | `POST /manage-sessioncode` tiap detik sampai `statusProcess` menandakan nozzle tercolok. |
+| Menunggu di Hubungkan Konektor | Hubungkan Konektor | `POST /check-status-connector` tiap detik sampai status OCPP-nya `Preparing` — tanda kabel sudah tercolok. |
 | Pilihan kWh ditekan | Pilih Nominal | `POST /count-kwh` menghitung harganya. |
 | "Lanjutkan" | Kode Sesi | **Tidak** mengirim apa pun. Hanya pindah ke Pilih Nominal. |
 | "Lanjutkan" | Pilih Nominal | `POST /transaction/push-order` membuat ordernya, dengan `reservationId` dari pemesanan. |
-| Kartu ditempelkan | Pembayaran Kartu | `inquiry-billing` menanyakan tagihan, lalu `payment-billing` membayarnya. Keduanya berhasil → pindah ke Pembayaran Berhasil; gagal di salah satunya → tetap di sini dan kartu bisa ditempelkan ulang. |
+| Kartu ditempelkan | Pembayaran Kartu | `inquiry-billing` menanyakan tagihan, lalu `payment-billing` membayarnya. Keduanya berhasil → pindah ke Pembayaran Berhasil; gagal di salah satunya → tetap di sini dan kartu bisa ditempelkan ulang. Tagihan bernilai nol — tanda tarif konektornya belum diatur — dihentikan sebelum dibayar. |
 | "Mulai Pengisian" | Pembayaran Berhasil | **Tidak** mengirim apa pun. Hanya pindah ke Hubungkan Konektor. |
 | "Mulai Pengisian" | Hubungkan Konektor | `POST /transaction/charging/start`, lalu pindah ke Sedang Mengisi. |
 | Kembali ke daftar sebelum pengisian jalan | mana pun di alur pembelian | `POST /cancelled-connector` melepas pemesanannya. |
@@ -113,10 +116,12 @@ Ini bagian yang paling mudah salah baca.
 `/start` sengaja dikirim dari **Hubungkan Konektor**, bukan lebih awal,
 supaya perintahnya berangkat sesudah kabel terpasang.
 
-Halaman itu memanggil `POST /manage-sessioncode` tiap detik dan
-menunggu `statusProcess` berpindah dari `2` ("hubungkan konektor") ke
-`3`. Selama masih `2`, tombolnya mati. Alurnya tetap utuh, tetapi tidak ada jaminan kabel benar-benar
-terpasang; charger yang menolak `/start` muncul sebagai pesan error.
+Halaman itu memanggil `POST /check-status-connector` tiap detik dan
+menunggu status OCPP konektornya menjadi `Preparing` — istilah untuk
+kabel yang sudah terpasang dan charger yang siap dimulai. Selama masih
+`Available`, tombolnya mati. `Faulted` dan `Unavailable` disebut apa
+adanya di layar: charger seperti itu tidak akan pernah sampai ke
+`Preparing`, jadi menunggu di situ tidak ada gunanya.
 
 Perintah start hanya diteruskan controller ke charger; konfirmasi bahwa
 pengisian benar-benar jalan datang dari polling `ongoing-kwh`
@@ -124,19 +129,56 @@ berikutnya.
 
 ## Riwayat transaksi
 
-Tiap kartu konektor di bottom sheet punya tombol struk yang membuka
-**Riwayat Transaksi** (Figma 189:761) untuk konektor itu. Pintu masuknya
-di situ karena `POST /transaction/history-transaction` meminta nomor
-charge box **dan** konektor, dan hanya di sheet itu keduanya ada di
-tangan sekaligus.
+Tombol struk di header halaman Pilih Charge Box — di sebelah ikon roda
+gigi — membuka **Riwayat Transaksi** (Figma 189:761) untuk **seluruh
+lokasi**.
 
-Tiap barisnya: nomor dan nama charge box, tipe konektor, waktu, nominal,
-dan nomor kartu yang disamarkan.
+`GET /transaction/history-transaction` mengembalikan seluruh riwayat
+dalam satu panggilan, tanpa body dan tanpa query. Halaman ini karena
+itu hanya mengurutkannya terbaru lebih dulu. Endpoint ini dulu sebuah
+POST yang melayani satu konektor sekali panggil — tanpa `chargeBoxId`
+atau `connectorId` dibalas `07` "Missing Field" — sehingga halaman
+menanyakan tiap konektor lalu menggabungkan jawabannya.
+
+Tiap barisnya (Figma 204:6137): nomor dan nama charge box, nama dan
+tipe konektor, waktu, nominal, dan nomor kartu yang disamarkan. Charge
+box dan konektornya disebut tiap entri; nomor urut dan dayanya
+dicocokkan ke daftar charge box, karena hanya `POST /list-chargerbox`
+yang mengirim keduanya. Entri dari charge box yang tidak ada di daftar
+tetap tampil, memakai nama dari entrinya sendiri dan tanpa nomor urut.
+
+**Kotak pencarian** di atas daftar menyaring tanggal, nama charger, dan
+nominal sekaligus. Penyaringannya di aplikasi: seluruh riwayat lokasi
+sudah ada di tangan, dan endpoint-nya tidak menerima kata kunci apa pun.
+
+## Rincian satu transaksi
+
+Kartu riwayat bisa ditekan, dan chevron di sisi kanannya menandai itu.
+Menekannya meminta **kode sesi** transaksi tersebut lebih dulu — keypad
+yang sama dengan Verifikasi Sesi — lalu membuka **Detail Transaksi**.
+
+Pembagiannya disengaja dan mengikuti backend: daftar riwayat boleh
+dilihat siapa saja yang berdiri di depan unit, karena isinya hanya
+waktu, nominal, dan nomor kartu yang disamarkan. Rinciannya tidak —
+`POST /transaction/detail-history-transaction` mewajibkan kode sesi, dan
+kode yang salah dibalas `21` sehingga alurnya berhenti di keypad.
+
+Halaman rinciannya menampilkan tiga kartu — charger, energi, dan
+pembayaran — dengan "Pembayaran Awal" sebagai baris yang ditonjolkan.
+Semua angkanya dari backend; tidak ada yang dihitung di aplikasi.
 
 ## Memilih jumlah kWh
 
-Pilihannya datang dari `GET /list-kwh` saat halaman dibuka, dan harganya
-dari `POST /count-kwh` setiap kali salah satu ditekan.
+Frame 204:3670. Pilihannya datang dari `GET /list-kwh` saat halaman
+dibuka, dan harganya dari `POST /count-kwh` setiap kali salah satu
+ditekan. Kartunya tiga per baris, berisi ikon petir dan angkanya saja
+("10", bukan "10,0 kWh") — cukup sempit untuk memuat tujuh pilihan
+tanpa menggulir.
+
+Hitung mundurnya duduk sebaris dengan judul, dan **meneruskan batas
+waktu pemesanan** (`sessionExpired`) — halaman ini menunjukkan sisa
+waktu yang sama dengan halaman Kode Sesi, bukan sepuluh menit yang
+dimulai ulang.
 
 **Tidak ada yang terpilih saat halaman dibuka**, dan tombol "Lanjutkan"
 mati sampai ada harga. Pilihan yang sudah tercentang sejak awal gampang
@@ -145,6 +187,11 @@ sendiri.
 
 Rincian harga baru muncul setelah ada pilihan; sebelum itu tempatnya
 diisi keterangan singkat, bukan kartu kosong.
+
+**Total Rp0 menghentikan alur di sini.** Konektor yang tarifnya belum
+diatur di server dihargai nol oleh `count-kwh`, dan tagihan nol pasti
+ditolak backend saat membayar ("Missing Field: amount"). "Lanjutkan"
+karena itu tetap mati, dengan keterangan yang menyebut sebabnya.
 
 "Lanjutkan" membuat order lewat `POST /transaction/push-order`. Sejak
 halaman Konfirmasi, angka yang ditampilkan adalah angka **order** — yang
@@ -160,7 +207,11 @@ juga membawa nomor referensi dan kode sesi — bukan perkiraan dari
    tersalur. Polling `ongoing-kwh` di halaman Sedang Mengisi melihat
    status `4` dan langsung pindah.
 
-Keduanya berujung ke `ChargingFinishedPage` dengan angka kWh final.
+Keduanya berujung ke `ChargingFinishedPage`, yang lalu menanyakan
+`POST /transaction/charging/detail` untuk angka penutupnya: energi
+tersalur, pembayaran awal, total pemakaian, dan sisa pembayaran. Selama
+jawabannya belum datang — atau kalau gagal, dan pada sesi tanpa order —
+yang ditampilkan adalah angka terakhir dari layar pemantauan.
 
 ## Navigasi dan tombol pulang
 
@@ -185,11 +236,14 @@ Keduanya berujung ke `ChargingFinishedPage` dengan angka kWh final.
   `isHome`, sehingga tidak ada halaman yang lupa menyediakan jalan
   pulang.
 - **Konfigurasi Server** dibuka lewat ikon roda gigi di header halaman
-  Pilih Charge Box, dan kembali ke sana setelah alamat disimpan.
-- **Hitung mundur** muncul di Kode Sesi, Pembayaran Kartu, dan
-  Hubungkan Konektor sebagai `CountdownPill`. Di Kode Sesi angkanya
-  datang dari `sessionExpired` milik pemesanan; di dua halaman lain
-  masih sepuluh menit tetap.
+  Pilih Charge Box, dan kembali ke sana setelah alamat disimpan. Di
+  sebelahnya ada tombol struk menuju Riwayat Transaksi.
+- **Hitung mundur** muncul lewat `ExpiryCountdown`, yang berdetak
+  sendiri sampai batas waktu yang diberikan. Kode Sesi, Pembayaran
+  Kartu, dan Hubungkan Konektor memakai pil lebar "Selesaikan dalam:
+  09:59"; Pilih Nominal memakai pil kecil sebaris judul (204:4690).
+  Batas waktunya datang dari `sessionExpired` milik pemesanan, dan
+  halaman yang belum menerimanya jatuh ke sepuluh menit.
 
 ## Kode sesi
 

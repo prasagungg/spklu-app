@@ -2,12 +2,15 @@ import 'package:dio/dio.dart';
 
 import '../config/env.dart';
 import '../models/charge_box.dart';
+import '../models/connector_check.dart';
 import '../models/billing.dart';
+import '../models/charging_detail.dart';
 import '../models/charging_progress.dart';
 import '../models/kwh_price.dart';
 import '../models/order.dart';
 import '../models/reservation.dart';
 import '../models/session_check.dart';
+import '../models/transaction_detail.dart';
 import '../models/transaction_history.dart';
 import '../models/spklu.dart';
 import '../services/api_client.dart';
@@ -185,29 +188,24 @@ class ChargePointRepository {
     return Order.fromJson(_unwrap(json));
   }
 
-  /// `POST /transaction/history-transaction`
+  /// `GET /transaction/history-transaction`
   ///
-  /// Transaksi yang pernah terjadi pada sebuah konektor, terbaru lebih
-  /// dulu.
+  /// Seluruh transaksi yang pernah tercatat, terbaru lebih dulu.
   ///
-  /// ```json
-  /// { "chargeBoxId": "CB-SMR-01", "connectorId": "1" }
-  /// ```
+  /// **GET tanpa body.** Endpoint ini dulu sebuah POST yang melayani
+  /// satu konektor sekali panggil dan mewajibkan `chargeBoxId` serta
+  /// `connectorId`, sehingga halaman riwayat harus menanyakan tiap
+  /// konektor lalu menggabungkan jawabannya. Sekarang satu panggilan
+  /// mengembalikan semuanya dan permintaannya tidak membawa field apa
+  /// pun.
   ///
-  /// Tiap entri hanya membawa nomor order, kartu, nominal, dan waktu —
-  /// nama charge box serta konektornya diketahui dari konteks tempat
-  /// riwayat itu dibuka.
+  /// Seperti GET lainnya, tanda tangannya dihitung dengan body kosong
+  /// — lihat `SignatureInterceptor`.
   Future<List<TransactionHistoryEntry>> fetchTransactionHistory({
-    required String chargeBoxId,
-    required int connectorId,
     CancelToken? cancelToken,
   }) async {
-    final json = await _client.post<Map<String, dynamic>>(
+    final json = await _client.get<Map<String, dynamic>>(
       '/transaction/history-transaction',
-      body: {
-        'chargeBoxId': chargeBoxId,
-        'connectorId': connectorId.toString(),
-      },
       cancelToken: cancelToken,
     );
     final data = _unwrap(json);
@@ -219,6 +217,31 @@ class ChargePointRepository {
       for (final item in list.whereType<Map<String, dynamic>>())
         TransactionHistoryEntry.fromJson(item),
     ];
+  }
+
+  /// `POST /transaction/detail-history-transaction`
+  ///
+  /// Rincian satu transaksi di riwayat. Kode sesinya wajib — itulah
+  /// yang membuktikan transaksi itu memang milik penanya.
+  ///
+  /// ```json
+  /// { "orderId": "U33UHB2TQQ4LV274UCXTEX6IVS", "sessionCode": "30" }
+  /// ```
+  ///
+  /// Gagal dengan [ResponseCode.missingField] tanpa `sessionCode`, dan
+  /// [ResponseCode.transactionNotFound] bila kodenya tidak cocok.
+  Future<TransactionDetail> fetchTransactionDetail({
+    required String orderId,
+    required String sessionCode,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/transaction/detail-history-transaction',
+      body: {'orderId': orderId, 'sessionCode': sessionCode},
+      cancelToken: cancelToken,
+    );
+
+    return TransactionDetail.fromJson(_unwrap(json));
   }
 
   /// `POST /transaction/inquiry-billing`
@@ -262,7 +285,9 @@ class ChargePointRepository {
   /// ```json
   /// { "orderId": "…", "amount": 145670,
   ///   "cardNumber": "0123456789012345",
-  ///   "bankLog": "1231408098812345678100500" }
+  ///   "bankLog": "1231408098812345678100500",
+  ///   "merchantId": "000000000000001",
+  ///   "terminalId": "00000001" }
   /// ```
   ///
   /// [amount] **harus sama persis dengan `totalAmount` dari inquiry** —
@@ -273,6 +298,10 @@ class ChargePointRepository {
   /// Bawaannya [Env.bankLog], masih tetap karena mesin kartunya belum
   /// ada.
   ///
+  /// [merchantId] dan [terminalId] menyebut mesin mana yang menagih.
+  /// Keduanya juga masih nilai sementara dari [Env], dengan alasan yang
+  /// sama, dan diganti lewat `--dart-define` begitu nomor aslinya ada.
+  ///
   /// Aman dipanggil berulang: pembayaran kedua untuk order yang sama
   /// dibalas sukses.
   Future<BillingInquiry> payBilling({
@@ -280,6 +309,8 @@ class ChargePointRepository {
     required int amount,
     String? cardNumber,
     String? bankLog,
+    String? merchantId,
+    String? terminalId,
     CancelToken? cancelToken,
   }) async {
     final json = await _client.post<Map<String, dynamic>>(
@@ -289,6 +320,8 @@ class ChargePointRepository {
         'amount': amount,
         'cardNumber': cardNumber ?? Env.cardNumber,
         'bankLog': bankLog ?? Env.bankLog,
+        'merchantId': merchantId ?? Env.merchantId,
+        'terminalId': terminalId ?? Env.terminalId,
       },
       cancelToken: cancelToken,
     );
@@ -303,9 +336,13 @@ class ChargePointRepository {
   /// sesinya milik order, bukan sesuatu yang bisa ditebak aplikasi.
   ///
   /// ```json
-  /// { "chargeBoxId": "CB-SMR-01", "connectorId": "1",
+  /// { "chargeboxId": "CB-SMR-01", "connectorId": "1",
   ///   "sessionCode": "29" }
   /// ```
+  ///
+  /// Endpoint ini mengeja `chargeboxId` dengan b kecil. Backend
+  /// playground menerima kedua ejaan, tetapi yang dikirim mengikuti
+  /// spesifikasinya.
   ///
   /// Jawabannya juga membawa `statusProcess`, yang dipakai halaman
   /// Hubungkan Konektor untuk memantau apakah nozzle sudah tercolok.
@@ -322,13 +359,42 @@ class ChargePointRepository {
     final json = await _client.post<Map<String, dynamic>>(
       '/manage-sessioncode',
       body: {
-        'chargeBoxId': chargeBoxId,
+        'chargeboxId': chargeBoxId,
         'connectorId': connectorId.toString(),
         'sessionCode': sessionCode,
       },
       cancelToken: cancelToken,
     );
     return SessionCheck.fromJson(_unwrap(json));
+  }
+
+  /// `POST /check-status-connector`
+  ///
+  /// Status OCPP satu konektor — inilah yang tahu kabelnya sudah
+  /// tercolok atau belum.
+  ///
+  /// ```json
+  /// { "chargeBoxId": "CB-SMR-01", "connectorId": "1" }
+  /// ```
+  ///
+  /// Di-polling tiap detik oleh halaman Hubungkan Konektor sampai
+  /// statusnya menjadi "Preparing". Kedua field wajib; tanpa
+  /// `connectorId` backend membalas [ResponseCode.missingField].
+  Future<ConnectorCheck> checkConnectorStatus({
+    required String chargeBoxId,
+    required int connectorId,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/check-status-connector',
+      body: {
+        'chargeBoxId': chargeBoxId,
+        'connectorId': connectorId.toString(),
+      },
+      cancelToken: cancelToken,
+    );
+
+    return ConnectorCheck.fromJson(_unwrap(json));
   }
 
   /// `POST /booked-connector`
@@ -452,16 +518,46 @@ class ChargePointRepository {
     return ChargingProgress.fromJson(_unwrap(json));
   }
 
+  /// `POST /transaction/charging/detail`
+  ///
+  /// Rincian akhir satu order: kWh yang dibeli dan yang terpakai,
+  /// nominal yang dibayar, yang terpakai, dan yang dikembalikan.
+  ///
+  /// ```json
+  /// { "orderId": "U33UHB2TQQ4LV274UCXTEX6IVS" }
+  /// ```
+  ///
+  /// Dipanggil halaman "Pengisian Selesai". Angkanya dipakai apa adanya:
+  /// pembukuan backend yang berwenang, bukan hitungan aplikasi.
+  Future<ChargingDetail> fetchChargingDetail({
+    required String orderId,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/transaction/charging/detail',
+      body: {'orderId': orderId},
+      cancelToken: cancelToken,
+    );
+
+    return ChargingDetail.fromJson(_unwrap(json));
+  }
+
   /// Memeriksa amplop response dan mengembalikan isi `data`.
   ///
   /// Backend membalas 4xx/5xx untuk kegagalan, jadi ini terutama
   /// menangkap kasus status 2xx tapi `responseCode` bukan "00".
+  ///
+  /// `POST /transaction/detail-history-transaction` mengeja amplopnya
+  /// `response_code`/`response_message` saat berhasil — tetapi tetap
+  /// camelCase saat gagal. Keduanya diterima di sini, jadi satu
+  /// endpoint yang menyimpang tidak perlu jalur penguraian sendiri.
   Map<String, dynamic>? _unwrap(Map<String, dynamic> json) {
-    final code = json['responseCode'] as String?;
+    final code = (json['responseCode'] ?? json['response_code']) as String?;
     if (code != _successCode) {
       throw ApiException(
         type: ApiErrorType.badRequest,
-        message: json['responseMessage'] as String? ??
+        message: (json['responseMessage'] ?? json['response_message'])
+                as String? ??
             'Backend menolak permintaan (kode $code).',
         responseCode: code,
         data: json,

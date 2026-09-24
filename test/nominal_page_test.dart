@@ -8,6 +8,7 @@ import 'package:kossotrik/pages/nominal_page.dart';
 import 'package:kossotrik/services/api_client.dart';
 import 'package:kossotrik/theme/app_theme.dart';
 import 'package:kossotrik/widgets/primary_button.dart';
+import 'package:kossotrik/widgets/session_widgets.dart';
 
 import 'fixtures.dart';
 
@@ -16,10 +17,15 @@ class _Stub extends Interceptor {
     this.options = const [10, 20, 30],
     this.failCount = false,
     this.orderErrorCode,
+    this.rpTotal = 27135,
   });
 
   final List<num> options;
   final bool failCount;
+
+  /// Total yang dibalas `/count-kwh`. Nol meniru konektor yang tarifnya
+  /// belum diatur.
+  final int rpTotal;
 
   /// Kode amplop yang dibalas `/transaction/push-order`, mis. "16".
   final String? orderErrorCode;
@@ -67,6 +73,7 @@ class _Stub extends Interceptor {
           '/list-kwh' => kwhOptionsResponse(options),
           '/count-kwh' => countKwhResponse(
               kwh: (options_.data as Map)['kwh'] as num,
+              rpTotal: rpTotal,
             ),
           '/transaction/push-order' => pushOrderResponse(
               kwh: (options_.data as Map)['kwh'] as num,
@@ -83,7 +90,11 @@ class _Stub extends Interceptor {
 
 final _box = ChargeBox.fromJson(chargeBoxJson(), number: 1);
 
-Future<_Stub> _pump(WidgetTester tester, {_Stub? stub}) async {
+Future<_Stub> _pump(
+  WidgetTester tester, {
+  _Stub? stub,
+  DateTime? expiresAt,
+}) async {
   final it = stub ?? _Stub();
   final repo = ChargePointRepository(
     client: ApiClient.withDio(Dio()..interceptors.add(it)),
@@ -94,7 +105,11 @@ Future<_Stub> _pump(WidgetTester tester, {_Stub? stub}) async {
       repository: repo,
       child: MaterialApp(
         theme: AppTheme.build(),
-        home: NominalPage(chargeBox: _box, connector: _box.connectors.single),
+        home: NominalPage(
+          chargeBox: _box,
+          connector: _box.connectors.single,
+          expiresAt: expiresAt,
+        ),
       ),
     ),
   );
@@ -108,13 +123,29 @@ PrimaryButton _continueButton(WidgetTester tester) => tester.widget<PrimaryButto
     );
 
 void main() {
+  /// Kartunya sempit — tiga per baris — jadi desainnya menulis
+  /// angkanya saja, tanpa satuan.
   testWidgets('pilihan kWh diambil dari /list-kwh', (tester) async {
     final stub = await _pump(tester);
 
     expect(stub.to('/list-kwh'), hasLength(1));
-    expect(find.text('10,0 kWh'), findsOneWidget);
-    expect(find.text('20,0 kWh'), findsOneWidget);
-    expect(find.text('30,0 kWh'), findsOneWidget);
+    expect(find.text('10'), findsOneWidget);
+    expect(find.text('20'), findsOneWidget);
+    expect(find.text('30'), findsOneWidget);
+    expect(find.text('10,0 kWh'), findsNothing);
+  });
+
+  /// Hitung mundurnya milik pemesanan, jadi sisa waktunya diteruskan
+  /// dari halaman Kode Sesi — bukan sepuluh menit yang dimulai ulang.
+  testWidgets('hitung mundur meneruskan batas waktu pemesanan',
+      (tester) async {
+    await _pump(
+      tester,
+      expiresAt: DateTime.now().add(const Duration(minutes: 5, seconds: 30)),
+    );
+
+    expect(find.byType(CompactCountdownPill), findsOneWidget);
+    expect(find.textContaining('05:'), findsOneWidget);
   });
 
   /// Pilihan yang sudah tercentang sejak awal gampang terlewat, dan
@@ -132,7 +163,7 @@ void main() {
       (tester) async {
     final stub = await _pump(tester);
 
-    await tester.tap(find.text('20,0 kWh'));
+    await tester.tap(find.text('20'));
     await tester.pumpAndSettle();
 
     final call = stub.to('/count-kwh').single;
@@ -148,7 +179,7 @@ void main() {
       (tester) async {
     await _pump(tester);
 
-    await tester.tap(find.text('10,0 kWh'));
+    await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
 
     expect(find.text('Rincian Harga'), findsOneWidget);
@@ -163,7 +194,7 @@ void main() {
   testWidgets('biaya yang bernilai nol disembunyikan', (tester) async {
     await _pump(tester);
 
-    await tester.tap(find.text('10,0 kWh'));
+    await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
 
     // Semuanya nol pada payload ini; deretan "Rp0" hanya menenggelamkan
@@ -176,20 +207,36 @@ void main() {
   testWidgets('ganti pilihan menghitung ulang', (tester) async {
     final stub = await _pump(tester);
 
-    await tester.tap(find.text('10,0 kWh'));
+    await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('30,0 kWh'));
+    await tester.tap(find.text('30'));
     await tester.pumpAndSettle();
 
     expect(stub.to('/count-kwh'), hasLength(2));
     expect((stub.to('/count-kwh').last.data as Map)['kwh'], 30);
   });
 
+  /// Konektor yang tarifnya belum diatur dihargai Rp0 oleh backend.
+  /// Ordernya boleh dibuat, tetapi tagihannya pasti ditolak saat
+  /// membayar — jadi alurnya dihentikan sebelum kartu ditempelkan.
+  testWidgets('total Rp0 menahan Lanjutkan dan menyebut sebabnya',
+      (tester) async {
+    await _pump(tester, stub: _Stub(rpTotal: 0));
+
+    await tester.tap(find.text('10'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Rincian Harga'), findsOneWidget);
+    expect(find.textContaining('Tarif konektor ini belum diatur'),
+        findsOneWidget);
+    expect(_continueButton(tester).onPressed, isNull);
+  });
+
   testWidgets('harga yang gagal dihitung tidak membuka Lanjutkan',
       (tester) async {
     await _pump(tester, stub: _Stub(failCount: true));
 
-    await tester.tap(find.text('10,0 kWh'));
+    await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
 
     expect(find.text('Rincian Harga'), findsNothing);
@@ -204,7 +251,7 @@ void main() {
     testWidgets('order dibuat dengan kWh yang dipilih', (tester) async {
       final stub = await _pump(tester);
 
-      await tester.tap(find.text('20,0 kWh'));
+      await tester.tap(find.text('20'));
       await tester.pumpAndSettle();
       expect(stub.to('/transaction/push-order'), isEmpty);
 
@@ -232,7 +279,7 @@ void main() {
         (tester) async {
       await _pump(tester);
 
-      await tester.tap(find.text('10,0 kWh'));
+      await tester.tap(find.text('10'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Lanjutkan'));
       await tester.pumpAndSettle();
@@ -249,7 +296,7 @@ void main() {
         (tester) async {
       await _pump(tester, stub: _Stub(orderErrorCode: '16'));
 
-      await tester.tap(find.text('10,0 kWh'));
+      await tester.tap(find.text('10'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Lanjutkan'));
       await tester.pumpAndSettle();
@@ -265,7 +312,7 @@ void main() {
         (tester) async {
       await _pump(tester, stub: _Stub(orderErrorCode: '77'));
 
-      await tester.tap(find.text('10,0 kWh'));
+      await tester.tap(find.text('10'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Lanjutkan'));
       await tester.pumpAndSettle();
@@ -279,7 +326,7 @@ void main() {
     testWidgets('gangguan server diarahkan mencoba lagi', (tester) async {
       await _pump(tester, stub: _Stub(orderErrorCode: '99'));
 
-      await tester.tap(find.text('10,0 kWh'));
+      await tester.tap(find.text('10'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Lanjutkan'));
       await tester.pumpAndSettle();
@@ -292,7 +339,7 @@ void main() {
         (tester) async {
       await _pump(tester, stub: _Stub(orderErrorCode: '13'));
 
-      await tester.tap(find.text('10,0 kWh'));
+      await tester.tap(find.text('10'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Lanjutkan'));
       await tester.pumpAndSettle();
@@ -310,7 +357,7 @@ void main() {
   testWidgets('jumlah pilihan ganjil tidak merusak grid', (tester) async {
     await _pump(tester, stub: _Stub(options: const [10, 20, 30, 40, 50]));
 
-    expect(find.text('50,0 kWh'), findsOneWidget);
+    expect(find.text('50'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

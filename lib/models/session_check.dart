@@ -13,9 +13,13 @@ import 'backend_status.dart';
 /// }
 /// ```
 ///
-/// Dua gunanya: membuktikan kode sesi yang diketik pengguna memang
-/// milik sesi itu, dan — karena [statusProcess] ikut dikirim — memantau
-/// apakah konektornya sudah tercolok.
+/// Gunanya membuktikan kode sesi yang diketik pengguna memang milik
+/// sesi itu, sekaligus memulihkan [orderId] dan [reservationId] yang
+/// diperlukan langkah berikutnya.
+///
+/// [statusProcess] menyebut tahap transaksinya, bukan keadaan fisik
+/// konektornya — yang tahu kabelnya sudah tercolok atau belum adalah
+/// `POST /check-status-connector`.
 class SessionCheck {
   const SessionCheck({
     this.orderId = '',
@@ -72,13 +76,6 @@ class SessionCheck {
   /// [BackendStatus.awaitingConnector]; begitu berpindah ke tahap
   /// pengisian, kabelnya sudah terpasang.
   ///
-  /// Sengaja mencocokkan nilai yang dikenal, bukan "lebih besar dari".
-  /// Angka yang tidak dikenal berarti aplikasi tidak tahu keadaannya,
-  /// dan menebaknya sebagai tercolok akan mengirim perintah start yang
-  /// pasti ditolak charger.
-  bool get isPluggedIn =>
-      statusProcess == BackendStatus.charging ||
-      statusProcess == BackendStatus.finished;
 
   @override
   String toString() =>

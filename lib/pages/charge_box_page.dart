@@ -21,10 +21,11 @@ import '../widgets/page_scaffold.dart';
 import '../widgets/state_view.dart';
 import '../widgets/status_chip.dart';
 import 'api_config_page.dart';
+import 'card_payment_page.dart';
 import 'charging_status_page.dart';
-import 'connect_connector_page.dart';
 import 'session_code_page.dart';
 import 'session_verification_page.dart';
+import 'transaction_history_page.dart';
 
 /// Frame Figma 70:1901 — "Pilih Charge Box".
 ///
@@ -42,6 +43,9 @@ class ChargeBoxPage extends StatefulWidget {
   /// Key tombol menuju Konfigurasi Server; ikonnya tanpa teks, jadi
   /// test butuh pegangan yang tidak menebak posisinya di pohon widget.
   static const configKey = Key('buka-konfigurasi-server');
+
+  /// Key tombol menuju Riwayat Transaksi, dengan alasan yang sama.
+  static const historyKey = Key('buka-riwayat-transaksi');
 
   const ChargeBoxPage({super.key, this.repository, this.chargeBoxes});
 
@@ -215,25 +219,25 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
     }
 
     // Tujuannya ditentukan status konektor: yang masih bebas memulai
-    // pembelian, sisanya melanjutkan sesi yang sudah dibayar orang.
-    //
-    // "Selesai" ikut ke layar pemantauan karena `/progress` yang jadi
-    // penentu: begitu ia melaporkan `finished`, halaman itu langsung
-    // berpindah ke rincian akhir dengan angka energi yang benar.
+    // pembelian, sisanya melanjutkan sesi yang sudah dipegang orang —
+    // masing-masing pada langkah tempat sesi itu berhenti.
     final destination = switch (connector.status) {
       // Kode sesinya ditunjukkan dulu — pengguna memerlukannya untuk
       // kembali ke sesi ini. "Dipesan" berarti pemesanan sudah ada
-      // tetapi belum dibayar, jadi jalurnya sama.
+      // tetapi belum dibeli, jadi jalurnya sama.
       ConnectorStatus.available || ConnectorStatus.reserved =>
         SessionCodePage(
           chargeBox: box,
           connector: connector,
           reservation: reservation,
         ),
-      ConnectorStatus.preparing => ConnectConnectorPage(
+      // Ordernya sudah dibuat tetapi belum dibayar: sesinya dilanjutkan
+      // di halaman pembayaran, dan nominalnya ditanyakan ulang lewat
+      // inquiry begitu kartu ditempelkan.
+      ConnectorStatus.awaitingPayment => CardPaymentPage(
           session: _resume(box, connector, verifiedOrderId),
         ),
-      ConnectorStatus.inUse || ConnectorStatus.finished => ChargingStatusPage(
+      ConnectorStatus.inUse => ChargingStatusPage(
           session: _resume(box, connector, verifiedOrderId),
         ),
       // Status tak dikenal tidak bisa ditekan, jadi cabang ini tak
@@ -341,6 +345,21 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
   /// config — tombol "Kembali ke Halaman Awal" di halaman-halaman
   /// lanjutan memulangkan ke rute pertama, dan rute pertama harus tetap
   /// daftar charge box, bukan layar konfigurasi.
+  /// Riwayat seluruh konektor di lokasi ini.
+  ///
+  /// Daftarnya diambil dari layar ini apa adanya: halaman riwayat
+  /// menanyakan tiap konektor sendiri, dan tanpa daftar itu ia tidak
+  /// tahu harus menanyakan apa.
+  void _openHistory() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TransactionHistoryPage(
+          chargeBoxes: _boxes ?? const [],
+        ),
+      ),
+    );
+  }
+
   void _openConfig() {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => const ApiConfigPage()),
@@ -355,10 +374,24 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
       showStation: true,
       isHome: true,
       // Alamat controller bisa diubah lagi tanpa menutup aplikasi.
-      headerAction: CircleIconButton(
-        key: ChargeBoxPage.configKey,
-        asset: 'assets/icons/ic_settings.svg',
-        onTap: _openConfig,
+      // Dua tombol: riwayat transaksi lalu konfigurasi server. Riwayat
+      // dibuka dari sini karena hanya halaman ini yang memegang seluruh
+      // charge box — endpoint riwayat meminta konektornya satu per satu.
+      headerAction: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleIconButton(
+            key: ChargeBoxPage.historyKey,
+            asset: 'assets/icons/ic_receipt.svg',
+            onTap: _openHistory,
+          ),
+          const SizedBox(width: 8),
+          CircleIconButton(
+            key: ChargeBoxPage.configKey,
+            asset: 'assets/icons/ic_settings.svg',
+            onTap: _openConfig,
+          ),
+        ],
       ),
       child: RefreshIndicator(
         onRefresh: _load,

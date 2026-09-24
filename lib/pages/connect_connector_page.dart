@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../config/env.dart';
 import '../data/charging_scope.dart';
 import '../models/charging_session.dart';
+import '../models/ocpp_status.dart';
 import '../services/api_exception.dart';
 import '../services/response_code.dart';
 import '../theme/app_colors.dart';
@@ -18,17 +19,18 @@ import 'charging_started_page.dart';
 /// Frame Figma 73:3470 "Hubungkan Konektor" dan 73:3597 "Konektor
 /// Terhubung" — dua state dari layar yang sama.
 ///
-/// BELUM ADA DETEKSI KONEKTOR SUNGGUHAN. Sebelumnya halaman ini
-/// mem-polling `GET /list` sampai status konektor berubah menjadi
-/// "Preparing" — tanda kabel tercolok ke kendaraan. `POST
-/// /list-chargerbox` tidak membawa status OCPP itu, dan endpoint
-/// pengecekan penggantinya belum tersedia.
+/// Kabel yang tercolok dideteksi lewat `POST /check-status-connector`,
+/// yang dipanggil tiap detik sampai status OCPP konektornya menjadi
+/// "Preparing". Sebelum itu tombol "Mulai Pengisian" tetap mati:
+/// perintah start yang dikirim sebelum kabel terpasang pasti ditolak
+/// charger.
 ///
-/// Sampai endpoint itu ada, tombol "Mulai Pengisian" diaktifkan setelah
-/// jeda [_simulationDelay] — perilaku yang selama ini hanya dipakai
-/// mode offline. Alurnya tetap utuh, tetapi tidak ada jaminan kabel
-/// benar-benar sudah terpasang; charger yang menolak `/start` akan
-/// terlihat sebagai pesan error dari [startErrorMessage].
+/// Status yang tidak dikenal tidak dianggap terpasang, dan "Faulted"
+/// atau "Unavailable" dikatakan apa adanya — menunggu lebih lama tidak
+/// akan mengubahnya.
+///
+/// Tanpa [ChargingScope] (mode offline) tidak ada yang bisa ditanya,
+/// jadi tombolnya menyala setelah jeda [_simulationDelay].
 class ConnectConnectorPage extends StatefulWidget {
   const ConnectConnectorPage({super.key, required this.session});
 
@@ -47,6 +49,10 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
   Duration _remaining = _limit;
   bool _connected = false;
   bool _starting = false;
+
+  /// Status OCPP terakhir yang dilaporkan charger, untuk ditampilkan
+  /// bila konektornya sedang bermasalah.
+  String _status = '';
 
   /// Satu pemeriksaan berjalan dalam satu waktu, supaya permintaan
   /// tidak menumpuk saat jaringan lambat.
@@ -77,7 +83,7 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
         : Timer.periodic(Env.connectorPollInterval, (_) => _pollConnector());
   }
 
-  /// Menanyakan tahap proses sesi ini dan menunggu konektor terpasang.
+  /// Menanyakan status OCPP konektor dan menunggu kabelnya terpasang.
   ///
   /// Kegagalan diabaikan: pengguna masih memasang kabel, dan percobaan
   /// berikutnya menyusul sedetik kemudian.
@@ -86,14 +92,14 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
     _checking = true;
 
     try {
-      final check = await _scope!.repository.verifySessionCode(
+      final check = await _scope!.repository.checkConnectorStatus(
         chargeBoxId: widget.session.chargeBox.id,
         connectorId: widget.session.connector.id,
-        sessionCode: widget.session.sessionCode,
       );
       if (!mounted) return;
 
-      debugPrint('[FLOW] Tahap proses: ${check.statusProcess}');
+      debugPrint('[FLOW] Status konektor: ${check.status}');
+      if (check.status != _status) setState(() => _status = check.status);
       if (check.isPluggedIn) _markPluggedIn();
     } on Object catch (_) {
       // Dicoba lagi pada pemeriksaan berikutnya.
@@ -176,6 +182,16 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
     );
   }
 
+  /// Apa yang sedang ditunggu, menurut charger sendiri.
+  ///
+  /// Charger yang rusak atau dimatikan tidak akan pernah melaporkan
+  /// "Preparing"; mengatakan "Menunggu konektor terdeteksi…" di situ
+  /// hanya membuat pengguna berdiri menunggu sesuatu yang tidak akan
+  /// datang.
+  String get _waitingLabel => OcppStatus.isBroken(_status)
+      ? 'Konektor sedang tidak bisa dipakai ($_status). Hubungi petugas.'
+      : 'Menunggu konektor terdeteksi...';
+
   @override
   Widget build(BuildContext context) {
     return PageScaffold(
@@ -214,9 +230,9 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
             const _ConnectedPanel()
           else ...[
             const HintStrip(text: 'Pasang konektor ke kendaraan Anda.'),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: WaitingPanel(label: 'Menunggu konektor terdeteksi...'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: WaitingPanel(label: _waitingLabel),
             ),
           ],
         ],

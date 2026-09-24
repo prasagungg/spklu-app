@@ -73,24 +73,33 @@ class ChargingProgress {
   final int estRemainingTime;
 
   factory ChargingProgress.fromJson(Map<String, dynamic>? json) {
+    // Sebagian field endpoint ini memakai snake_case (`last_soc`,
+    // `power_active_import`, `estimated_charged`) sedangkan sisanya
+    // camelCase, dan charge box-nya dieja dengan b kecil. Kedua ejaan
+    // diterima: yang salah eja tidak memunculkan error, hanya diam-diam
+    // bernilai nol — persis gejala "angkanya tidak nambah-nambah".
+    num? pick(String a, String b) => (json?[a] ?? json?[b]) as num?;
     double number(String key) => (json?[key] as num?)?.toDouble() ?? 0;
-    double? maybeNumber(String key) => (json?[key] as num?)?.toDouble();
+    double either(String a, String b) => pick(a, b)?.toDouble() ?? 0;
+    double? maybeEither(String a, String b) => pick(a, b)?.toDouble();
     int whole(String key) => (json?[key] as num?)?.round() ?? 0;
 
     return ChargingProgress(
       orderId: json?['orderId'] as String? ?? '',
-      chargeBoxId: json?['chargeBoxId'] as String? ?? '',
-      chargeBoxName: json?['chargeBoxName'] as String? ?? '',
+      chargeBoxId:
+          (json?['chargeBoxId'] ?? json?['chargeboxId']) as String? ?? '',
+      chargeBoxName:
+          (json?['chargeBoxName'] ?? json?['chargeboxName']) as String? ?? '',
       connectorName: json?['connectorName'] as String? ?? '',
       orderKwh: number('orderKwh'),
       charged: number('charged'),
       remaining: number('remaining'),
       statusCode: BackendStatus.parse(json?['status']),
-      firstSoc: maybeNumber('firstSoc'),
-      lastSoc: maybeNumber('lastSoc'),
+      firstSoc: maybeEither('first_soc', 'firstSoc'),
+      lastSoc: maybeEither('last_soc', 'lastSoc'),
       power: number('power'),
-      powerActiveImport: number('powerActiveImport'),
-      estimatedCharged: number('estimatedCharged'),
+      powerActiveImport: either('power_active_import', 'powerActiveImport'),
+      estimatedCharged: either('estimated_charged', 'estimatedCharged'),
       chargeDurationS: whole('chargeDurationS'),
       chargeDurationM: whole('chargeDurationM'),
       estRemainingTime: whole('estRemainingTime'),

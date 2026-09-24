@@ -119,11 +119,16 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
 
     debugPrint('[FLOW] Kartu terbaca: $card — menanyakan tagihan');
     unawaited(_reader?.stop());
-    unawaited(_settleBilling());
+    unawaited(_settleBilling(card));
   }
 
   /// Menanyakan tagihan order ini lalu membayarnya.
-  Future<void> _settleBilling() async {
+  ///
+  /// Nomor kartunya dari kartu yang ditempelkan bila kartunya
+  /// mengungkapkannya; kalau tidak, dari [Env.cardNumber]. Keduanya
+  /// dipakai apa adanya — backend yang memutuskan penerbitnya dari
+  /// empat digit pertama.
+  Future<void> _settleBilling(TappedCard card) async {
     final repository = ChargingScope.maybeOf(context)?.repository;
 
     // Mode offline: tidak ada yang bisa ditagih.
@@ -135,17 +140,35 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
     setState(() => _inquiring = true);
 
     try {
+      final cardNumber = card.cardNumber.isEmpty ? null : card.cardNumber;
+
       final inquiry = await repository.inquiryBilling(
         orderId: widget.session.orderId,
+        cardNumber: cardNumber,
       );
       if (!mounted) return;
       debugPrint('[FLOW] Tagihan: $inquiry');
+
+      // Tagihan nol tidak bisa dibayar: backend menolak `amount: 0`
+      // sebagai "Missing Field: amount", pesan yang tidak berarti
+      // apa-apa bagi petugas. Penyebabnya konektor yang tarifnya belum
+      // diatur — `count-kwh` sudah mengembalikan total nol sejak
+      // halaman Pilih Nominal. Jadi itu yang dikatakan, tanpa mengirim
+      // permintaan yang pasti gagal.
+      if (inquiry.totalAmount <= 0) {
+        await _failBilling(
+          'Tagihan pesanan ini Rp0 — tarif konektor ini belum diatur di '
+          'server. Pilih konektor lain atau hubungi petugas.',
+        );
+        return;
+      }
 
       // Nominalnya harus persis dari inquiry. Total order pun ditolak
       // backend sebagai "Amount mismatch" bila berbeda.
       final paid = await repository.payBilling(
         orderId: widget.session.orderId,
         amount: inquiry.totalAmount,
+        cardNumber: cardNumber,
       );
       if (!mounted) return;
       debugPrint('[FLOW] Pembayaran: $paid');

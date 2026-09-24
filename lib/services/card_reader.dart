@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 
+import 'card_number_reader.dart';
+
 /// Kesiapan pembaca kartu pada perangkat ini.
 enum CardReaderStatus {
   /// Siap menunggu kartu ditempelkan.
@@ -17,34 +19,46 @@ enum CardReaderStatus {
 /// Kartu yang baru ditempelkan.
 @immutable
 class TappedCard {
-  const TappedCard({required this.uid, this.technologies = const []});
+  const TappedCard({
+    required this.uid,
+    this.technologies = const [],
+    this.cardNumber = '',
+  });
 
   /// Nomor seri kartu dalam heksadesimal, mis. "04A2B3C4".
+  ///
+  /// Ini **nomor chip**, bukan nomor uang elektroniknya — keduanya
+  /// berbeda, dan backend meminta yang kedua.
   final String uid;
 
   /// Teknologi yang didukung kartu, mis. `["MifareClassic", "NfcA"]`.
   final List<String> technologies;
 
+  /// Nomor uang elektronik yang berhasil dibaca dari kartu, atau
+  /// kosong bila kartunya tidak mengungkapkannya — lihat
+  /// `card_number_reader.dart`.
+  final String cardNumber;
+
   @override
-  String toString() => 'TappedCard($uid [${technologies.join(', ')}])';
+  String toString() => 'TappedCard($uid [${technologies.join(', ')}]'
+      '${cardNumber.isEmpty ? '' : ', nomor $cardNumber'})';
 }
 
 /// Pembaca kartu uang elektronik.
 ///
 /// ## Batas yang harus diketahui
 ///
-/// Pembaca ini hanya **mendeteksi** kartu dan membaca nomor serinya.
-/// Saldo kartu uang elektronik Indonesia — Flazz, BRIZZI, e-Money,
-/// TapCash — tersimpan di sektor yang terkunci kunci milik penerbit dan
-/// hanya bisa dibaca atau didebit lewat SAM (Secure Access Module)
-/// bersertifikat. Aplikasi Android biasa tidak bisa melakukannya, dan
-/// tidak ada pustaka yang mengubah kenyataan itu.
+/// Pembaca ini **mendeteksi** kartu, membaca nomor serinya, dan — untuk
+/// kartu yang menjawab perintah EMV — mencoba membaca nomor uang
+/// elektroniknya (`card_number_reader.dart`). Kartu berbasis MIFARE
+/// Classic seperti e-Money, TapCash, dan Brizzi menyimpan nomor serta
+/// saldonya di sektor yang terkunci kunci milik penerbit, dan hanya
+/// bisa dibaca atau didebit lewat SAM (Secure Access Module)
+/// bersertifikat.
 ///
-/// Jadi tap di halaman pembayaran berfungsi sebagai *pemicu* bahwa
-/// kartu sudah ditempelkan, bukan sebagai transaksi. Pemotongan saldo
-/// sungguhan harus lewat reader atau backend pembayaran bersertifikat;
-/// begitu itu tersedia, panggilannya masuk di [CardPaymentPage] setelah
-/// kartu terbaca dan sebelum berpindah halaman.
+/// **Saldonya tidak dipotong di sini.** Tap di halaman pembayaran
+/// adalah pemicu bahwa kartu sudah ditempelkan; pemotongan sungguhan
+/// lewat mesin kartu bersertifikat, yang juga jadi sumber `bankLog`.
 abstract class CardReader {
   /// Apakah perangkat ini siap membaca kartu.
   Future<CardReaderStatus> status();
@@ -100,7 +114,7 @@ class NfcCardReader implements CardReader {
           NfcPollingOption.iso14443,
           NfcPollingOption.iso18092,
         },
-        onDiscovered: (tag) => onTap(_toCard(tag)),
+        onDiscovered: (tag) async => onTap(await _toCard(tag)),
       );
       debugPrint('[NFC] Menunggu kartu ditempelkan');
     } on Object catch (e) {
@@ -121,11 +135,41 @@ class NfcCardReader implements CardReader {
     }
   }
 
-  static TappedCard _toCard(NfcTag tag) {
+  static Future<TappedCard> _toCard(NfcTag tag) async {
     final android = NfcTagAndroid.from(tag);
     if (android == null) return const TappedCard(uid: '-');
 
-    return TappedCard(uid: _hex(android.id), technologies: android.techList);
+    return TappedCard(
+      uid: _hex(android.id),
+      technologies: android.techList,
+      cardNumber: await _cardNumber(tag),
+    );
+  }
+
+  /// Nomor uang elektronik kartu, bila kartunya mengungkapkannya.
+  ///
+  /// Hanya kartu ISO-DEP yang ditanyai: perintah EMV tidak berlaku di
+  /// MIFARE Classic, dan mencobanya hanya memperlambat tap.
+  ///
+  /// Kegagalan tidak pernah dilempar ke pemanggil — kartu yang tidak
+  /// menjawab cukup berarti nomornya tidak terbaca, dan pembayaran
+  /// jatuh ke nomor dari konfigurasi.
+  static Future<String> _cardNumber(NfcTag tag) async {
+    final isoDep = IsoDepAndroid.from(tag);
+    if (isoDep == null) return '';
+
+    try {
+      final number = await readCardNumber(isoDep.transceive);
+      debugPrint(
+        number.isEmpty
+            ? '[NFC] Kartu tidak mengungkapkan nomornya'
+            : '[NFC] Nomor kartu terbaca: $number',
+      );
+      return number;
+    } on Object catch (e) {
+      debugPrint('[NFC] Nomor kartu gagal dibaca: $e');
+      return '';
+    }
   }
 
   static String _hex(Uint8List bytes) => [

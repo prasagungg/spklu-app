@@ -12,11 +12,11 @@ import 'package:kossotrik/widgets/primary_button.dart';
 
 import 'fixtures.dart';
 
-/// Melaporkan tahap proses yang bisa diubah test di tengah jalan.
+/// Melaporkan status OCPP yang bisa diubah test di tengah jalan.
 class _Stub extends Interceptor {
-  _Stub(this.statusProcess);
+  _Stub(this.status);
 
-  int statusProcess;
+  String status;
   final List<RequestOptions> requests = [];
 
   @override
@@ -26,15 +26,15 @@ class _Stub extends Interceptor {
       Response<Map<String, dynamic>>(
         requestOptions: options,
         statusCode: 200,
-        data: options.path == '/manage-sessioncode'
-            ? sessionCodeResponse(statusProcess: statusProcess)
+        data: options.path == '/check-status-connector'
+            ? connectorStatusResponse(status: status)
             : okResponse,
       ),
     );
   }
 
   List<RequestOptions> get checks =>
-      requests.where((r) => r.path == '/manage-sessioncode').toList();
+      requests.where((r) => r.path == '/check-status-connector').toList();
 }
 
 ChargingSession _session() {
@@ -50,8 +50,8 @@ ChargingSession _session() {
   );
 }
 
-Future<_Stub> _pump(WidgetTester tester, {int statusProcess = 2}) async {
-  final stub = _Stub(statusProcess);
+Future<_Stub> _pump(WidgetTester tester, {String status = 'Available'}) async {
+  final stub = _Stub(status);
   final repo = ChargePointRepository(
     client: ApiClient.withDio(Dio()..interceptors.add(stub)),
   );
@@ -81,7 +81,7 @@ Future<void> _tick(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('tahap proses ditanyakan tiap detik', (tester) async {
+  testWidgets('status konektor ditanyakan tiap detik', (tester) async {
     final stub = await _pump(tester);
 
     await _tick(tester);
@@ -91,14 +91,12 @@ void main() {
     expect(stub.checks.first.data, {
       'chargeBoxId': 'CB-SMR-01',
       'connectorId': '1',
-      // Kode sesi dari order yang sedang dibeli.
-      'sessionCode': '29',
     });
   });
 
-  /// Selama backend masih meminta konektor dihubungkan, perintah start
-  /// tidak boleh bisa dikirim.
-  testWidgets('tombol mati selama statusProcess masih 2', (tester) async {
+  /// Selama charger masih melaporkan "Available", kabelnya belum
+  /// terpasang dan perintah start tidak boleh bisa dikirim.
+  testWidgets('tombol mati selama konektor masih Available', (tester) async {
     await _pump(tester);
 
     for (var i = 0; i < 5; i++) {
@@ -110,15 +108,14 @@ void main() {
     expect(_startButton(tester).onPressed, isNull);
   });
 
-  testWidgets('statusProcess naik berarti nozzle sudah tercolok',
-      (tester) async {
+  testWidgets('Preparing berarti nozzle sudah tercolok', (tester) async {
     final stub = await _pump(tester);
 
     await _tick(tester);
     expect(_startButton(tester).onPressed, isNull);
 
     // Kabel dicolokkan ke kendaraan.
-    stub.statusProcess = 3;
+    stub.status = 'Preparing';
     await _tick(tester);
 
     expect(find.text('Konektor Terhubung'), findsOneWidget);
@@ -127,7 +124,7 @@ void main() {
 
   testWidgets('pemeriksaan berhenti setelah konektor terdeteksi',
       (tester) async {
-    final stub = await _pump(tester, statusProcess: 3);
+    final stub = await _pump(tester, status: 'Preparing');
 
     await _tick(tester);
     final afterDetection = stub.checks.length;
@@ -138,11 +135,11 @@ void main() {
     expect(stub.checks, hasLength(afterDetection));
   });
 
-  /// Menebak angka yang tidak dikenal sebagai "tercolok" akan mengirim
-  /// perintah start yang pasti ditolak charger.
+  /// Menebak status yang tidak dikenal sebagai "tercolok" akan
+  /// mengirim perintah start yang pasti ditolak charger.
   testWidgets('status tak dikenal tidak dianggap tercolok', (tester) async {
     final stub = await _pump(tester);
-    stub.statusProcess = 99;
+    stub.status = 'SomethingElse';
 
     await _tick(tester);
     await _tick(tester);
@@ -151,12 +148,28 @@ void main() {
     expect(_startButton(tester).onPressed, isNull);
   });
 
-  testWidgets('status selesai juga berarti kabelnya terpasang',
+  /// Charger bisa melewati "Preparing" bila sesinya sudah jalan; kalau
+  /// keadaan sesudahnya tidak ikut dihitung, halamannya menggantung.
+  testWidgets('status sesudah Preparing juga berarti kabelnya terpasang',
       (tester) async {
-    await _pump(tester, statusProcess: 4);
+    await _pump(tester, status: 'SuspendedEV');
 
     await _tick(tester);
 
     expect(_startButton(tester).onPressed, isNotNull);
+  });
+
+  /// Charger yang rusak tidak akan pernah melaporkan "Preparing".
+  /// Menyuruh pengguna menunggu di situ hanya membuang waktunya.
+  testWidgets('konektor bermasalah dikatakan apa adanya', (tester) async {
+    await _pump(tester, status: 'Faulted');
+
+    await _tick(tester);
+
+    expect(
+      find.textContaining('tidak bisa dipakai (Faulted)'),
+      findsOneWidget,
+    );
+    expect(_startButton(tester).onPressed, isNull);
   });
 }

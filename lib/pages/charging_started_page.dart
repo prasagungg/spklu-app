@@ -7,17 +7,17 @@ import '../widgets/page_scaffold.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/session_widgets.dart';
 
-/// Frame Figma 73:3667 — "Pengisian Dimulai".
+/// Frame Figma 204:5174 (sebelumnya 73:3667) — "Pengisian Dimulai".
 ///
-/// Muncul setelah perintah start berhasil, dan satu-satunya tempat kode
-/// sesi ditampilkan besar. Kodenya datang dari
-/// `POST /transaction/push-order` — pengguna memerlukannya untuk
-/// mengakhiri sesinya nanti, jadi inilah alasan layar ini ada.
+/// Inilah akhir alur normal: muncul setelah perintah start berhasil,
+/// dan mengulang kode sesi dari `POST /booked-connector` sekali lagi
+/// sebelum pengguna pergi.
 ///
-/// Satu-satunya jalan keluarnya adalah pulang ke daftar charge box,
-/// mengikuti desain. Untuk memantau atau menghentikan pengisiannya,
-/// pengguna menekan konektornya lagi dari daftar itu dan memasukkan
-/// kode sesi ini.
+/// **Layar baterai yang terus naik bukan di sini.** Alur normal berhenti
+/// di halaman ini dan pulang ke daftar charge box, mengikuti desain.
+/// Untuk memantau atau menghentikan pengisiannya, pengguna menekan
+/// konektor yang sedang dipakai itu dari daftar, memasukkan kode sesi
+/// ini, lalu `ChargingStatusPage` yang menampilkan kemajuannya.
 class ChargingStartedPage extends StatelessWidget {
   const ChargingStartedPage({super.key, required this.session});
 
@@ -52,7 +52,7 @@ class ChargingStartedPage extends StatelessWidget {
           const HintStrip(text: 'Pengisian sedang berlangsung...'),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _SessionCodeCard(code: session.sessionCode),
+            child: SessionCodeCard(code: session.sessionCode),
           ),
         ],
       ),
@@ -61,8 +61,8 @@ class ChargingStartedPage extends StatelessWidget {
 }
 
 /// Kartu kode sesi (73:3708) — latar #EEF7FE, angka Inter Bold 48.
-class _SessionCodeCard extends StatelessWidget {
-  const _SessionCodeCard({required this.code});
+class SessionCodeCard extends StatelessWidget {
+  const SessionCodeCard({super.key, required this.code});
 
   final String code;
 
@@ -103,10 +103,15 @@ class _SessionCodeCard extends StatelessWidget {
                 horizontal: 12,
                 vertical: 16,
               ),
+              // Anak Stack yang tidak diposisikan hanya selebar isinya
+              // dan menempel ke kiri; tanpa lebar penuh, kode sesinya
+              // terlihat bergeser dari tengah kartu.
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text(
                     'Simpan Kode Sesi Anda',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -116,6 +121,7 @@ class _SessionCodeCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     code,
+                    textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 48,
                       fontWeight: FontWeight.w700,
@@ -126,6 +132,7 @@ class _SessionCodeCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   const Text(
                     'Kode ini diperlukan untuk mengakhiri sesi.',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w400,

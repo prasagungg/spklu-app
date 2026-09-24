@@ -204,7 +204,7 @@ void main() {
         chargeBoxDetailResponse(
           connectors: [
             connectorJson(id: '1', status: 1),
-            connectorJson(id: '2', nama: 'Gun 2', status: 3),
+            connectorJson(id: '2', nama: 'Gun 2', status: 2),
           ],
         ),
       ).fetchChargeBoxDetail(chargeBoxId: 'CB-SMR-01', number: 4);
@@ -225,6 +225,44 @@ void main() {
 
       expect(box.daya, isEmpty);
     });
+  });
+
+  /// Backend mengeja charge box dengan b kecil di endpoint ini, dan
+  /// pernah menamai batas waktunya `sessionExpiredTime` sebelum menjadi
+  /// `sessionExpired`. Yang salah eja akan hilang diam-diam.
+  test('order menerima kedua ejaan yang dipakai backend', () async {
+    final repo = _repositoryReturning({
+      'responseCode': '00',
+      'responseMessage': 'Success',
+      'data': {
+        'orderId': 'VB4LY6CAI8Z8C25QHMY4MIRJUC',
+        'chargeboxId': 'ACMP_UAT',
+        'chargeboxName': 'ACMP UAT',
+        'connectorName': 'DCCT 200 kW',
+        'connectorId': '3',
+        'partnerReference': '81067',
+        'sessionCode': '65',
+        'sessionExpired': '2026-09-24T02:43:44Z',
+        'kwh': 10,
+        'rpTotal': 2000,
+        'serviceFee': 2000,
+      },
+    });
+
+    final order = await repo.pushOrder(
+      chargeBoxId: 'ACMP_UAT',
+      connectorId: 3,
+      reservationId: 'GiutWg7co_CaODPntGi3c',
+      kwh: 10,
+    );
+
+    expect(order.chargeBoxId, 'ACMP_UAT');
+    expect(order.chargeBoxName, 'ACMP UAT');
+    expect(order.sessionExpiredAt, DateTime.utc(2026, 9, 24, 2, 43, 44));
+    expect(order.rpTotal, 2000);
+    // Biaya jasanya satu-satunya isi tagihan; tanpa barisnya, rincian
+    // harga akan menunjukkan deretan nol dengan total 2.000.
+    expect(order.extraCharges, contains((label: 'Biaya Jasa', amount: 2000)));
   });
 
   group('perintah pengisian', () {

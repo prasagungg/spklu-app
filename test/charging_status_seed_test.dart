@@ -55,7 +55,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('0,000 kWh'), findsOneWidget);
+    expect(find.text('0 kWh'), findsOneWidget);
     expect(find.text('Sedang Mengisi'), findsOneWidget);
   });
 
@@ -75,7 +75,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('0,000 kWh'), findsOneWidget);
+    expect(find.text('0 kWh'), findsOneWidget);
 
     // Satu putaran polling.
     await tester.pump(const Duration(seconds: 1));

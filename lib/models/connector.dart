@@ -1,23 +1,22 @@
 import 'backend_status.dart';
+import 'connector_status_code.dart';
 
 /// Status konektor yang dipakai UI, sejalan dengan angka `status` dari
-/// backend (lihat [BackendStatus]).
+/// backend (lihat [ConnectorStatusCode]).
 ///
-/// - [reserved]    Sedang dipesan; belum sampai tahap pembayaran.
-/// - [available]   Bebas, bisa langsung dibeli.
-/// - [preparing]   Sudah dibayar, menunggu konektor dihubungkan.
-/// - [inUse]       Sedang mengisi daya.
-/// - [finished]    Pengisian sudah selesai, konektor belum dilepas.
-/// - [unavailable] Angka status di luar keempatnya.
+/// - [reserved]        Sudah dipesan; belum sampai pembelian.
+/// - [available]       Tersedia, bisa langsung dibeli.
+/// - [inUse]           Sedang digunakan.
+/// - [awaitingPayment] Menunggu pembayaran; ordernya sudah dibuat.
+/// - [unavailable]     Tidak tersedia, termasuk angka yang tak dikenal.
 ///
 /// Semua kecuali [available] berarti konektornya sudah diklaim orang
 /// lain, jadi pengguna harus membuktikan kepemilikan sesi lebih dulu.
 enum ConnectorStatus {
   reserved,
   available,
-  preparing,
   inUse,
-  finished,
+  awaitingPayment,
   unavailable,
 }
 
@@ -90,37 +89,35 @@ class Connector {
   /// Satu-satunya tempat angka status konektor diterjemahkan.
   ///
   /// Status yang hilang diperlakukan seperti bebas — lihat
-  /// [BackendStatus.isUsable].
+  /// [ConnectorStatusCode.isUsable]. Angka `4` dan angka yang tidak
+  /// dikenal sama-sama jatuh ke [ConnectorStatus.unavailable].
   static ConnectorStatus mapStatus(int? code) => switch (code) {
-        null || BackendStatus.available => ConnectorStatus.available,
-        BackendStatus.reserved => ConnectorStatus.reserved,
-        BackendStatus.awaitingConnector => ConnectorStatus.preparing,
-        BackendStatus.charging => ConnectorStatus.inUse,
-        BackendStatus.finished => ConnectorStatus.finished,
+        null || ConnectorStatusCode.available => ConnectorStatus.available,
+        ConnectorStatusCode.reserved => ConnectorStatus.reserved,
+        ConnectorStatusCode.inUse => ConnectorStatus.inUse,
+        ConnectorStatusCode.awaitingPayment =>
+          ConnectorStatus.awaitingPayment,
         _ => ConnectorStatus.unavailable,
       };
 
-  /// Bebas sepenuhnya, belum ada kabel tercolok.
+  /// Tersedia untuk siapa saja.
   bool get isAvailable => status == ConnectorStatus.available;
 
-  /// Sudah dipesan orang lain, belum dibayar.
+  /// Sudah dipesan orang lain, belum sampai pembelian.
   bool get isReserved => status == ConnectorStatus.reserved;
 
-  /// Sudah dibayar, menunggu konektor dihubungkan.
-  bool get isPreparing => status == ConnectorStatus.preparing;
-
-  /// Sedang mengisi daya.
+  /// Sedang digunakan.
   bool get isInUse => status == ConnectorStatus.inUse;
 
-  /// Pengisian sudah selesai.
-  bool get isFinished => status == ConnectorStatus.finished;
+  /// Ordernya sudah dibuat, tagihannya belum dibayar.
+  bool get isAwaitingPayment => status == ConnectorStatus.awaitingPayment;
 
-  /// Boleh ditekan pengguna. Keempat keadaan yang dikenal bisa ditekan
-  /// — yang selain [available] mengharuskan verifikasi kode sesi lebih
-  /// dulu. Hanya status yang tidak dikenal yang mati.
+  /// Boleh ditekan pengguna. Keadaan yang dikenal bisa ditekan — yang
+  /// selain [available] mengharuskan verifikasi kode sesi lebih dulu.
+  /// Yang mati hanya "tidak tersedia", termasuk angka yang tak dikenal.
   bool get isSelectable => status != ConnectorStatus.unavailable;
 
-  /// Salinan dengan status hasil `POST /status-konektor`.
+  /// Salinan dengan status hasil `POST /detail-chargerbox`.
   ///
   /// Daftar charge box tidak memperlihatkan status sebenarnya, jadi
   /// nilai dari daftar ditimpa begitu jawabannya datang.

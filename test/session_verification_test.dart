@@ -144,14 +144,15 @@ void main() {
       expect(call.method, 'POST');
       expect(call.path, '/manage-sessioncode');
       expect(call.data, {
-        'chargeBoxId': 'CB-SMR-01',
+        // Endpoint ini mengeja charge box dengan b kecil.
+        'chargeboxId': 'CB-SMR-01',
         'connectorId': '1',
         'sessionCode': '29',
       });
     });
 
-    /// statusProcess-nya ikut terbawa; halaman Hubungkan Konektor
-    /// memakai angka itu untuk tahu nozzle sudah tercolok.
+    /// Yang dibawa pulang dari verifikasi menentukan langkah
+    /// berikutnya: kode sesinya, tahap transaksinya, dan ordernya.
     testWidgets('kode benar menutup halaman dengan hasil pemeriksaan',
         (tester) async {
       await _open(tester, stub: _Stub(statusProcess: 3, orderId: 'ORDER-9'));
@@ -161,7 +162,6 @@ void main() {
       expect(lastResult, isNotNull);
       expect(lastResult!.sessionCode, '29');
       expect(lastResult!.statusProcess, 3);
-      expect(lastResult!.isPluggedIn, isTrue);
       // Ordernya ikut terbawa, jadi sesi yang dibuka kembali bisa
       // dipantau dan dihentikan.
       expect(lastResult!.orderId, 'ORDER-9');

@@ -22,6 +22,9 @@ class _Counter extends Interceptor {
           '/booked-connector' => bookingResponse(),
           '/detail-chargerbox' => chargeBoxDetailResponse(nama: 'CB-SMR-01'),
           '/manage-sessioncode' => sessionCodeResponse(),
+          // Kabelnya dianggap sudah terpasang; penungguannya
+          // diuji tersendiri di connector_detection_poll_test.
+          '/check-status-connector' => connectorStatusResponse(),
           '/list-kwh' => kwhOptionsResponse(),
           '/count-kwh' => countKwhResponse(),
           '/transaction/push-order' => pushOrderResponse(),
@@ -79,7 +82,7 @@ void main() {
     await tester.tap(find.text('Gun 1'));
     await passSessionCode(tester);
     // Tidak ada pilihan yang tercentang sejak awal.
-    await tester.tap(find.text('10,0 kWh'));
+    await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();

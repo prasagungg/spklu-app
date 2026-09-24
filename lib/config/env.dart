@@ -43,7 +43,7 @@ class Env {
   /// server.
   static const String idSpklu = String.fromEnvironment(
     'SPKLU_ID',
-    defaultValue: 'SPKLU-SMR',
+    defaultValue: '00001',
   );
 
   /// Nomor kartu uang elektronik yang dipakai saat menagih.
@@ -65,6 +65,24 @@ class Env {
   static const String bankLog = String.fromEnvironment(
     'SPKLU_BANK_LOG',
     defaultValue: '1231408098812345678100500',
+  );
+
+  /// Identitas merchant pada permintaan pembayaran.
+  ///
+  /// Nilai sementara: mesin kartunya belum ada, jadi belum ada sumber
+  /// yang sebenarnya — sama seperti [cardNumber] dan [bankLog]. Diganti
+  /// lewat `--dart-define=SPKLU_MERCHANT_ID=…` begitu nomor aslinya
+  /// diketahui.
+  static const String merchantId = String.fromEnvironment(
+    'SPKLU_MERCHANT_ID',
+    defaultValue: '000000000000001',
+  );
+
+  /// Identitas terminal pembayaran di SPKLU ini. Sementara seperti
+  /// [merchantId].
+  static const String terminalId = String.fromEnvironment(
+    'SPKLU_TERMINAL_ID',
+    defaultValue: '00000001',
   );
 
   /// Identitas pemanggil pada header `client-id`.

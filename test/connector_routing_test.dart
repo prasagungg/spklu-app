@@ -27,6 +27,9 @@ class _Stub extends Interceptor {
             ),
           '/booked-connector' => bookingResponse(),
           '/manage-sessioncode' => sessionCodeResponse(),
+          // Kabelnya dianggap sudah terpasang; penungguannya
+          // diuji tersendiri di connector_detection_poll_test.
+          '/check-status-connector' => connectorStatusResponse(),
           '/list-kwh' => kwhOptionsResponse(),
           '/count-kwh' => countKwhResponse(),
           '/transaction/push-order' => pushOrderResponse(),
@@ -83,18 +86,20 @@ void main() {
     expect(find.text('Pilih Nominal'), findsOneWidget);
   });
 
-  testWidgets('status 2 melanjutkan ke Hubungkan Konektor', (tester) async {
+  testWidgets('status 2 membuka layar pemantauan', (tester) async {
     await _tapConnector(tester, 2);
     await _verify(tester);
 
-    expect(find.text('Hubungkan Konektor'), findsOneWidget);
+    expect(find.text('Sedang Mengisi'), findsOneWidget);
   });
 
-  testWidgets('status 3 membuka layar pemantauan', (tester) async {
+  /// Ordernya sudah dibuat tetapi belum dibayar; sesinya dilanjutkan
+  /// tepat di langkah itu.
+  testWidgets('status 3 melanjutkan ke pembayaran', (tester) async {
     await _tapConnector(tester, 3);
     await _verify(tester);
 
-    expect(find.text('Sedang Mengisi'), findsOneWidget);
+    expect(find.text('Pembayaran'), findsOneWidget);
   });
 
   testWidgets('status 0 melanjutkan pemesanan yang sudah ada',
@@ -111,11 +116,13 @@ void main() {
   /// dan begitu ia melaporkan selesai halaman itu berpindah sendiri ke
   /// rincian akhir.
 
-  testWidgets('status 4 juga lewat layar pemantauan', (tester) async {
+  /// "Tidak tersedia" diperlakukan sama dengan angka yang tak dikenal:
+  /// konektornya tidak bisa ditekan sama sekali.
+  testWidgets('status 4 tidak bisa ditekan', (tester) async {
     await _tapConnector(tester, 4);
-    await _verify(tester);
 
-    expect(find.text('Sedang Mengisi'), findsOneWidget);
+    expect(find.text('Daftar Konektor'), findsOneWidget);
+    expect(find.text('Verifikasi Sesi'), findsNothing);
   });
 
   testWidgets('status tak dikenal membuat konektornya tidak bisa ditekan',

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kossotrik/models/backend_status.dart';
+import 'package:kossotrik/models/connector_status_code.dart';
 import 'package:kossotrik/models/charge_box.dart';
 import 'package:kossotrik/models/connector.dart';
 
@@ -14,7 +15,7 @@ Connector _connector({int status = 1, Object? estimasi}) => ChargeBox.fromJson(
 
 void main() {
   group('status konektor dari /list-chargerbox', () {
-    test('status 1 berarti bisa dipakai', () {
+    test('status 1 berarti tersedia', () {
       final c = _connector();
 
       expect(c.status, ConnectorStatus.available);
@@ -23,33 +24,34 @@ void main() {
       expect(c.statusCode, 1);
     });
 
-    test('status 2 berarti menunggu konektor dihubungkan', () {
+    test('status 2 berarti sedang digunakan', () {
       final c = _connector(status: 2);
 
-      expect(c.status, ConnectorStatus.preparing);
-      expect(c.isPreparing, isTrue);
+      expect(c.status, ConnectorStatus.inUse);
+      expect(c.isInUse, isTrue);
       // Sudah diklaim orang lain, tapi tetap bisa ditekan — lewat
       // verifikasi kode sesi.
       expect(c.isAvailable, isFalse);
       expect(c.isSelectable, isTrue);
     });
 
-    test('status 3 berarti sedang mengisi', () {
+    test('status 3 berarti menunggu pembayaran', () {
       final c = _connector(status: 3);
 
-      expect(c.status, ConnectorStatus.inUse);
-      expect(c.isInUse, isTrue);
+      expect(c.status, ConnectorStatus.awaitingPayment);
+      expect(c.isAwaitingPayment, isTrue);
       expect(c.isAvailable, isFalse);
       expect(c.isSelectable, isTrue);
     });
 
-    test('status 4 berarti pengisian selesai', () {
+    /// Angka `4` dan angka yang tak dikenal sama-sama berarti konektor
+    /// itu tidak bisa dipakai sekarang.
+    test('status 4 berarti tidak tersedia', () {
       final c = _connector(status: 4);
 
-      expect(c.status, ConnectorStatus.finished);
-      expect(c.isFinished, isTrue);
+      expect(c.status, ConnectorStatus.unavailable);
       expect(c.isAvailable, isFalse);
-      expect(c.isSelectable, isTrue);
+      expect(c.isSelectable, isFalse);
     });
 
     test('status 0 berarti sedang dipesan', () {
@@ -62,7 +64,7 @@ void main() {
       expect(c.isSelectable, isTrue);
     });
 
-    test('angka di luar kelimanya tidak bisa ditekan', () {
+    test('angka di luar daftarnya tidak bisa ditekan', () {
       for (final status in [5, 9, 99]) {
         final c = _connector(status: status);
         expect(c.status, ConnectorStatus.unavailable, reason: '$status');
@@ -209,9 +211,19 @@ void main() {
     });
   });
 
-  group('BackendStatus', () {
-    test('status yang hilang dianggap bisa dipakai', () {
-      expect(BackendStatus.isUsable(null), isTrue);
+  group('Kosakata angka status', () {
+    test('status konektor yang hilang dianggap bisa dipakai', () {
+      expect(ConnectorStatusCode.isUsable(null), isTrue);
+    });
+
+    /// Dua kosakata yang berbeda memakai angka yang sama: `3` berarti
+    /// "menunggu pembayaran" pada konektor, tetapi "sedang mengisi"
+    /// pada tahap transaksi. Menyatukannya akan menyesatkan.
+    test('angka konektor dan tahap transaksi dipisah', () {
+      expect(ConnectorStatusCode.awaitingPayment, 3);
+      expect(BackendStatus.charging, 3);
+      expect(ConnectorStatusCode.unavailable, 4);
+      expect(BackendStatus.finished, 4);
     });
 
     test('angka dibaca dari number maupun teks', () {

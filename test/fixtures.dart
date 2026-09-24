@@ -187,6 +187,109 @@ Map<String, dynamic> paymentBillingResponse({
 }
 
 /// Amplop `POST /manage-sessioncode`.
+/// Amplop `POST /check-status-connector`.
+///
+/// Bawaannya "Preparing" — kabel sudah terpasang — karena kebanyakan
+/// test hanya ingin melewati tahap menunggu konektor. Kirim "Available"
+/// untuk menguji penungguannya.
+Map<String, dynamic> connectorStatusResponse({
+  String status = 'Preparing',
+  String chargeBoxId = 'CB-SMR-01',
+  String connectorId = '1',
+}) =>
+    {
+      'responseCode': '00',
+      'responseMessage': 'Success',
+      'data': {
+        'chargeBoxId': chargeBoxId,
+        'chargeboxName': 'Kempower Satellite 200 kW',
+        'connectorName': 'Gun $connectorId',
+        'connectorId': connectorId,
+        'connectorStatus': status,
+      },
+    };
+
+/// Amplop `POST /transaction/detail-history-transaction`.
+///
+/// Endpoint ini mengeja amplopnya **snake_case** saat berhasil —
+/// `response_code`/`response_message` — sedangkan kegagalannya tetap
+/// camelCase. Nomor kartunya pun sudah disamarkan backend.
+Map<String, dynamic> transactionDetailResponse({
+  String orderId = '8XWS0G9RULEYBLHS48ULF6OFH7',
+  num rpPesan = 50000,
+  num rpPakai = 32500,
+  num rpSisa = 17500,
+  num kwhPakai = 6.4,
+}) =>
+    {
+      'response_code': '00',
+      'response_message': 'Success',
+      'data': {
+        'orderId': orderId,
+        'chargeboxId': 'CB-SMR-01',
+        'chargeboxName': 'Kempower Satellite 200 kW',
+        'connectorId': 1,
+        'connectorName': 'Gun 1',
+        'namaSpklu': 'SPKLU PLN PUSAT',
+        'pspId': 'EM-BNI',
+        'cardNumber': '601••••••••••890',
+        'status': 4,
+        'tglCatat': '2026-09-23T09:28:44Z',
+        'kwhPesan': 10,
+        'kwhPakai': kwhPakai,
+        'sisaKwh': 3.6,
+        'rpPesan': rpPesan,
+        'rpPakai': rpPakai,
+        'rpSisa': rpSisa,
+        'hargaKwh': 2466,
+        'rpLayanan': null,
+        'rpMaterai': null,
+        'firstSoc': null,
+        'idleFee': 0,
+      },
+    };
+
+/// Amplop `POST /transaction/charging/detail`.
+///
+/// Sebagian angkanya memang dikirim backend sebagai teks atau null —
+/// `chargeDuration` "120", `rpMaterai` null — jadi fixture ini menirunya
+/// apa adanya.
+Map<String, dynamic> chargingDetailResponse({
+  String orderId = 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
+  num kwhPesan = 10,
+  num kwhPakai = 6.4,
+  num rpPesan = 25400,
+  num rpPakai = 16256,
+  num rpSisa = 9144,
+}) =>
+    {
+      'responseCode': '00',
+      'responseMessage': 'Success',
+      'data': {
+        'orderId': orderId,
+        'chargeboxId': 'CB-SMR-01',
+        'chargeboxName': 'Kempower Satellite 200 kW',
+        'connectorName': 'Gun 1',
+        'connectorId': '1',
+        'status': 4,
+        'kwhPesan': kwhPesan,
+        'kwhPakai': kwhPakai,
+        'sisaKwh': 3.6,
+        'rpPesan': rpPesan,
+        'rpPakai': rpPakai,
+        'rpSisa': rpSisa,
+        'hargaKwh': 2466,
+        'chargeDuration': '120',
+        'chargeDurationInMinutes': '2',
+        'rpMaterai': null,
+        'firstSoc': null,
+        'lastSoc': null,
+        'idleFee': 0,
+        'serviceFee': 0,
+        'tglCatat': '2026-09-24T04:08:39Z',
+      },
+    };
+
 Map<String, dynamic> sessionCodeResponse({
   String orderId = 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
   String sessionCode = '29',
@@ -287,7 +390,8 @@ Map<String, dynamic> ongoingKwhResponse({
       },
     };
 
-/// Amplop `POST /transaction/history-transaction`.
+/// Amplop `GET /transaction/history-transaction` — seluruh riwayat
+/// dalam satu jawaban.
 Map<String, dynamic> historyResponse([
   List<Map<String, dynamic>>? list,
 ]) =>
@@ -295,8 +399,6 @@ Map<String, dynamic> historyResponse([
       'responseCode': '00',
       'responseMessage': 'Success',
       'data': {
-        'chargeboxId': 'CB-SMR-01',
-        'connectorId': '1',
         'list': list ??
             [
               historyEntryJson(),
@@ -311,12 +413,19 @@ Map<String, dynamic> historyResponse([
 
 /// Satu entri riwayat. `pspId` dan `cardNumber` kosong berarti
 /// transaksinya tidak pernah sampai dibayar.
+///
+/// Sejak endpoint-nya melayani seluruh riwayat sekali panggil, tiap
+/// entri menyebut charge box dan konektornya sendiri.
 Map<String, dynamic> historyEntryJson({
   String orderId = '8XWS0G9RULEYBLHS48ULF6OFH7',
   String pspId = 'EM-BNI',
   String cardNumber = '6012345678907890',
   int totalAmount = 12700,
   String createdDate = '2026-09-23T09:28:44Z',
+  String chargeBoxId = 'CB-SMR-01',
+  String chargeBoxName = 'Kempower Satellite 200 kW',
+  Object? connectorId = '1',
+  String connectorName = 'Gun 1',
 }) =>
     {
       'pspId': pspId,
@@ -324,6 +433,10 @@ Map<String, dynamic> historyEntryJson({
       'orderId': orderId,
       'totalAmount': totalAmount,
       'createdDate': createdDate,
+      'chargeboxId': chargeBoxId,
+      'chargeboxName': chargeBoxName,
+      'connectorId': connectorId,
+      'connectorName': connectorName,
     };
 
 /// Balasan sukses tanpa isi, untuk `/start` dan `/stop`.

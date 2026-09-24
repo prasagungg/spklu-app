@@ -117,7 +117,9 @@ class CostRows extends StatelessWidget {
           DetailRow(label: 'Biaya Listrik', value: formatRupiah(price.rpKwh)),
         ],
         const SizedBox(height: 12),
-        DetailRow(label: 'PPJ-TL', value: formatRupiah(price.rpPpj)),
+        // "PBJT-TL" — istilah yang dipakai desain terbaru untuk pajak
+        // yang sama; backend tetap mengirimnya sebagai `rpPpj`.
+        DetailRow(label: 'PBJT-TL', value: formatRupiah(price.rpPpj)),
         const SizedBox(height: 12),
         DetailRow(label: 'Biaya PPN', value: formatRupiah(price.rpPpn)),
         for (final row in price.extraCharges) ...[

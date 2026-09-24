@@ -128,9 +128,16 @@ daya beberapa detik setelah perintah berhenti. `StopConfirmPage`
 memanggil `ongoing-kwh` sampai lima kali sampai statusnya `4`, alih-alih
 memakai angka saat tombol ditekan.
 
-**Desimal kWh menyesuaikan.** Di bawah 1 kWh dipakai tiga desimal.
-Dengan satu desimal, 127 Wh tampil "0,1 kWh" dan 3 Wh tampil "0,0 kWh",
-sehingga pengisian yang baru mulai terlihat mandek.
+**Energi tersalur ditampilkan apa adanya.** Angka yang tampil adalah
+`charged` dari `ongoing-kwh` persis seperti yang dikirim backend —
+tidak dibulatkan dan desimalnya tidak dipangkas, hanya titiknya diganti
+koma. `formatEnergy` sempat memangkas ke satu desimal mulai 1 kWh dan
+tiga desimal di bawahnya; dengan aturan itu 0,126 dan 0,127 kWh tampil
+sama, dan angka di layar berselisih dengan catatan backend. Nilai bulat
+ditulis tanpa ",0" di ujungnya. Simulasi mode offline yang angkanya
+karangan aplikasi sendiri dibulatkan **di sumbernya**, bukan di
+formatternya, supaya penjumlahan pecahan biner tidak tampil sebagai
+"1,2000000000000002 kWh".
 
 **Tagihan dibulatkan ke bawah.** `usageCostFor()` membulatkan ke bawah
 per seribu rupiah agar tagihan tidak pernah melebihi pemakaian
@@ -207,24 +214,40 @@ datang dari `POST /transaction/push-order` lewat
 Halaman pembayaran menunggu kartu e-Money ditempelkan ke pembaca NFC;
 tap kartu itulah yang memajukan alur. Tidak ada tombol bayar.
 
-**Yang bisa dan tidak bisa dilakukan.** Pembacanya hanya mendeteksi
-kartu dan membaca nomor serinya. Saldo kartu uang elektronik Indonesia
-— Flazz, BRIZZI, e-Money, TapCash — tersimpan di sektor yang terkunci
-kunci milik penerbit dan hanya bisa dibaca atau didebit lewat SAM
-(Secure Access Module) bersertifikat. Aplikasi Android biasa tidak bisa
-melakukannya, dan tidak ada pustaka yang mengubah kenyataan itu.
+**Yang bisa dan tidak bisa dibaca.** Nomor seri kartu (UID) selalu
+terbaca, tetapi itu nomor chip — bukan nomor uang elektronik 16 digit
+yang diminta backend. Untuk nomor itu, `card_number_reader.dart`
+menjalankan urutan EMV standar: SELECT PPSE untuk menanyakan aplikasi
+apa saja yang ada di kartu, SELECT tiap aplikasi, lalu READ RECORD
+sampai ketemu tag `5A` (Application PAN) atau `57` (Track 2). Semua
+perintahnya **hanya membaca**.
 
-Jadi tap berfungsi sebagai **pemicu**. Begitu kartu terbaca, aplikasi
-menanyakan tagihan lewat `POST /transaction/inquiry-billing` dengan
-nomor kartu tetap dari `Env.cardNumber` — nomor yang sesungguhnya tidak
-bisa dibaca. Gagal di situ menahan alur dan membuka lagi pembacaan
-kartu.
+Yang menjawab hanya kartu ISO-DEP/EMV — Flazz keluaran baru dan
+sebagian kartu lain. **e-Money, TapCash, dan Brizzi berbasis MIFARE
+Classic**, yang menyimpan nomor dan saldonya di sektor terkunci kunci
+milik penerbit; tanpa kunci itu atau SAM (Secure Access Module)
+bersertifikat, keduanya tidak terbaca aplikasi Android biasa. Kartu
+seperti itu menghasilkan nomor kosong, dan pembayaran jatuh ke
+`Env.cardNumber`.
 
-Tagihannya lalu dibayar lewat `POST /transaction/payment-billing`.
-Nominalnya diambil dari jawaban inquiry, tidak pernah dari angka yang
-diingat: backend menolak selisih sekecil apa pun sebagai "Amount
-mismatch". Dua field lain — nomor kartu dan `bankLog` — masih nilai
-tetap karena mesin kartunya belum ada.
+**Saldonya tetap tidak dipotong di sini.** Tap berfungsi sebagai
+pemicu: begitu kartu terbaca, aplikasi menanyakan tagihan lewat
+`POST /transaction/inquiry-billing` dengan nomor kartu yang didapat.
+Gagal di situ menahan alur dan membuka lagi pembacaan kartu.
+
+**Dua hal yang masih menghalangi pemakaian sungguhan.** Pertama, tabel
+penerbit di backend baru mengenal empat prefiks percobaan — BIN asli
+dibalas `05`, lihat
+[api-backend.md](api-backend.md#nomor-kartu-dibaca-dari-kartunya-bila-bisa).
+Kedua, pemotongan saldo tetap memerlukan mesin kartu bersertifikat,
+yang juga jadi sumber `bankLog`.
+
+Tagihannya lalu dibayar lewat `POST /transaction/payment-billing`,
+dengan nomor kartu yang sama seperti saat inquiry. Nominalnya diambil
+dari jawaban inquiry, tidak pernah dari angka yang diingat: backend
+menolak selisih sekecil apa pun sebagai "Amount mismatch". `bankLog`,
+`merchantId`, dan `terminalId` masih nilai tetap karena mesin kartunya
+belum ada.
 
 Yang ditampilkan di rincian akhir adalah `ChargingSession.paidAmount`,
 yaitu angka yang benar-benar didebit. Tagihan bisa melebihi total order

@@ -4,6 +4,7 @@ import 'package:kossotrik/data/card_reader_scope.dart';
 import 'package:kossotrik/data/demo_data.dart';
 import 'package:kossotrik/models/charging_session.dart';
 import 'package:kossotrik/pages/charge_box_page.dart';
+import 'package:kossotrik/pages/charging_started_page.dart';
 import 'package:kossotrik/pages/charging_status_page.dart';
 import 'package:kossotrik/theme/app_theme.dart';
 import 'package:kossotrik/widgets/page_scaffold.dart';
@@ -91,7 +92,7 @@ void main() {
       isNull,
     );
 
-    await tester.tap(find.text('10,0 kWh'));
+    await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
     expect(find.text('Rincian Harga'), findsOneWidget);
     await tester.tap(find.text('Lanjutkan'));
@@ -147,6 +148,16 @@ void main() {
     expect(find.text('Simpan Kode Sesi Anda'), findsOneWidget);
     expect(find.text('00'), findsOneWidget);
 
+    // Angkanya harus benar-benar di tengah kartunya. Kartu itu sebuah
+    // Stack, dan anak yang tidak diposisikan menempel ke kiri kalau
+    // lebarnya tidak direntangkan — cacat yang tidak kelihatan dari
+    // teks yang ditemukan, hanya dari letaknya.
+    final card = tester.getRect(find.byType(SessionCodeCard));
+    expect(
+      tester.getCenter(find.text('00')).dx,
+      moreOrLessEquals(card.center.dx, epsilon: 0.5),
+    );
+
     // 10. Pulang ke daftar — satu-satunya jalan keluar dari layar ini.
     //
     // Membuka sesinya lagi butuh konektor yang melapor "sedang
@@ -167,12 +178,12 @@ void main() {
     expect(find.text('Energi tersalur'), findsOneWidget);
 
     // Energi bertambah seiring waktu — inilah "cek status".
-    // Di bawah 1 kWh dipakai tiga desimal agar pergerakannya terlihat.
-    expect(find.text('0,000 kWh'), findsOneWidget);
+    // Angkanya ditampilkan apa adanya, tanpa desimal yang dipaksakan.
+    expect(find.text('0 kWh'), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('0,400 kWh'), findsOneWidget);
+    expect(find.text('0,4 kWh'), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('0,800 kWh'), findsOneWidget);
+    expect(find.text('0,8 kWh'), findsOneWidget);
 
     // Akhiri pengisian -> layar konfirmasi.
     await tester.tap(find.text('Akhiri Pengisian'));
@@ -222,7 +233,7 @@ void main() {
     await tester.tap(find.text('Gun 1'));
     await passSessionCode(tester);
     // Tidak ada pilihan yang tercentang sejak awal.
-    await tester.tap(find.text('10,0 kWh'));
+    await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
@@ -275,7 +286,7 @@ void main() {
     await expectHome('Pilih Nominal');
 
     // Tidak ada pilihan yang tercentang sejak awal.
-    await tester.tap(find.text('10,0 kWh'));
+    await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
@@ -334,7 +345,7 @@ void main() {
     await tester.tap(find.text('Gun 1'));
     await passSessionCode(tester);
     // Tidak ada pilihan yang tercentang sejak awal.
-    await tester.tap(find.text('10,0 kWh'));
+    await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();

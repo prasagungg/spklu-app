@@ -98,7 +98,7 @@ ikut dijalankan sebagai suite.
 
 | Berkas | Menguji |
 |---|---|
-| `formatters_test.dart` | Format rupiah dan kWh, termasuk aturan tiga desimal di bawah 1 kWh |
+| `formatters_test.dart` | Format rupiah dan kWh, termasuk energi tersalur yang dicetak tanpa pembulatan |
 | `charging_session_test.dart` | Biaya pemakaian, dana kembali, breadcrumb, format tanggal |
 | `host_test.dart` | Normalisasi alamat dan pengenalan jaringan privat |
 | `connector_detection_test.dart` | Pemetaan angka `status` ke kelompok UI, penguraian nama/tipe konektor, dan aturan bisa-ditekan |
@@ -123,7 +123,7 @@ ikut dijalankan sebagai suite.
 | `nominal_page_test.dart` | Pilihan dari `/list-kwh`, tidak ada yang terpilih di awal, perhitungan lewat `/count-kwh`, pembuatan order lewat `/transaction/push-order`, dan penanganan kode `16` |
 | `booking_test.dart` | pemesanan konektor saat nozzle dipilih dan penghentian alur saat ditolak, kode sesi yang ditunjukkan sebelum nominal, `reservationId` yang dibawa `push-order` dan pembatalan, serta pelepasan konektor saat alur ditinggalkan |
 | `connector_detection_poll_test.dart` | Polling `manage-sessioncode` tiap detik, tombol start mati selama menunggu, dan status tak dikenal tidak dianggap tercolok |
-| `transaction_history_test.dart` | Penguraian entri riwayat, penyamaran nomor kartu, format tanggal, dan tampilan halamannya |
+| `transaction_history_test.dart` | Riwayat diminta sekali lewat GET tanpa body, penguraian entri beserta asalnya, penyamaran nomor kartu, format tanggal, dan tampilan halamannya |
 | `connector_sheet_test.dart` | Isi charge box diambil sekali saat sheet dibuka, status daftar ditimpa hasilnya, label tiap status, detail kosong tidak mengosongkan sheet, dan tidak ada polling |
 | `charge_box_list_render_test.dart` | Dua charge box dari `/list` keduanya tampil |
 | `charge_box_reload_test.dart` | `/list` dipanggil ulang tiap kembali ke daftar |

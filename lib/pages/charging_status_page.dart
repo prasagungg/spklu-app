@@ -91,7 +91,12 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
       return;
     }
     setState(() {
-      _simulatedKwh = (_simulatedKwh + _kwhPerTick).clamp(0, max).toDouble();
+      // Dibulatkan di sini, bukan saat ditampilkan: angka ini karangan
+      // aplikasi sendiri, sedangkan [formatEnergy] sengaja mencetak
+      // bacaan backend apa adanya. Tanpa pembulatan di sumbernya,
+      // penjumlahan 0,4 yang berulang tampil "1,2000000000000002 kWh".
+      final next = (_simulatedKwh + _kwhPerTick).clamp(0, max).toDouble();
+      _simulatedKwh = (next * 1000).roundToDouble() / 1000;
     });
   }
 

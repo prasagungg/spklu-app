@@ -170,9 +170,9 @@ class _SessionVerificationPageState extends State<SessionVerificationPage> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
-          _DigitBoxes(entered: _entered, length: _length, wrong: _wrong),
+          SessionDigitBoxes(entered: _entered, length: _length, wrong: _wrong),
           const SizedBox(height: 16),
-          _Keypad(onDigit: _press, onErase: _erase),
+          SessionKeypad(onDigit: _press, onErase: _erase),
         ],
       ),
     );
@@ -181,8 +181,9 @@ class _SessionVerificationPageState extends State<SessionVerificationPage> {
 
 /// Dua kotak digit (73:4866). Kotak yang sedang diisi bergaris biru;
 /// yang kosong menampilkan kursor.
-class _DigitBoxes extends StatelessWidget {
-  const _DigitBoxes({
+class SessionDigitBoxes extends StatelessWidget {
+  const SessionDigitBoxes({
+    super.key,
     required this.entered,
     required this.length,
     required this.wrong,
@@ -263,8 +264,12 @@ class _DigitBox extends StatelessWidget {
 }
 
 /// Keypad 73:4878 — tiga baris angka, lalu 0 dan tombol hapus.
-class _Keypad extends StatelessWidget {
-  const _Keypad({required this.onDigit, required this.onErase});
+class SessionKeypad extends StatelessWidget {
+  const SessionKeypad({
+    super.key,
+    required this.onDigit,
+    required this.onErase,
+  });
 
   final ValueChanged<String> onDigit;
   final VoidCallback onErase;

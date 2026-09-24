@@ -21,6 +21,7 @@ class PageScaffold extends StatelessWidget {
     this.title,
     this.subtitle,
     this.titleAlign = TextAlign.start,
+    this.titleTrailing,
     this.headerAction,
     this.headerExtra,
     this.isHome = false,
@@ -37,6 +38,11 @@ class PageScaffold extends StatelessWidget {
   final String? title;
   final String? subtitle;
   final TextAlign titleAlign;
+
+  /// Elemen di ujung kanan baris judul, mis. pil hitung mundur kecil
+  /// (204:4690). Berbeda dari [headerExtra], yang menempati barisnya
+  /// sendiri di bawah subjudul.
+  final Widget? titleTrailing;
 
   /// Mengganti tombol bawaan di ujung kanan mobile header.
   final Widget? headerAction;
@@ -122,13 +128,17 @@ class PageScaffold extends StatelessWidget {
                             : CrossAxisAlignment.start,
                         children: [
                           if (title != null)
-                            SizedBox(
-                              width: double.infinity,
-                              child: Text(
-                                title!,
-                                textAlign: titleAlign,
-                                style: AppTheme.pageTitle,
-                              ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    title!,
+                                    textAlign: titleAlign,
+                                    style: AppTheme.pageTitle,
+                                  ),
+                                ),
+                                ?titleTrailing,
+                              ],
                             ),
                           if (subtitle != null) ...[
                             const SizedBox(height: 4),

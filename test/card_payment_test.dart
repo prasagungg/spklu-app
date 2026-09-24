@@ -181,8 +181,74 @@ void main() {
         'cardNumber': Env.cardNumber,
         // Wajib; tanpa itu backend membalas "Missing Field: bankLog".
         'bankLog': Env.bankLog,
+        // Mesin mana yang menagih. Nilainya masih sementara, tetapi
+        // fieldnya tetap harus ikut terkirim.
+        'merchantId': Env.merchantId,
+        'terminalId': Env.terminalId,
       });
       expect(find.byType(PaymentSuccessPage), findsOneWidget);
+    });
+
+    /// Konektor yang tarifnya belum diatur dihargai nol sampai ke
+    /// inquiry. Mengirimkannya sebagai `amount` dibalas "Missing Field:
+    /// amount" — pesan yang menyesatkan.
+    testWidgets('tagihan nol dijelaskan, bukan dikirim ke pembayaran',
+        (tester) async {
+      final reader = FakeCardReader();
+      final billing = _Billing(totalAmount: 0);
+      await _pumpOnline(tester, reader, billing);
+
+      reader.tap();
+      await settleNetwork(tester);
+
+      expect(
+        billing.requests.map((r) => r.path),
+        isNot(contains('/transaction/payment-billing')),
+      );
+      expect(find.byType(PaymentSuccessPage), findsNothing);
+      expect(
+        find.textContaining('tarif konektor ini belum diatur'),
+        findsOneWidget,
+      );
+    });
+
+    /// Kartu yang mengungkapkan nomornya dipakai apa adanya; yang
+    /// tidak — MIFARE Classic seperti e-Money — jatuh ke nomor dari
+    /// konfigurasi.
+    testWidgets('nomor dari kartu dipakai bila kartunya membukanya',
+        (tester) async {
+      final reader = FakeCardReader();
+      final billing = _Billing();
+      await _pumpOnline(tester, reader, billing);
+
+      reader.tap(cardNumber: '6019213456789012');
+      await settleNetwork(tester);
+
+      for (final path in [
+        '/transaction/inquiry-billing',
+        '/transaction/payment-billing',
+      ]) {
+        final call = billing.requests.firstWhere((r) => r.path == path);
+        expect(
+          (call.data as Map)['cardNumber'],
+          '6019213456789012',
+          reason: path,
+        );
+      }
+    });
+
+    testWidgets('kartu tanpa nomor jatuh ke nomor konfigurasi',
+        (tester) async {
+      final reader = FakeCardReader();
+      final billing = _Billing();
+      await _pumpOnline(tester, reader, billing);
+
+      reader.tap();
+      await settleNetwork(tester);
+
+      final call = billing.requests
+          .firstWhere((r) => r.path == '/transaction/inquiry-billing');
+      expect((call.data as Map)['cardNumber'], Env.cardNumber);
     });
 
     testWidgets('tagihan ditanyakan lebih dulu, baru dibayar',

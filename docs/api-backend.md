@@ -126,19 +126,26 @@ Catatan:
   inilah yang menentukan kartunya bisa ditekan atau tidak.
 - `connectorTotal` dipakai untuk label "2 Konektor" bila daftar
   konektornya ternyata tidak lengkap.
-- **Angka `status` pada konektor** menggambarkan perjalanan satu sesi:
+- **Angka `status` pada konektor** menyebut keadaan konektor itu:
 
-  | `status` | Arti | `ConnectorStatus` |
-  |---|---|---|
-  | `0` | Sedang dipesan, belum dibayar | `reserved` |
-  | `1` | Belum dibayar atau masih bisa dipakai | `available` |
-  | `2` | Sudah dibayar, menunggu konektor dihubungkan | `preparing` |
-  | `3` | Sedang mengisi | `inUse` |
-  | `4` | Pengisian selesai | `finished` |
-  | lainnya | Tidak dikenal | `unavailable` |
+  | `status` | Arti | `ConnectorStatus` | Bisa ditekan |
+  |---|---|---|---|
+  | `0` | Sudah dipesan, belum dibeli | `reserved` | ya |
+  | `1` | Tersedia | `available` | ya |
+  | `2` | Sedang digunakan | `inUse` | ya |
+  | `3` | Menunggu pembayaran | `awaitingPayment` | ya |
+  | `4` | Tidak tersedia | `unavailable` | tidak |
+  | lainnya | Tidak dikenal | `unavailable` | tidak |
 
-  Seluruh aplikasi menafsirkannya lewat `lib/models/backend_status.dart`
-  saja, jadi perubahan kosakata cukup diikuti di satu tempat.
+  Seluruh aplikasi menafsirkannya lewat
+  `lib/models/connector_status_code.dart` saja, jadi perubahan kosakata
+  cukup diikuti di satu tempat.
+
+  **Kosakata ini berbeda dari `statusProcess`.** Angka yang sama berarti
+  hal yang berbeda: `3` di sini "menunggu pembayaran", sedangkan pada
+  `manage-sessioncode` dan `ongoing-kwh` `3` berarti "sedang mengisi".
+  Keduanya sengaja dipisah — `lib/models/backend_status.dart` memegang
+  kosakata tahap transaksi.
 - **Angka `status` di tingkat charge box tidak dipakai.** Keempat angka
   di atas menggambarkan keadaan sesi pada satu konektor; untuk charge
   box yang menentukan adalah `isActive`.
@@ -147,10 +154,9 @@ Catatan:
 - **Tidak ada objek `session`.** Endpoint ini tidak membawa kemajuan
   sesi yang sedang berjalan; angka kWh selalu datang dari
   `ongoing-kwh`.
-- **Status `2` tidak berarti kabel sudah tercolok** — artinya pengguna
-  sedang *diminta* menghubungkannya. Yang memastikan kabel terpasang
-  adalah `manage-sessioncode` yang dipanggil tiap detik di halaman
-  Hubungkan Konektor.
+- **Tidak satu pun angka itu menjawab "kabelnya sudah tercolok?"** —
+  yang melaporkan keadaan fisik konektornya adalah
+  `POST /check-status-connector` dengan status OCPP-nya.
 - **Nomor charge box tidak dikirim backend.** Urutan tampil (01, 02, …)
   diambil dari posisi di daftar.
 - `chargeBoxes` kosong adalah kondisi normal dan menghasilkan daftar
@@ -200,6 +206,64 @@ Detail yang gagal diambil, atau yang datang tanpa satu pun konektor,
 memakai data dari daftar apa adanya. Mengosongkan sheet karena satu
 jawaban aneh jauh lebih merugikan daripada menampilkan data yang sedikit
 basi.
+## `POST /check-status-connector`
+
+Status OCPP satu konektor — inilah yang tahu kabelnya sudah tercolok
+atau belum.
+
+```json
+{ "chargeBoxId": "CB-SMR-01", "connectorId": "1" }
+```
+
+```json
+{
+  "responseCode": "00", "responseMessage": "Success",
+  "data": {
+    "chargeBoxId": "CB-SMR-01",
+    "chargeboxName": "Kempower Satellite 200 kW",
+    "connectorName": "Gun 1",
+    "connectorId": "1",
+    "connectorStatus": "Available"
+  }
+}
+```
+
+### Kosakata `connectorStatus`
+
+Istilah OCPP 1.6 apa adanya, disalin ke `lib/models/ocpp_status.dart`:
+
+| Status | Arti | Dianggap tercolok |
+|---|---|---|
+| `Available` | Bebas, kabel belum terpasang | tidak |
+| `Preparing` | **Kabel sudah terpasang**, siap dimulai | ya |
+| `Charging` | Sedang mengisi | ya |
+| `SuspendedEVSE` | Tertahan dari sisi charger | ya |
+| `SuspendedEV` | Tertahan dari sisi kendaraan | ya |
+| `Finishing` | Sesi selesai, kabel biasanya masih terpasang | ya |
+| `Reserved` | Dipesan untuk orang lain | tidak |
+| `Unavailable` | Sengaja dimatikan operator | tidak |
+| `Faulted` | Charger melaporkan gangguan | tidak |
+
+Status yang **tidak dikenal tidak dianggap tercolok**: menebaknya akan
+mengirim perintah start yang pasti ditolak charger.
+
+### Dipakai halaman Hubungkan Konektor
+
+Di-polling tiap detik sampai statusnya `Preparing`. Selama belum,
+tombol "Mulai Pengisian" tetap mati. Inilah deteksi kabel tercolok yang
+sungguhan — sebelumnya halaman itu menebak dari `statusProcess` milik
+`manage-sessioncode`, yang menggambarkan tahap transaksi, bukan keadaan
+fisik konektornya.
+
+`Faulted` dan `Unavailable` disebut apa adanya di layar — charger
+seperti itu tidak akan pernah melaporkan `Preparing`, jadi menyuruh
+pengguna menunggu hanya membuang waktunya.
+
+Kedua field permintaannya wajib; tanpa `connectorId` dibalas
+`responseCode` `07` "Missing Field: connectorId". Terbukti saat
+pengujian: ACMP_UAT konektor 2 dan 4 membalas `Available`, ACMAX_UAT
+konektor 1 membalas `Preparing`.
+
 ## `POST /booked-connector`
 
 Memesan konektor atas nama pengguna yang sedang memakai unit ini.
@@ -356,7 +420,7 @@ sekali per penekanan, bukan berkala.
 **Aplikasi tidak menghitung apa pun.** Semua angka ditampilkan apa
 adanya, termasuk tidak mengalikan `kwh` dengan `rpPerKwh` untuk membuat
 baris "Biaya Listrik": angka turunan yang berselisih dengan `rpTotal`
-hanya membingungkan. Yang ditampilkan adalah tarif per kWh, PPJ-TL,
+hanya membingungkan. Yang ditampilkan adalah tarif per kWh, PBJT-TL,
 PPN, lalu biaya tambahan yang tidak nol, dan `rpTotal` sebagai Total
 Pembayaran.
 
@@ -390,18 +454,25 @@ Dipanggil saat "Lanjutkan" ditekan di halaman Pilih Nominal.
   "responseCode": "00",
   "responseMessage": "Success",
   "data": {
-    "orderId": "ADWTJU5D56QGZNXTTNOX9YZFTN",
-    "chargeBoxId": "CB-SMR-01",
-    "chargeBoxName": "Kempower Satellite 200 kW",
-    "connectorName": "Gun 1", "connectorId": "1",
-    "partnerReference": "81067", "sessionCode": "29",
-    "sessionExpiredTime": "2026-09-22T04:22:14Z",
-    "kwh": 10, "rpPerKwh": 2466, "rpPpj": 740, "rpPpn": 0,
-    "rpTotal": 25400, "rpLayanan": 0, "rpMaterai": 0,
-    "rpKwh": 24660, "idleFee": 0, "serviceFee": 0
+    "orderId": "VB4LY6CAI8Z8C25QHMY4MIRJUC",
+    "chargeboxId": "ACMP_UAT", "chargeboxName": "ACMP UAT",
+    "connectorName": "DCCT 200 kW", "connectorId": "3",
+    "partnerReference": "81067", "sessionCode": "65",
+    "reservationId": "GiutWg7co_CaODPntGi3c",
+    "connectorStatus": "R1",
+    "createdDate": "2026-09-24T02:38:44Z",
+    "sessionExpired": "2026-09-24T02:43:44Z",
+    "kwh": 10, "rpPerKwh": 0, "rpPpj": 0, "rpPpn": 0,
+    "rpTotal": 2000, "rpMaterai": 0, "rpKwh": 0,
+    "idleFee": 0, "serviceFee": 2000
   }
 }
 ```
+
+Jawabannya **mengeja `chargeboxId` dan `chargeboxName` dengan b kecil**,
+dan menamai batas waktunya `sessionExpired` — sebelumnya
+`sessionExpiredTime`. `Order.fromJson` menerima kedua ejaan itu: yang
+salah eja tidak memunculkan error, hanya diam-diam kosong.
 
 Dua hal pada permintaannya yang mudah terlewat:
 
@@ -428,7 +499,14 @@ konsisten — 24.660 + 740 = 25.400.
 ### Yang diamati saat pengujian
 
 - **Hanya satu order tertunda per konektor.** Push kedua dibalas
-  `responseCode` `16` "Processing Another Request" (HTTP 409).
+  `responseCode` `16` "Processing Another Request" (HTTP 409). Order
+  yang ditinggalkan mengunci konektornya sampai kedaluwarsa —
+  membatalkan pemesanannya tidak melepas ordernya.
+- **Batas waktunya hanya lima menit** pada playground: `createdDate`
+  02:38:44 dengan `sessionExpired` 02:43:44. Lewat dari itu tagihannya
+  **tetap bisa ditanyakan dengan nominal yang sama** — yang hilang
+  lebih dulu adalah pemesanannya, yang dibalas `26` "Reservation Not
+  Found" saat dibatalkan.
 - `orderId` baru setiap order; `partnerReference` tetap pada playground.
 - `sessionExpiredTime` menyebut kapan ordernya kedaluwarsa. Lewat dari
   itu backend membalas `21` — baik saat menagih maupun saat memulai
@@ -466,12 +544,29 @@ Dipanggil begitu kartu ditempelkan di halaman Pembayaran.
 }
 ```
 
-### Nomor kartu masih tetap
+### Nomor kartu dibaca dari kartunya bila bisa
 
-NFC hanya bisa membaca nomor seri kartu, bukan nomor uang elektroniknya
-— lihat [arsitektur.md](arsitektur.md#pembayaran-kartu). Yang dikirim
-karena itu `Env.cardNumber`, bisa diganti lewat
-`--dart-define=SPKLU_CARD_NUMBER=…`.
+Kartu yang menjawab perintah EMV — Flazz keluaran baru dan kartu
+ISO-DEP lain — nomornya dibaca langsung dari kartu dan itulah yang
+dikirim. Kartu MIFARE Classic seperti e-Money, TapCash, dan Brizzi
+mengunci nomornya di sektor milik penerbit, dan untuk kartu itu yang
+dikirim tetap `Env.cardNumber`
+(`--dart-define=SPKLU_CARD_NUMBER=…`). Lihat
+[arsitektur.md](arsitektur.md#pembayaran-kartu).
+
+**Nomor asli belum diterima backend.** Tabel penerbitnya baru mengenal
+empat prefiks percobaan; BIN sungguhan dibalas `05`. Terbukti saat
+pengujian:
+
+| Nomor | Jawaban |
+|---|---|
+| `0123…` | `21` — prefiksnya lolos, ordernya yang tidak ada |
+| `6019 21…` (Flazz) | `05` E-Money Provider Is Not Supported |
+| `6032 98…` (e-Money) | `05` |
+| `6013 50…` (TapCash) | `05` |
+
+Jadi selama tabel itu belum diisi BIN asli, kartu yang nomornya
+berhasil dibaca justru akan ditolak saat menagih.
 
 Empat digit pertamanya menentukan penerbit yang dikenali backend:
 
@@ -494,8 +589,15 @@ Bawaannya `0123456789012345` (EM-BNI).
 - Panjang nomor tidak diperiksa; yang penting prefiksnya.
 - Order yang tidak ditemukan dibalas `responseCode` `21`, "Transaction
   Not Found" (404).
-- **`sessionCode` di sini dikirim kosong.** Yang berlaku adalah kode
-  dari pemesanan, dan aplikasi tidak menimpanya dengan nilai dari sini.
+- **Nominal nol berarti tarif konektornya belum diatur.** Bukan soal
+  kedaluwarsa: order pada konektor tanpa tarif dibalas `00` dengan
+  `amount` dan `totalAmount` `0`, dan `POST /count-kwh` untuk konektor
+  itu pun sudah mengembalikan `rpTotal: 0` sejak halaman Pilih Nominal.
+  Terbukti di playground: ACMP_UAT konektor 4 dihargai `0`, konektor 2
+  dihargai `667` untuk 5 kWh yang sama.
+- **`sessionCode` dan `reservationId` ikut dikirim.** Kode sesinya sama
+  dengan milik pemesanan; aplikasi tidak menimpanya dengan nilai dari
+  sini.
 
 Kegagalan menahan alur: pengguna tidak dibiarkan maju ke "Pembayaran
 Berhasil" untuk tagihan yang tidak pernah terverifikasi. Sesi NFC dibuka
@@ -509,7 +611,8 @@ inquiry, dalam rangkaian yang sama saat kartu terdeteksi.
 ```json
 { "orderId": "F3YYZCWLRC4FPR1YDZ7F1A30ID", "amount": 145670,
   "cardNumber": "0123456789012345",
-  "bankLog": "1231408098812345678100500" }
+  "bankLog": "1231408098812345678100500",
+  "merchantId": "000000000000001", "terminalId": "00000001" }
 ```
 
 Jawabannya sama dengan inquiry, ditambah `bankLog` sebagai bukti
@@ -541,6 +644,30 @@ jadi tagihan memang bisa berbeda dari total order. Yang ditampilkan di
 rincian akhir adalah angka yang benar-benar didebit
 (`ChargingSession.paidAmount`), bukan total order.
 
+### `amount` nol dibalas "Missing Field: amount"
+
+Nilai `0` dianggap tidak ada, dan balasannya `07` "Missing Field:
+amount" — pesan yang menyesatkan, karena fieldnya jelas terkirim.
+Penyebab sebenarnya ada jauh sebelumnya: konektor yang tarifnya belum
+diatur membuat `count-kwh`, order, dan inquiry sama-sama bernilai nol.
+
+Aplikasi karena itu berhenti **dua kali**. Halaman Pilih Nominal
+mematikan "Lanjutkan" untuk total nol dan mengatakan alasannya, dan
+`CardPaymentPage` tetap memeriksa `totalAmount` sekali lagi sebelum
+menagih — sisi pengaman kalau tarifnya berubah di tengah alur.
+
+### `merchantId` dan `terminalId`
+
+Menyebut mesin mana yang menagih. Keduanya **masih nilai sementara** —
+mesin kartunya belum ada, jadi belum ada sumber yang sebenarnya, sama
+seperti `cardNumber` dan `bankLog`. Diganti lewat
+`--dart-define=SPKLU_MERCHANT_ID=…` dan `SPKLU_TERMINAL_ID=…` begitu
+nomor aslinya diketahui.
+
+Backend menerimanya tanpa keberatan: permintaan dengan kedua field itu
+dan order karangan dibalas `21` "Transaction Not Found" — gagal karena
+ordernya, bukan karena bentuk bodynya.
+
 ### `bankLog` wajib
 
 Tanpa field itu dibalas `responseCode` `07`, "Missing Field: bankLog".
@@ -559,13 +686,19 @@ Isinya bukti transaksi dari mesin kartu; masih nilai tetap dari
 - Order kedaluwarsa cukup cepat: order yang dibuat beberapa menit
   sebelumnya sudah dibalas `21` "Transaction Not Found".
 
-## `POST /transaction/history-transaction`
+## `GET /transaction/history-transaction`
 
-Transaksi yang pernah terjadi pada sebuah konektor, terbaru lebih dulu.
-Dipanggil saat tombol riwayat di daftar konektor ditekan.
+Transaksi yang pernah tercatat, terbaru lebih dulu. Dipanggil saat
+tombol riwayat di header halaman Pilih Charge Box ditekan.
 
-```json
-{ "chargeBoxId": "CB-SMR-01", "connectorId": "1" }
+**Tanpa body dan tanpa query.** Seperti GET lainnya, tanda tangannya
+dihitung dengan body kosong:
+
+```sh
+curl --location 'localhost:8080/transaction/history-transaction' \
+  --header 'client-id: edge' \
+  --header 'timestamp: 2026-09-24T05:31:00Z' \
+  --header 'signature: dd2ca39f…'
 ```
 
 ```json
@@ -579,20 +712,104 @@ Dipanggil saat tombol riwayat di daftar konektor ditekan.
 }
 ```
 
-Tiap entri hanya membawa nomor order, kartu, nominal, dan waktu — nama
-charge box serta konektornya sudah diketahui dari tempat riwayat itu
-dibuka.
+### Dulu POST per konektor
+
+Endpoint ini sebelumnya sebuah POST yang melayani **satu konektor**
+sekali panggil dan mewajibkan `chargeBoxId` serta `connectorId` —
+tanpa salah satunya dibalas `07` "Missing Field". Tidak ada endpoint
+yang mengembalikan riwayat satu lokasi sekaligus, jadi halaman riwayat
+menanyakan tiap konektor yang sedang ditampilkan daftar, berbarengan,
+lalu menggabungkan jawabannya.
+
+Sekarang satu panggilan mengembalikan semuanya, dan penggabungan itu
+hilang: yang tersisa di halaman riwayat hanya mengurutkan terbaru
+lebih dulu.
+
+### Asal tiap entri
+
+Karena permintaannya tidak lagi menyebut charge box dan konektor,
+**asal tiap entri harus datang dari entrinya sendiri**.
+`TransactionHistoryEntry` membaca `chargeboxId`, `chargeboxName`,
+`connectorId`, dan `connectorName` — kedua ejaan b besar/kecil
+diterima, dan `connectorId` diterima sebagai angka maupun teks, seperti
+di `detail-history-transaction`.
+
+Nomor urut ("01", "02") dan daya charge box tidak ada di jawaban ini —
+keduanya hanya dikirim `POST /list-chargerbox`. Halaman riwayat karena
+itu mencocokkan `chargeboxId` entri ke daftar charge box yang sedang
+ditampilkan, dan memakai nama dari entrinya sendiri bila tidak
+ditemukan — riwayat charge box yang sudah dilepas dari lokasi tetap
+terlihat, hanya tanpa nomor urut.
 
 `pspId` dan `cardNumber` bisa kosong: order yang tidak pernah sampai
 dibayar tetap tercatat. Nomor kartunya **tidak pernah ditampilkan
 utuh** — `TransactionHistoryEntry.maskedCard` menyisakan empat digit
 pertama dan terakhir, "6012 **** **** 7890".
 
+## `POST /transaction/detail-history-transaction`
+
+Rincian satu transaksi di riwayat.
+
+```json
+{ "orderId": "U33UHB2TQQ4LV274UCXTEX6IVS", "sessionCode": "30" }
+```
+
+```json
+{
+  "response_code": "00",
+  "response_message": "Success",
+  "data": {
+    "chargeboxId": "ACMP_UAT", "chargeboxName": "ACMP UAT",
+    "connectorId": 2, "connectorName": "AC 22 kW",
+    "orderId": "U33UHB2TQQ4LV274UCXTEX6IVS",
+    "namaSpklu": "SPKLU PLN PUSAT",
+    "pspId": "EM-BNI", "cardNumber": "012••••••••••345",
+    "status": 0, "tglCatat": "2026-09-24T04:08:39Z",
+    "kwhPesan": 10, "kwhPakai": 0, "sisaKwh": null,
+    "rpPesan": 18775, "rpPakai": 0, "rpSisa": null,
+    "hargaKwh": 1710, "rpLayanan": 1332.2, "idleFee": 0
+  }
+}
+```
+
+### Amplopnya snake_case — tapi hanya saat berhasil
+
+Satu-satunya endpoint yang membalas `response_code`/`response_message`;
+sisanya camelCase. Yang membingungkan, **kegagalannya tetap
+camelCase**: kode sesi yang salah dibalas
+`{"responseCode":"21","responseMessage":"Transaction Not Found"}`.
+
+`_unwrap` di repository karena itu menerima kedua ejaan. Kalau tidak,
+jawaban sukses endpoint ini akan terbaca sebagai amplop tanpa kode dan
+ditolak aplikasi sendiri.
+
+### `sessionCode` wajib
+
+Tanpa itu dibalas `07` "Missing Field: sessionCode", dan kode yang tidak
+cocok dibalas `21`. Inilah yang membedakan daftar riwayat dari
+rinciannya: daftarnya boleh dilihat siapa saja yang berdiri di depan
+unit — isinya hanya waktu, nominal, dan nomor kartu yang disamarkan —
+sedangkan rinciannya hanya untuk pemegang kode sesi.
+
+### Yang diamati saat pengujian
+
+- **Nomor kartunya sudah disamarkan backend**: "012••••••••••345",
+  dengan titik tengah, bukan bintang. Ditampilkan apa adanya.
+- `connectorId` di sini berupa **angka** (`2`), bukan teks seperti di
+  endpoint lain.
+- Banyak field bernilai null pada transaksi yang tidak sampai selesai —
+  `sisaKwh`, `rpSisa`, `chargeDuration`, `rpAdmin`, `rpMaterai`,
+  `firstSoc`. Penguraiannya karena itu longgar dan menganggapnya nol.
+
 ## `POST /manage-sessioncode`
 
 ```json
-{ "chargeBoxId": "CB-SMR-01", "connectorId": "1", "sessionCode": "29" }
+{ "chargeboxId": "CB-SMR-01", "connectorId": "1", "sessionCode": "29" }
 ```
+
+Endpoint ini mengeja `chargeboxId` dengan b kecil. Playground menerima
+kedua ejaan — terbukti saat pengujian, keduanya dibalas `00` untuk kode
+yang sama — tetapi yang dikirim mengikuti spesifikasinya.
 
 ```json
 {
@@ -618,19 +835,17 @@ bisa — dan tidak boleh — memutuskannya sendiri. Sebelum endpoint ini
 ada, verifikasi membandingkan dengan `SPKLU_SESSION_PIN` yang tetap,
 sehingga kode yang ditunjukkan di layar sebenarnya tidak membuka apa-apa.
 
-### Memantau nozzle
+### Tahap transaksi
 
-`statusProcess` memakai kosakata angka yang sama dengan status konektor:
-`1` belum bayar, `2` menunggu konektor dihubungkan, `3` sedang mengisi,
-`4` selesai.
+`statusProcess` menyebut tahap transaksinya: `0` baru dipesan dan
+ordernya belum ada, `1` belum bayar, `2` menunggu konektor dihubungkan,
+`3` sedang mengisi, `4` selesai. Terbukti saat pengujian: pemesanan yang
+baru dibuat dibalas `statusProcess: 0` dengan `orderId: null`.
 
-Halaman Hubungkan Konektor memanggil endpoint ini **tiap detik** dan
-menunggu angkanya berpindah dari `2`. Selama masih `2`, tombol "Mulai
-Pengisian" tetap mati. Inilah deteksi kabel tercolok yang sebelumnya
-tidak ada penggantinya sejak `/list` diganti.
-
-Angka yang **tidak dikenal tidak dianggap tercolok**. Menebaknya akan
-mengirim perintah start yang pasti ditolak charger.
+**Angkanya bukan kosakata yang sama dengan `status` milik konektor** di
+daftar dan detail charge box — lihat tabel di `POST /list-chargerbox`.
+Dan bukan pula keadaan fisik konektornya: yang tahu kabel sudah tercolok
+atau belum adalah `POST /check-status-connector`.
 
 ### Ejaan `chargeBoxId`
 
@@ -687,18 +902,30 @@ Kemajuan pengisian. Di-polling tiap detik oleh halaman Sedang Mengisi.
 {
   "responseCode": "00", "responseMessage": "Success",
   "data": {
-    "orderId": "F3YYZCWLRC4FPR1YDZ7F1A30ID",
-    "chargeBoxId": "CB-SMR-01",
-    "chargeBoxName": "Kempower Satellite 200 kW",
-    "connectorName": "Gun 2",
+    "orderId": "U33UHB2TQQ4LV274UCXTEX6IVS",
+    "reservationId": "k4sTm8G-CuHinqgkFsZDY", "sessionCode": "30",
+    "chargeboxId": "ACMP_UAT", "chargeboxName": "ACMP UAT",
+    "connectorName": "AC 22 kW",
     "orderKwh": 10, "charged": 0, "remaining": 10,
-    "status": 2, "lastSoc": null, "firstSoc": null,
+    "status": 2, "last_soc": null, "first_soc": null,
     "power": 0, "chargeDurationS": 0, "chargeDurationM": 0,
-    "estRemainingTime": 0, "powerActiveImport": 0,
-    "estimatedCharged": 0
+    "estRemainingTime": 0, "power_active_import": 0,
+    "estimated_charged": 0
   }
 }
 ```
+
+### Ejaannya campur
+
+Empat field memakai snake_case — `first_soc`, `last_soc`,
+`power_active_import`, `estimated_charged` — sedangkan sisanya
+camelCase, dan charge box-nya dieja `chargeboxId` dengan b kecil.
+Ejaannya pernah seluruhnya camelCase; `ChargingProgress.fromJson`
+sekarang menerima keduanya. Field yang salah eja tidak memunculkan
+error, hanya diam-diam bernilai nol — persis gejala "angkanya tidak
+nambah-nambah".
+
+`connectorId` sudah tidak dikirim endpoint ini.
 
 Dua hal yang berbeda dari `GET /progress` yang dipakai sebelum backend
 ini:
@@ -713,6 +940,18 @@ ini:
 `firstSoc` dan `lastSoc` adalah daya baterai kendaraan dalam persen,
 dan bisa null bila charger tidak melaporkannya.
 
+### `charged` nol bukan berarti salah baca
+
+Order yang sudah dibayar tetapi pengisiannya belum benar-benar jalan
+membalas `status: 2` dengan `charged: 0`, dan angkanya memang tidak
+bergerak. Terbukti saat pengujian: `POST /transaction/charging/start`
+untuk charge box yang tidak terhubung dibalas `31` "Charging station
+ACMP_UAT is not connected", sehingga sesinya tidak pernah mulai
+menyalurkan energi.
+
+Jadi sebelum menuduh penguraian, periksa `status` pada jawaban yang sama:
+`3` berarti benar-benar sedang mengisi.
+
 ### Sesi tanpa order belum bisa dipantau
 
 Ketiga endpoint ini berkunci `orderId`. Sesi yang dilanjutkan dari
@@ -721,6 +960,60 @@ tidak membawa orderId kecuali `manage-sessioncode` menyebutkannya, jadi
 kemajuannya tidak bisa ditanyakan dan pengisiannya tidak bisa
 dihentikan lewat aplikasi. Halaman status jatuh ke simulasi lokal untuk
 sesi seperti itu.
+
+## `POST /transaction/charging/detail`
+
+Rincian akhir satu order — sumber angka halaman "Pengisian Selesai".
+
+```json
+{ "orderId": "U33UHB2TQQ4LV274UCXTEX6IVS" }
+```
+
+```json
+{
+  "responseCode": "00", "responseMessage": "Success",
+  "data": {
+    "orderId": "U33UHB2TQQ4LV274UCXTEX6IVS",
+    "chargeboxId": "ACMP_UAT", "chargeboxName": "ACMP UAT",
+    "connectorName": "AC 22 kW", "connectorId": "2",
+    "status": 2, "kwhPesan": 10, "kwhPakai": 0, "sisaKwh": 10,
+    "rpPesan": 18775, "rpPakai": 0, "rpSisa": 18775,
+    "hargaKwh": 1710, "rpPpjPesan": 342, "rpPpjPakai": 0,
+    "chargeDuration": "0", "chargeDurationInMinutes": "0",
+    "rpAdmin": 0, "rpLayanan": 1332.2, "rpMaterai": null,
+    "firstSoc": null, "lastSoc": null, "power": null,
+    "idleFee": 0, "serviceFee": 1332.2,
+    "namaSpklu": "SPKLU PLN PUSAT",
+    "alamatSpklu": "Jl. M.I. Ridwan Rais No.1, Gambir",
+    "tglCatat": "2026-09-24T04:08:39Z"
+  }
+}
+```
+
+Empat angka yang dipakai layar penutup:
+
+| Field | Ditampilkan sebagai |
+|---|---|
+| `kwhPakai` | Energi Tersalur |
+| `rpPesan` | Pembayaran Awal |
+| `rpPakai` | Total Pemakaian |
+| `rpSisa` | Sisa Pembayaran |
+
+Sebelumnya ketiga angka rupiah itu **dihitung aplikasi** dari nominal
+yang dibayar dan energi yang tersalur, dengan pembulatan ke bawah per
+seribu rupiah. Hitungan seperti itu tidak pernah bisa dijamin sama
+dengan pembukuan backend, jadi sekarang angkanya diambil apa adanya.
+
+### Penguraiannya sengaja longgar
+
+`chargeDuration` dan `chargeDurationInMinutes` dikirim sebagai **teks**
+("0"), dan `rpMaterai`, `rpDiskon`, `firstSoc`, `lastSoc`, `power`,
+`rpJaminan` bisa **null**. Charge box-nya juga dieja dengan b kecil.
+Semuanya dibaca lewat satu jalan yang menerima angka maupun teks.
+
+Amplop tanpa `data` terurai menjadi nol semua; halaman penutup
+mengabaikannya dan tetap menampilkan angka dari layar pemantauan,
+supaya satu jawaban aneh tidak menghapus angka yang sudah benar.
 
 ## Kode `responseCode`
 
@@ -816,8 +1109,12 @@ Saat debug, `ApiLogger` mencetak satu baris per panggilan:
 [API] ✗ 503 POST /transaction/charging/start (118ms) code=31 Charging station CB-SMR-01 is not connected
 ```
 
-Body dipotong di 400 karakter supaya response `/list-chargerbox` yang
-panjang tidak membanjiri konsol. Log otomatis mati di build release;
+Body dipotong di 1.200 karakter supaya response `/list-chargerbox` yang
+panjang tidak membanjiri konsol — cukup untuk memuat jawaban
+`ongoing-kwh` utuh. Batasnya dulu 400, dan justru memotong tepat di
+angka yang paling ingin dilihat saat menelusuri pengisian. Inspektur di
+dalam aplikasi menyimpan sampai 20.000 karakter, jadi jawaban panjang
+tetap bisa dibaca lengkap di sana. Log otomatis mati di build release;
 bisa dimatikan lebih awal lewat `--dart-define=SPKLU_API_LOG=false`.
 
 Seluruhnya juga tercatat di dalam aplikasi — lihat

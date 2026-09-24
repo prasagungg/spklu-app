@@ -13,10 +13,12 @@ import 'package:flutter/foundation.dart';
 /// [API] ✗ 503 POST /start (118ms) code=12 Charging station SIM-456 is not connected
 /// ```
 class ApiLogger extends Interceptor {
-  ApiLogger({this.maxBodyChars = 400});
+  ApiLogger({this.maxBodyChars = 1200});
 
-  /// Body dipotong supaya response `/list` yang panjang tidak
-  /// membanjiri konsol.
+  /// Body dipotong supaya response daftar charge box yang panjang tidak
+  /// membanjiri konsol. Batasnya cukup untuk memuat jawaban
+  /// `ongoing-kwh` utuh — dulu 400, dan angkanya justru terpotong di
+  /// tempat yang paling ingin dilihat saat menelusuri pengisian.
   final int maxBodyChars;
 
   static const _startKey = 'api_logger_start';

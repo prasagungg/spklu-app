@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kossotrik/config/env.dart';
 import 'package:kossotrik/data/charge_point_repository.dart';
 import 'package:kossotrik/main.dart';
+import 'package:kossotrik/pages/charge_box_page.dart';
 import 'package:kossotrik/services/api_client.dart';
 
 import 'fake_card_reader.dart';
@@ -52,6 +53,35 @@ Map<String, dynamic> _list() => listResponse([
 const _ok = okResponse;
 
 void main() {
+  /// Riwayat dibuka dari header halaman awal, dan seluruhnya datang
+  /// dari satu `GET /transaction/history-transaction` tanpa body.
+  testWidgets('tombol riwayat di halaman awal membuka seluruh riwayat',
+      (tester) async {
+    final recorder = _Recorder(
+      (path) => switch (path) {
+        '/list-chargerbox' => _list(),
+        '/transaction/history-transaction' => historyResponse(),
+        _ => _ok,
+      },
+    );
+    final repo = ChargePointRepository(
+      client: ApiClient.withDio(Dio()..interceptors.add(recorder)),
+    );
+
+    await tester.pumpWidget(SPKLUApp(repository: repo));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(ChargeBoxPage.historyKey));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Riwayat Transaksi'), findsOneWidget);
+
+    final calls = recorder.to('/transaction/history-transaction');
+    expect(calls, hasLength(1));
+    expect(calls.single.method, 'GET');
+    expect(calls.single.data, isNull);
+  });
+
   testWidgets('menekan Mulai Pengisian benar-benar mengirim POST /start',
       (tester) async {
     final recorder = _Recorder(
@@ -60,6 +90,9 @@ void main() {
         '/booked-connector' => bookingResponse(),
         '/detail-chargerbox' => chargeBoxDetailResponse(),
         '/manage-sessioncode' => sessionCodeResponse(),
+        // Kabelnya dianggap sudah terpasang; penungguannya
+        // diuji tersendiri di connector_detection_poll_test.
+        '/check-status-connector' => connectorStatusResponse(),
         '/list-kwh' => kwhOptionsResponse(),
         '/count-kwh' => countKwhResponse(),
         '/transaction/push-order' => pushOrderResponse(),
@@ -96,7 +129,7 @@ void main() {
     await passSessionCode(tester);
 
     // Tidak ada pilihan yang tercentang sejak awal.
-    await tester.tap(find.text('10,0 kWh'));
+    await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
@@ -159,12 +192,15 @@ void main() {
       if (path == '/transaction/charging/start') charging = true;
       if (path == '/detail-chargerbox') {
         return chargeBoxDetailResponse(
-          connectors: [connectorJson(status: charging ? 3 : 1)],
+          connectors: [connectorJson(status: charging ? 2 : 1)],
         );
       }
       if (path == '/list-chargerbox') return _list();
       if (path == '/booked-connector') return bookingResponse();
       if (path == '/manage-sessioncode') return sessionCodeResponse();
+      if (path == '/check-status-connector') {
+        return connectorStatusResponse();
+      }
       if (path == '/list-kwh') return kwhOptionsResponse();
       if (path == '/count-kwh') return countKwhResponse();
       if (path == '/transaction/push-order') return pushOrderResponse();
@@ -201,7 +237,7 @@ void main() {
     await tester.tap(find.text('Gun 1'));
     await passSessionCode(tester);
     // Tidak ada pilihan yang tercentang sejak awal.
-    await tester.tap(find.text('10,0 kWh'));
+    await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
@@ -271,12 +307,15 @@ void main() {
       if (path == '/transaction/charging/start') charging = true;
       if (path == '/detail-chargerbox') {
         return chargeBoxDetailResponse(
-          connectors: [connectorJson(status: charging ? 3 : 1)],
+          connectors: [connectorJson(status: charging ? 2 : 1)],
         );
       }
       if (path == '/list-chargerbox') return _list();
       if (path == '/booked-connector') return bookingResponse();
       if (path == '/manage-sessioncode') return sessionCodeResponse();
+      if (path == '/check-status-connector') {
+        return connectorStatusResponse();
+      }
       if (path == '/list-kwh') return kwhOptionsResponse();
       if (path == '/count-kwh') return countKwhResponse();
       if (path == '/transaction/push-order') return pushOrderResponse();
@@ -322,7 +361,7 @@ void main() {
     await tester.tap(find.text('Gun 1'));
     await passSessionCode(tester);
     // Tidak ada pilihan yang tercentang sejak awal.
-    await tester.tap(find.text('10,0 kWh'));
+    await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();

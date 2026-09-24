@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../models/charge_box.dart';
@@ -41,46 +39,13 @@ class SessionCodePage extends StatefulWidget {
 }
 
 class _SessionCodePageState extends State<SessionCodePage> {
-  /// Dipakai bila backend tidak menyebut batas waktunya.
-  static const _fallbackLimit = Duration(minutes: 10);
-
-  Timer? _ticker;
-  late Duration _remaining = _initialRemaining();
-
-  Duration _initialRemaining() {
-    final expiry = widget.reservation.expiredAt;
-    if (expiry == null) return _fallbackLimit;
-
-    final left = expiry.difference(DateTime.now());
-    return left.isNegative ? Duration.zero : left;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-
-    _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return;
-      if (_remaining.inSeconds <= 0) {
-        timer.cancel();
-        return;
-      }
-      setState(() => _remaining -= const Duration(seconds: 1));
-    });
-  }
-
-  @override
-  void dispose() {
-    _ticker?.cancel();
-    super.dispose();
-  }
-
   void _continue() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => NominalPage(
           chargeBox: widget.chargeBox,
           connector: widget.connector,
+          expiresAt: widget.reservation.expiredAt,
         ),
       ),
     );
@@ -90,7 +55,7 @@ class _SessionCodePageState extends State<SessionCodePage> {
   Widget build(BuildContext context) {
     return PageScaffold(
       backgroundColor: AppColors.pageBackgroundPlain,
-      headerExtra: CountdownPill(remaining: _remaining),
+      headerExtra: ExpiryCountdown(expiresAt: widget.reservation.expiredAt),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [

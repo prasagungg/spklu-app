@@ -35,10 +35,13 @@ class _Recorder extends Interceptor {
               chargeBoxJson(id: 'CB-SMR-01', nama: 'CB-SMR-01'),
             ]),
           '/detail-chargerbox' => chargeBoxDetailResponse(
-              connectors: [connectorJson(status: _charging ? 3 : 1)],
+              connectors: [connectorJson(status: _charging ? 2 : 1)],
             ),
           '/booked-connector' => bookingResponse(accepted: bookingAccepted),
           '/manage-sessioncode' => sessionCodeResponse(),
+          // Kabelnya dianggap sudah terpasang; penungguannya
+          // diuji tersendiri di connector_detection_poll_test.
+          '/check-status-connector' => connectorStatusResponse(),
           '/cancelled-connector' => cancellationResponse(),
           '/list-kwh' => kwhOptionsResponse(),
           '/count-kwh' => countKwhResponse(),
@@ -143,7 +146,7 @@ void main() {
     await passSessionCode(tester);
 
     // Tidak ada pilihan yang tercentang sejak awal.
-    await tester.tap(find.text('10,0 kWh'));
+    await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
@@ -220,7 +223,7 @@ void main() {
       await passSessionCode(tester);
 
       // Tidak ada pilihan yang tercentang sejak awal.
-      await tester.tap(find.text('10,0 kWh'));
+      await tester.tap(find.text('10'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Lanjutkan'));
       await tester.pumpAndSettle();
@@ -243,7 +246,7 @@ void main() {
       await passSessionCode(tester);
 
       // Tidak ada pilihan yang tercentang sejak awal.
-      await tester.tap(find.text('10,0 kWh'));
+      await tester.tap(find.text('10'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Lanjutkan'));
       await tester.pumpAndSettle();
@@ -306,7 +309,7 @@ void main() {
     await _pickConnector(tester, recorder);
     await passSessionCode(tester);
 
-    await tester.tap(find.text('10,0 kWh'));
+    await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
@@ -340,7 +343,7 @@ void main() {
     await _pickConnector(tester, recorder);
     await passSessionCode(tester);
 
-    await tester.tap(find.text('10,0 kWh'));
+    await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lanjutkan'));
     await tester.pumpAndSettle();
@@ -374,7 +377,8 @@ void main() {
     // panggilan terakhir — yaitu verifikasinya.
     final check = recorder.to('/manage-sessioncode').last;
     expect(check.data, {
-      'chargeBoxId': 'CB-SMR-01',
+      // Endpoint ini mengeja charge box dengan b kecil.
+      'chargeboxId': 'CB-SMR-01',
       'connectorId': '1',
       'sessionCode': '29',
     });

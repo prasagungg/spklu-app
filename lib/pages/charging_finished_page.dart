@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../data/charging_scope.dart';
 import '../data/formatters.dart';
+import '../models/charging_detail.dart';
 import '../models/charging_session.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -11,7 +13,16 @@ import '../widgets/primary_button.dart';
 import '../widgets/session_widgets.dart';
 
 /// Frame Figma 73:5171 — "Pengisian Selesai".
-class ChargingFinishedPage extends StatelessWidget {
+///
+/// Angkanya datang dari `POST /transaction/charging/detail`: energi
+/// yang tersalur, nominal yang dibayar, yang terpakai, dan yang
+/// dikembalikan. Aplikasi tidak menghitungnya sendiri — hitungan lokal
+/// tidak pernah bisa dijamin sama dengan pembukuan backend.
+///
+/// Selama rinciannya belum datang, dan bila panggilannya gagal atau
+/// sesinya tidak punya order (mode offline), yang ditampilkan adalah
+/// angka yang sudah dipegang layar sebelumnya.
+class ChargingFinishedPage extends StatefulWidget {
   const ChargingFinishedPage({
     super.key,
     required this.session,
@@ -22,8 +33,57 @@ class ChargingFinishedPage extends StatelessWidget {
   final double energyKwh;
 
   @override
+  State<ChargingFinishedPage> createState() => _ChargingFinishedPageState();
+}
+
+class _ChargingFinishedPageState extends State<ChargingFinishedPage> {
+  ChargingDetail? _detail;
+  bool _asked = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_asked) return;
+    _asked = true;
+
+    final repository = ChargingScope.maybeOf(context)?.repository;
+    final orderId = widget.session.orderId;
+    if (repository == null || orderId.isEmpty) return;
+
+    () async {
+      try {
+        final detail = await repository.fetchChargingDetail(orderId: orderId);
+        if (!mounted) return;
+        debugPrint('[FLOW] Rincian akhir: $detail');
+
+        // Amplop tanpa `data` terurai menjadi nol semua. Memakainya
+        // akan menghapus angka yang sudah benar di layar, jadi hanya
+        // rincian yang benar-benar berisi yang dipakai.
+        if (detail.orderId.isNotEmpty) setState(() => _detail = detail);
+      } on Object catch (e) {
+        // Angka dari layar sebelumnya tetap ditampilkan; memunculkan
+        // error di layar penutup hanya menahan pengguna yang sudah
+        // selesai.
+        debugPrint('[FLOW] Rincian akhir gagal diambil: $e');
+      }
+    }();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final usage = session.usageCostFor(energyKwh);
+    final session = widget.session;
+    final detail = _detail;
+
+    // Energi dari backend bila ada; kalau tidak, angka terakhir yang
+    // dilihat layar pemantauan.
+    final energyKwh = detail?.usedKwh ?? widget.energyKwh;
+    final paid = detail?.paidAmount ?? session.paidAmount;
+    final usage = detail?.usageAmount ?? session.usageCostFor(energyKwh);
+    final refund = detail?.refundAmount ?? session.refundFor(energyKwh);
+
+    // Sesi yang dilanjutkan tanpa data pembelian tetap menyembunyikan
+    // baris rupiahnya — kecuali backend yang menyebutkan angkanya.
+    final hasAmounts = detail != null || session.hasPurchase;
 
     return PageScaffold(
       backgroundColor: AppColors.pageBackgroundPlain,
@@ -71,11 +131,11 @@ class ChargingFinishedPage extends StatelessWidget {
                 ),
                 // Sesi yang dilanjutkan tidak membawa data pembelian,
                 // jadi baris pembayarannya dilewati.
-                if (session.hasPurchase) ...[
+                if (hasAmounts) ...[
                   const SizedBox(height: 16),
                   DetailRow(
                     label: 'Pembayaran Awal',
-                    value: formatRupiah(session.paidAmount ?? 0),
+                    value: formatRupiah(paid ?? 0),
                     muted: true,
                   ),
                   const SizedBox(height: 16),
@@ -87,7 +147,7 @@ class ChargingFinishedPage extends StatelessWidget {
                   const SizedBox(height: 16),
                   DetailRow(
                     label: 'Sisa Pembayaran',
-                    value: formatRupiah(session.refundFor(energyKwh) ?? 0),
+                    value: formatRupiah(refund ?? 0),
                   ),
                 ],
               ],

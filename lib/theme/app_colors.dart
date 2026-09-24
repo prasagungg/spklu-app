@@ -101,6 +101,9 @@ class AppColors {
   static const Color sessionCardBorder = Color(0xFFC4E0FC);
 
   /// Blok rincian biaya di halaman konfirmasi.
+  /// Teks petunjuk di kotak pencarian (204:6136).
+  static const Color placeholder = Color(0xFF97A3B5);
+
   static const Color breakdownBg = Color(0xFFECF5FE);
   static const Color breakdownTotalBg = Color(0xFFD8EBFD);
 

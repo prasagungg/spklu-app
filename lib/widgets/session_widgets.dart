@@ -1,8 +1,75 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import 'asset_slot.dart';
+
+/// Hitung mundur sampai [expiresAt], berdetak sendiri tiap detik.
+///
+/// Batas waktunya milik pemesanan (`sessionExpired`), jadi halaman yang
+/// berbeda dalam satu alur menunjukkan sisa waktu yang sama — bukan
+/// sepuluh menit yang dimulai ulang tiap pindah layar.
+///
+/// [expiresAt] null berarti backend tidak menyebutkannya; dipakai
+/// [fallback] supaya pilnya tetap ada seperti di desain.
+class ExpiryCountdown extends StatefulWidget {
+  const ExpiryCountdown({
+    super.key,
+    this.expiresAt,
+    this.compact = false,
+    this.fallback = const Duration(minutes: 10),
+  });
+
+  final DateTime? expiresAt;
+
+  /// Varian kecil yang duduk sebaris dengan judul halaman (204:4690).
+  final bool compact;
+
+  final Duration fallback;
+
+  @override
+  State<ExpiryCountdown> createState() => _ExpiryCountdownState();
+}
+
+class _ExpiryCountdownState extends State<ExpiryCountdown> {
+  Timer? _ticker;
+  late Duration _remaining = _initial();
+
+  Duration _initial() {
+    final expiry = widget.expiresAt;
+    if (expiry == null) return widget.fallback;
+
+    final left = expiry.difference(DateTime.now());
+    return left.isNegative ? Duration.zero : left;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      if (_remaining.inSeconds <= 0) {
+        timer.cancel();
+        return;
+      }
+      setState(() => _remaining -= const Duration(seconds: 1));
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.compact
+      ? CompactCountdownPill(remaining: _remaining)
+      : CountdownPill(remaining: _remaining);
+}
 
 /// Pil hitung mundur "Selesaikan dalam: 09:59" (73:2850).
 class CountdownPill extends StatelessWidget {
@@ -47,6 +114,47 @@ class CountdownPill extends StatelessWidget {
               fontSize: 14,
               fontWeight: FontWeight.w400,
               color: AppColors.description,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pil hitung mundur kecil yang duduk sebaris dengan judul halaman
+/// (204:4690) — hanya ikon dan angkanya, tanpa kata "Selesaikan dalam".
+///
+/// Dipakai di halaman yang judulnya tetap terlihat, jadi pilnya tidak
+/// boleh memakan satu baris sendiri.
+class CompactCountdownPill extends StatelessWidget {
+  const CompactCountdownPill({super.key, required this.remaining});
+
+  final Duration remaining;
+
+  @override
+  Widget build(BuildContext context) {
+    final minutes = remaining.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = remaining.inSeconds.remainder(60).toString().padLeft(2, '0');
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.borderAlt),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const AssetSlot('assets/icons/ic_timer.svg', width: 15.5, height: 18),
+          const SizedBox(width: 4),
+          Text(
+            '$minutes:$seconds',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.title,
             ),
           ),
         ],

@@ -22,6 +22,15 @@ String formatRupiahDecimal(double amount) {
       : '$whole,${cents.toString().padLeft(2, '0')}';
 }
 
+/// Angka kWh tanpa satuan, untuk kartu pilihan yang sempit (204:3717).
+///
+/// Pilihan dari `GET /list-kwh` selalu bulat, dan desainnya menulisnya
+/// begitu — "10", bukan "10,0". Nilai pecahan tetap ditampilkan apa
+/// adanya kalau suatu saat backend mengirimnya.
+String formatKwhNumber(double kwh) => kwh == kwh.roundToDouble()
+    ? kwh.round().toString()
+    : kwh.toStringAsFixed(1).replaceAll('.', ',');
+
 /// 19.5 -> "19,5 kWh" (koma desimal, gaya Indonesia).
 ///
 /// Dipakai untuk nilai yang memang dalam satuan kWh, mis. kWh yang
@@ -31,21 +40,29 @@ String formatKwh(double kwh) {
   return '$text kWh';
 }
 
-/// Energi tersalur dari `GET /progress`, yang dilaporkan dalam Wh.
-///
-/// Satuannya selalu kWh, tetapi jumlah desimalnya menyesuaikan. Mulai
-/// 1 kWh dipakai satu desimal seperti desain ("6,4 kWh"); di bawah itu
-/// dipakai tiga desimal agar angkanya benar-benar bergerak — dengan
-/// satu desimal, 127 Wh tampil "0,1 kWh" dan 3 Wh tampil "0,0 kWh"
-/// sehingga terlihat mandek padahal pengisian sedang berjalan.
+/// Bentuk [formatEnergy] untuk nilai yang dilaporkan dalam Wh.
 ///
 /// 3 -> "0,003 kWh" | 127 -> "0,127 kWh" | 6400 -> "6,4 kWh"
 String formatEnergyWh(num watthours) => formatEnergy(watthours / 1000);
 
-/// Bentuk [formatEnergyWh] untuk nilai yang sudah dalam kWh.
+/// Energi tersalur — `charged` dari
+/// `POST /transaction/charging/ongoing-kwh` — **apa adanya**.
+///
+/// Angkanya tidak dibulatkan dan desimalnya tidak dipangkas: yang
+/// tampil di layar adalah bacaan backend persis seperti yang dikirim,
+/// hanya dengan koma sebagai pemisah desimal. Pemangkasan sempat
+/// membuat dua bacaan yang berbeda tampil sama — 0,127 dan 0,126
+/// keduanya menjadi "0,1 kWh" — dan angka yang berselisih dengan
+/// catatan backend lebih buruk daripada angka yang panjang.
+///
+/// Nilai bulat ditulis tanpa desimal, karena ".0" bukan bagian dari
+/// angkanya: 0 -> "0 kWh" | 5 -> "5 kWh".
+///
+/// 0.003 -> "0,003 kWh" | 6.4 -> "6,4 kWh" | 4.945678 -> "4,945678 kWh"
 String formatEnergy(double kwh) {
-  final digits = kwh.abs() >= 1 ? 1 : 3;
-  final text = kwh.toStringAsFixed(digits).replaceAll('.', ',');
+  final text = kwh == kwh.roundToDouble()
+      ? kwh.toStringAsFixed(0)
+      : kwh.toString().replaceAll('.', ',');
   return '$text kWh';
 }
 

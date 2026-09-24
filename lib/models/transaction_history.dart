@@ -1,5 +1,7 @@
-/// Satu transaksi yang pernah terjadi pada sebuah konektor, dari
-/// `POST /transaction/history-transaction`.
+import 'backend_status.dart';
+
+/// Satu transaksi yang pernah terjadi, dari
+/// `GET /transaction/history-transaction`.
 ///
 /// ```json
 /// {
@@ -13,6 +15,13 @@
 ///
 /// `pspId` dan `cardNumber` bisa kosong — transaksi yang tidak pernah
 /// sampai dibayar tetap tercatat.
+///
+/// Endpoint-nya kini dipanggil tanpa body dan mengembalikan seluruh
+/// transaksi sekaligus, jadi asal tiap entri — charge box dan
+/// konektornya — tidak lagi diketahui dari permintaan yang
+/// menghasilkannya. [chargeBoxId] dan kawan-kawannya dibaca dari
+/// entrinya sendiri bila ada, dan halaman riwayat memakainya untuk
+/// mencari charge box yang bersangkutan di daftar lokasi ini.
 class TransactionHistoryEntry {
   const TransactionHistoryEntry({
     required this.orderId,
@@ -20,6 +29,10 @@ class TransactionHistoryEntry {
     this.cardNumber = '',
     this.totalAmount = 0,
     this.createdAt,
+    this.chargeBoxId = '',
+    this.chargeBoxName = '',
+    this.connectorId,
+    this.connectorName = '',
   });
 
   final String orderId;
@@ -32,7 +45,26 @@ class TransactionHistoryEntry {
   final int totalAmount;
   final DateTime? createdAt;
 
+  /// Asal transaksinya, bila entrinya menyebutkannya. Kosong pada
+  /// versi backend yang masih menitipkan keduanya ke permintaan.
+  final String chargeBoxId;
+  final String chargeBoxName;
+  final int? connectorId;
+  final String connectorName;
+
   factory TransactionHistoryEntry.fromJson(Map<String, dynamic> json) {
+    // Ejaan `chargeboxId`/`chargeboxName` dengan b kecil dipakai
+    // `detail-history-transaction` dan `ongoing-kwh`; ejaan dengan B
+    // besar dipakai sisanya. Keduanya diterima, karena field yang salah
+    // eja tidak memunculkan error — hanya diam-diam kosong.
+    String text(List<String> keys) {
+      for (final key in keys) {
+        final value = json[key];
+        if (value is String && value.isNotEmpty) return value;
+      }
+      return '';
+    }
+
     return TransactionHistoryEntry(
       orderId: json['orderId'] as String? ?? '',
       pspId: json['pspId'] as String? ?? '',
@@ -42,6 +74,18 @@ class TransactionHistoryEntry {
         final String value => DateTime.tryParse(value),
         _ => null,
       },
+      chargeBoxId: text(const ['chargeboxId', 'chargeBoxId']),
+      chargeBoxName: text(const [
+        'chargeboxName',
+        'chargeBoxName',
+        'namaChargebox',
+        'namaChargeBox',
+      ]),
+      // Dikirim sebagai teks di sebagian endpoint dan angka di
+      // sebagian lain, jadi diurai lewat satu jalan yang menerima
+      // keduanya.
+      connectorId: BackendStatus.parse(json['connectorId']),
+      connectorName: text(const ['connectorName', 'namaKonektor']),
     );
   }
 
