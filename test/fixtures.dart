@@ -148,7 +148,9 @@ Map<String, dynamic> inquiryBillingResponse({
   String orderId = 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
   String pspId = 'EM-BNI',
   String cardNumber = '0123456789012345',
-  int totalAmount = 25400,
+  // `num`, bukan `int`: tagihan sungguhan kerap pecahan (25161.156),
+  // dan itulah angka yang harus dikirim balik saat membayar.
+  num totalAmount = 25400,
 }) =>
     {
       'responseCode': '00',
@@ -174,7 +176,7 @@ Map<String, dynamic> inquiryBillingResponse({
 /// transaksinya.
 Map<String, dynamic> paymentBillingResponse({
   String orderId = 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
-  int totalAmount = 25400,
+  num totalAmount = 25400,
   String bankLog = '1231408098812345678100500',
 }) {
   final body = inquiryBillingResponse(

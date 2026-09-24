@@ -62,7 +62,11 @@ class ChargingSession {
   /// Tagihan bisa berbeda dari total order — inquiry menambahkan `fee`,
   /// `idleFee`, dan `serviceFee` — jadi yang dipakai untuk rincian akhir
   /// adalah angka yang didebit, bukan angka order.
-  int? get paidAmount => billing?.totalAmount ?? price?.rpTotal;
+  ///
+  /// Dibulatkan di sini karena ini angka yang **ditampilkan**;
+  /// [BillingInquiry.totalAmount] yang belum dibulatkan tetap dipakai
+  /// apa adanya saat menagih.
+  int? get paidAmount => billing?.totalAmount.round() ?? price?.rpTotal;
 
   final DateTime createdAt;
 

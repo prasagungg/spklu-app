@@ -292,7 +292,9 @@ class ChargePointRepository {
   ///
   /// [amount] **harus sama persis dengan `totalAmount` dari inquiry** —
   /// nilai lain, termasuk total order, dibalas
-  /// [ResponseCode.amountMismatch].
+  /// [ResponseCode.amountMismatch]. Itu sebabnya tipenya [num] dan
+  /// bukan `int`: tagihan bisa berupa pecahan (25161.156), dan
+  /// membulatkannya lebih dulu sudah dihitung sebagai selisih.
   ///
   /// [bankLog] wajib; tanpa itu dibalas [ResponseCode.missingField].
   /// Bawaannya [Env.bankLog], masih tetap karena mesin kartunya belum
@@ -306,7 +308,7 @@ class ChargePointRepository {
   /// dibalas sukses.
   Future<BillingInquiry> payBilling({
     required String orderId,
-    required int amount,
+    required num amount,
     String? cardNumber,
     String? bankLog,
     String? merchantId,

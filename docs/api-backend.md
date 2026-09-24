@@ -639,6 +639,13 @@ bernilai 145.670, dibayar dengan 25.400 → `25`. Aplikasi karena itu
 selalu mengirim `totalAmount` dari jawaban inquiry, tidak pernah angka
 yang diingat atau dihitung sendiri.
 
+**Termasuk desimalnya.** `totalAmount` kerap berupa pecahan —
+25161.156 — dan pembulatan sekecil apa pun sudah terhitung selisih:
+mengirim 25161 untuk tagihan 25161.156 dibalas `25` juga. Karena itu
+`BillingInquiry.totalAmount` bertipe `num` dan disimpan apa adanya,
+sementara angka rupiah lain di kelas itu dibulatkan karena hanya
+ditampilkan.
+
 Inquiry menambahkan `fee`, `idleFee`, dan `serviceFee` di atas `amount`,
 jadi tagihan memang bisa berbeda dari total order. Yang ditampilkan di
 rincian akhir adalah angka yang benar-benar didebit

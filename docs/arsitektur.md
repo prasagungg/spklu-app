@@ -245,7 +245,9 @@ yang juga jadi sumber `bankLog`.
 Tagihannya lalu dibayar lewat `POST /transaction/payment-billing`,
 dengan nomor kartu yang sama seperti saat inquiry. Nominalnya diambil
 dari jawaban inquiry, tidak pernah dari angka yang diingat: backend
-menolak selisih sekecil apa pun sebagai "Amount mismatch". `bankLog`,
+menolak selisih sekecil apa pun sebagai "Amount mismatch" — termasuk
+desimal yang hilang karena pembulatan, sehingga `totalAmount` disimpan
+sebagai `num` apa adanya dan dikirim balik persis begitu. `bankLog`,
 `merchantId`, dan `terminalId` masih nilai tetap karena mesin kartunya
 belum ada.
 

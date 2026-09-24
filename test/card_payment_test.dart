@@ -64,7 +64,7 @@ class _Billing extends Interceptor {
   /// Hanya path ini yang ditolak; null berarti semuanya.
   final String? errorPath;
 
-  final int totalAmount;
+  final num totalAmount;
   final List<RequestOptions> requests = [];
 
   @override
@@ -186,6 +186,24 @@ void main() {
         'merchantId': Env.merchantId,
         'terminalId': Env.terminalId,
       });
+      expect(find.byType(PaymentSuccessPage), findsOneWidget);
+    });
+
+    /// Tagihan sungguhan kerap pecahan. Dibulatkan lebih dulu,
+    /// nominalnya berselisih dari inquiry dan backend membalas
+    /// "Amount mismatch" (25) — pembayaran tidak pernah bisa selesai.
+    testWidgets('nominal pecahan dikirim persis, tanpa dibulatkan',
+        (tester) async {
+      final reader = FakeCardReader();
+      final billing = _Billing(totalAmount: 25161.156);
+      await _pumpOnline(tester, reader, billing);
+
+      reader.tap();
+      await settleNetwork(tester);
+
+      final call = billing.requests
+          .firstWhere((r) => r.path == '/transaction/payment-billing');
+      expect((call.data as Map)['amount'], 25161.156);
       expect(find.byType(PaymentSuccessPage), findsOneWidget);
     });
 

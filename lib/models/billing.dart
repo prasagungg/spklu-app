@@ -58,7 +58,15 @@ class BillingInquiry {
 
   /// Yang didebit dari kartu. Inilah nilai yang harus dikirim sebagai
   /// `amount` saat membayar — bukan total order.
-  final int totalAmount;
+  ///
+  /// Disimpan **apa adanya**, termasuk desimalnya: backend bisa
+  /// menagih 25161.156, dan `payment-billing` membandingkan nominal
+  /// yang dikirim dengan angka itu persis. Dibulatkan lebih dulu
+  /// menjadi 25161, permintaannya dibalas kode `25` "Amount mismatch"
+  /// dan pembayaran tidak pernah bisa selesai. Angka ini karena itu
+  /// bertipe [num] — satu-satunya di kelas ini — sementara yang lain
+  /// hanya ditampilkan dan boleh dibulatkan.
+  final num totalAmount;
 
   /// Bukti transaksi dari mesin kartu. Hanya terisi pada jawaban
   /// pembayaran.
@@ -75,7 +83,8 @@ class BillingInquiry {
       fee: rupiah('fee'),
       idleFee: rupiah('idleFee'),
       serviceFee: rupiah('serviceFee'),
-      totalAmount: rupiah('totalAmount'),
+      // Tanpa pembulatan, sengaja — lihat [totalAmount].
+      totalAmount: (json?['totalAmount'] as num?) ?? 0,
       bankLog: json?['bankLog'] as String? ?? '',
     );
   }
