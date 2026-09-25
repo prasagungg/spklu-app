@@ -60,7 +60,9 @@ void main() {
     expect(find.text('Sedang Mengisi'), findsOneWidget);
   });
 
-  testWidgets('polling ongoing-kwh pertama mengisi angkanya', (tester) async {
+  testWidgets('bacaan pertama diminta sebelum layar sempat menampilkan nol', (
+    tester,
+  ) async {
     final repo = ChargePointRepository(
       client: ApiClient.withDio(Dio()..interceptors.add(_Stub(0.127))),
     );
@@ -75,13 +77,18 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('0 kWh'), findsOneWidget);
+    // Sebelum bacaan pertama datang, angkanya belum ditampilkan sama
+    // sekali — "0 kWh" akan terbaca sebagai belum ada yang tersalur.
+    expect(find.text('0 kWh'), findsNothing);
+    expect(find.text('Membaca energi tersalur…'), findsOneWidget);
 
-    // Satu putaran polling.
-    await tester.pump(const Duration(seconds: 1));
+    // Bacaan pertama diminta tanpa menunggu detak pertama; yang
+    // ditunggu di sini hanya perjalanan jaringannya.
+    await tester.pump(const Duration(milliseconds: 50));
     await tester.pump();
 
     expect(find.text('0,127 kWh'), findsOneWidget);
+    expect(find.text('Membaca energi tersalur…'), findsNothing);
   });
 
   /// Sesi yang dilanjutkan dari daftar charge box tidak membawa

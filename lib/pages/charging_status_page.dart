@@ -15,6 +15,7 @@ import '../theme/app_colors.dart';
 import '../widgets/battery_gauge.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/primary_button.dart';
+import '../widgets/session_widgets.dart';
 import 'charging_finished_page.dart';
 import 'session_verification_page.dart';
 
@@ -120,11 +121,24 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
 
   Timer _startTicker() {
     final live = _live;
+
+    // Bacaan pertama diminta sekarang juga, bukan menunggu detak
+    // pertama: menunggu berarti layar sempat menampilkan "0 kWh" yang
+    // bukan angka dari charger.
+    if (live) unawaited(_poll());
+
     return Timer.periodic(
       live ? Env.progressPollInterval : const Duration(seconds: 1),
       (_) => live ? _poll() : _tick(),
     );
   }
+
+  /// Bacaan pertama dari backend belum datang.
+  ///
+  /// Selama itu angka energi tidak ditampilkan sama sekali — nol di
+  /// layar akan terbaca sebagai "belum ada yang tersalur", padahal
+  /// aplikasinya yang belum tahu.
+  bool get _waitingFirstReading => _live && _progress == null;
 
   /// Mode offline: energi dinaikkan tetap tiap detik.
   void _tick() {
@@ -309,25 +323,32 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
               ),
             ),
           ),
-          Text(
-            // Desimalnya menyesuaikan supaya angkanya tidak terlihat
-            // mandek di "0,0 kWh" saat pengisian baru mulai.
-            formatEnergy(_energyKwh),
-            style: const TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.w700,
-              color: AppColors.title,
+          if (_waitingFirstReading)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: WaitingPanel(label: 'Membaca energi tersalur…'),
+            )
+          else ...[
+            Text(
+              // Desimalnya menyesuaikan supaya angkanya tidak terlihat
+              // mandek di "0,0 kWh" saat pengisian baru mulai.
+              formatEnergy(_energyKwh),
+              style: const TextStyle(
+                fontSize: 36,
+                fontWeight: FontWeight.w700,
+                color: AppColors.title,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Energi tersalur',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: AppColors.description,
+            const SizedBox(height: 4),
+            const Text(
+              'Energi tersalur',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: AppColors.description,
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 8),
         ],
       ),

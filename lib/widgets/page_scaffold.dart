@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../config/env.dart';
 import '../pages/api_log_page.dart';
+import '../pages/settings_page.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import 'asset_slot.dart';
@@ -200,23 +203,7 @@ class _MobileHeader extends StatelessWidget {
       height: 64,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            // Tekan lama logo membuka inspektur jaringan. Sengaja tanpa
-            // penanda: petugas tahu cara membukanya, pengguna tidak
-            // akan menemukannya secara tak sengaja.
-            GestureDetector(
-              key: PageScaffold.logKey,
-              behavior: HitTestBehavior.opaque,
-              onLongPress: Env.enableDebugPanel
-                  ? () => ApiLogPage.open(context)
-                  : null,
-              child: const LogoImage(height: 44),
-            ),
-            const Spacer(),
-            ?action,
-          ],
-        ),
+        child: Row(children: [const _LogoGestures(), const Spacer(), ?action]),
       ),
     );
   }
@@ -289,6 +276,75 @@ class HomeButton extends StatelessWidget {
     return CircleIconButton(
       asset: 'assets/icons/ic_home.svg',
       onTap: onTap ?? () => Navigator.of(context).popUntil((r) => r.isFirst),
+    );
+  }
+}
+
+/// Logo di header, sekaligus dua pintu petugas yang sengaja tidak
+/// diberi penanda apa pun: pengguna tidak akan menemukannya secara tak
+/// sengaja, petugas cukup diberi tahu caranya.
+///
+/// - **Tekan lama** — inspektur jaringan (hanya bila panel debug menyala).
+/// - **Ketuk lima kali** — halaman Pengaturan, setelah password benar.
+class _LogoGestures extends StatefulWidget {
+  const _LogoGestures();
+
+  @override
+  State<_LogoGestures> createState() => _LogoGesturesState();
+}
+
+class _LogoGesturesState extends State<_LogoGestures> {
+  /// Ketukan yang berjeda lebih lama dari ini dianggap ketukan biasa,
+  /// bukan bagian dari rangkaian — supaya sentuhan tak sengaja di sela
+  /// pemakaian tidak menumpuk menjadi lima.
+  static const _window = Duration(seconds: 2);
+  static const _tapsNeeded = 5;
+
+  int _taps = 0;
+
+  /// Melupakan hitungan bila ketukan berikutnya tidak datang tepat
+  /// waktu. Dipakai timer, bukan selisih jam dinding, supaya jendela
+  /// waktunya bisa diuji.
+  Timer? _forget;
+
+  /// Dialog password sedang terbuka; ketukan berikutnya diabaikan
+  /// supaya tidak menumpuk dua dialog.
+  bool _opening = false;
+
+  @override
+  void dispose() {
+    _forget?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _onTap() async {
+    _forget?.cancel();
+    _taps++;
+
+    if (_taps < _tapsNeeded) {
+      _forget = Timer(_window, () => _taps = 0);
+      return;
+    }
+
+    _taps = 0;
+    if (_opening) return;
+
+    _opening = true;
+    try {
+      await openSettings(context);
+    } finally {
+      if (mounted) _opening = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      key: PageScaffold.logKey,
+      behavior: HitTestBehavior.opaque,
+      onTap: _onTap,
+      onLongPress: Env.enableDebugPanel ? () => ApiLogPage.open(context) : null,
+      child: const LogoImage(height: 44),
     );
   }
 }

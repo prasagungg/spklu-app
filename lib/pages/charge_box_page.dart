@@ -20,7 +20,6 @@ import '../widgets/connector_sheet.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/state_view.dart';
 import '../widgets/status_chip.dart';
-import 'api_config_page.dart';
 import 'card_payment_page.dart';
 import 'charging_status_page.dart';
 import 'session_code_page.dart';
@@ -40,11 +39,8 @@ import 'transaction_history_page.dart';
 /// tarik-ke-bawah, tombol pada tampilan kosong/gagal, atau otomatis
 /// saat pengguna kembali ke sini dari halaman lain.
 class ChargeBoxPage extends StatefulWidget {
-  /// Key tombol menuju Konfigurasi Server; ikonnya tanpa teks, jadi
-  /// test butuh pegangan yang tidak menebak posisinya di pohon widget.
-  static const configKey = Key('buka-konfigurasi-server');
-
-  /// Key tombol menuju Riwayat Transaksi, dengan alasan yang sama.
+  /// Key tombol menuju Riwayat Transaksi; ikonnya tanpa teks, jadi test
+  /// butuh pegangan yang tidak menebak posisinya di pohon widget.
   static const historyKey = Key('buka-riwayat-transaksi');
 
   const ChargeBoxPage({super.key, this.repository, this.chargeBoxes});
@@ -357,12 +353,6 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
     );
   }
 
-  void _openConfig() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const ApiConfigPage()),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return PageScaffold(
@@ -370,25 +360,16 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
       subtitle: 'Pastikan sama dengan nomor tempat parkir',
       showStation: true,
       isHome: true,
-      // Alamat controller bisa diubah lagi tanpa menutup aplikasi.
-      // Dua tombol: riwayat transaksi lalu konfigurasi server. Riwayat
-      // dibuka dari sini karena hanya halaman ini yang memegang seluruh
-      // charge box — endpoint riwayat meminta konektornya satu per satu.
-      headerAction: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircleIconButton(
-            key: ChargeBoxPage.historyKey,
-            asset: 'assets/icons/ic_receipt.svg',
-            onTap: _openHistory,
-          ),
-          const SizedBox(width: 8),
-          CircleIconButton(
-            key: ChargeBoxPage.configKey,
-            asset: 'assets/icons/ic_settings.svg',
-            onTap: _openConfig,
-          ),
-        ],
+      // Riwayat transaksi dibuka dari sini karena hanya halaman ini yang
+      // memegang seluruh charge box — endpoint riwayat meminta
+      // konektornya satu per satu.
+      //
+      // Konfigurasi Server tidak lagi punya tombol di sini; ia pindah ke
+      // halaman Pengaturan, bersama pengaturan perangkat lainnya.
+      headerAction: CircleIconButton(
+        key: ChargeBoxPage.historyKey,
+        asset: 'assets/icons/ic_receipt.svg',
+        onTap: _openHistory,
       ),
       child: RefreshIndicator(
         onRefresh: _load,

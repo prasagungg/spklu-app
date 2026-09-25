@@ -141,4 +141,20 @@ class Env {
   static const Duration sendTimeout = Duration(seconds: 20);
 
   static bool get hasAuthorization => apiAuthorization.isNotEmpty;
+
+  /// Password halaman Pengaturan — layar petugas yang dibuka dengan
+  /// menekan logo lima kali.
+  ///
+  /// Masih nilai tetap; timpa lewat
+  /// `--dart-define=SPKLU_SETTINGS_PASSWORD=…` bila unit di lapangan
+  /// perlu password sendiri. Ini gerbang operasional, bukan pengaman
+  /// data: siapa pun yang memegang APK bisa membacanya.
+  static const String settingsPassword = String.fromEnvironment(
+    'SPKLU_SETTINGS_PASSWORD',
+    defaultValue: '5PKLU+2026',
+  );
+
+  /// Versi yang ditampilkan di kaki halaman Pengaturan. Samakan dengan
+  /// `version:` pada pubspec.yaml.
+  static const String appVersion = '1.0.0';
 }

@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kossotrik/widgets/page_scaffold.dart';
+import 'package:kossotrik/pages/settings_page.dart';
 import 'package:kossotrik/config/api_config.dart';
 import 'package:kossotrik/config/env.dart';
 import 'package:kossotrik/data/charge_point_repository.dart';
@@ -196,21 +198,30 @@ void main() {
     );
   });
 
-  testWidgets('tombol di header daftar charge box kembali ke konfigurasi', (
-    tester,
-  ) async {
+  /// Konfigurasi Server tidak lagi punya tombol di header daftar; ia
+  /// dibuka dari halaman Pengaturan.
+  testWidgets('dibuka dari kartu di halaman Pengaturan', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: SettingsPage()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(SettingsPage.serverKey));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ApiConfigPage), findsOneWidget);
+    // Menumpuk di atas Pengaturan, jadi ada tempat untuk pulang.
+    expect(find.byType(SettingsPage), findsNothing);
+    expect(find.byType(HomeButton), findsWidgets);
+  });
+
+  /// Alamat yang berhasil dipasang memulangkan ke daftar charge box,
+  /// yang memuat ulang dirinya dengan alamat baru itu.
+  testWidgets('berhasil menghubungkan memulangkan ke daftar', (tester) async {
     await _pumpPage(tester, _Stub());
 
     await tester.tap(find.text('Hubungkan'));
     await tester.pumpAndSettle();
+
     expect(find.byType(ChargeBoxPage), findsOneWidget);
-
-    await tester.tap(find.byKey(ChargeBoxPage.configKey));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(ApiConfigPage), findsOneWidget);
-    // Konfigurasi menggantikan daftar, bukan menumpuk di atasnya,
-    // supaya "Kembali ke Halaman Awal" tetap memulangkan ke daftar.
-    expect(find.byType(ChargeBoxPage), findsNothing);
+    expect(find.byType(ApiConfigPage), findsNothing);
   });
 }

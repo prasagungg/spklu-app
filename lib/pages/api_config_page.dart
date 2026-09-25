@@ -115,7 +115,18 @@ class _ApiConfigPageState extends State<ApiConfigPage> {
   Future<void> _rememberAndOpen() async {
     await ApiConfig.remember();
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
+
+    final navigator = Navigator.of(context);
+    // Dibuka dari halaman Pengaturan: pulang ke daftar charge box, yang
+    // memuat ulang dirinya begitu terlihat lagi — dengan alamat baru.
+    if (navigator.canPop()) {
+      navigator.popUntil((route) => route.isFirst);
+      return;
+    }
+
+    // Belum ada apa pun di tumpukan (mis. alamat diatur sebelum daftar
+    // pernah terbuka): daftar charge box yang menggantikannya.
+    navigator.pushReplacement(
       MaterialPageRoute<void>(builder: (_) => const ChargeBoxPage()),
     );
   }
@@ -127,9 +138,10 @@ class _ApiConfigPageState extends State<ApiConfigPage> {
       subtitle:
           'Masukkan alamat edge controller yang akan dipakai '
           'aplikasi ini.',
-      // Dicapai lewat pushReplacement, jadi halaman ini satu-satunya di
-      // tumpukan — tidak ada tempat untuk pulang.
-      isHome: true,
+      // Tombol Home muncul bila ada tempat untuk pulang. Saat halaman
+      // ini satu-satunya di tumpukan — alamat diatur sebelum daftar
+      // pernah terbuka — tombolnya tidak ada gunanya.
+      isHome: !Navigator.of(context).canPop(),
       backgroundColor: AppColors.pageBackgroundPlain,
       bottomBar: BottomActionBar(
         children: [
