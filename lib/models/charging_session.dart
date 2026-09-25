@@ -104,10 +104,15 @@ class ChargingSession {
     required DateTime now,
     String orderId = '',
     String sessionCode = '',
+    DateTime? expiresAt,
   }) {
     return ChargingSession(
       chargeBox: chargeBox,
       connector: connector,
+      // Tenggat dari `manage-sessioncode`: sesi lanjutan tidak melewati
+      // push-order maupun payment-billing, jadi inilah satu-satunya
+      // sumber hitung mundurnya.
+      expiresAt: expiresAt,
       // Kode sesi ikut dibawa bila pengguna baru saja mengetiknya:
       // halaman Hubungkan Konektor memakainya untuk menanyakan tahap
       // proses lewat `manage-sessioncode`.

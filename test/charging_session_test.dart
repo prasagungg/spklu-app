@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kossotrik/data/demo_data.dart';
 import 'package:kossotrik/models/charging_session.dart';
+import 'package:kossotrik/models/session_check.dart';
 import 'package:kossotrik/models/billing.dart';
 import 'package:kossotrik/models/order.dart';
 
@@ -23,6 +24,8 @@ ChargingSession _session() {
 }
 
 void main() {
+  _sessionCheckExpiryTests();
+
   /// Tagihan bisa berbeda dari total order — inquiry menambahkan fee,
   /// idleFee, dan serviceFee — jadi rincian akhir memakai angka yang
   /// benar-benar didebit.
@@ -134,6 +137,34 @@ void main() {
       );
 
       expect(paid.expiresAt, before);
+    });
+  });
+}
+
+void _sessionCheckExpiryTests() {
+  group('tenggat dari manage-sessioncode', () {
+    test('sessionExpiredTime diurai', () {
+      final check = SessionCheck.fromJson(const {
+        'orderId': 'ORDER-1',
+        'sessionCode': '70',
+        'statusProcess': 2,
+        'sessionExpiredTime': '2026-09-25T12:33:51Z',
+      });
+
+      expect(check.sessionExpiredAt, DateTime.utc(2026, 9, 25, 12, 33, 51));
+    });
+
+    /// `payment-billing` memakai ejaan tanpa "Time"; keduanya diterima.
+    test('ejaan sessionExpired ikut diterima', () {
+      final check = SessionCheck.fromJson(const {
+        'sessionExpired': '2026-09-25T12:33:51Z',
+      });
+
+      expect(check.sessionExpiredAt, DateTime.utc(2026, 9, 25, 12, 33, 51));
+    });
+
+    test('tanpa tenggat tetap null, bukan melempar', () {
+      expect(SessionCheck.fromJson(const {}).sessionExpiredAt, isNull);
     });
   });
 }

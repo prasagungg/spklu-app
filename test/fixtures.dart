@@ -291,6 +291,10 @@ Map<String, dynamic> chargingDetailResponse({
 Map<String, dynamic> sessionCodeResponse({
   String orderId = 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
   String sessionCode = '29',
+
+  /// Tenggat sesi. Null berarti backend tidak mengirimnya — hitung
+  /// mundur di halaman lanjutan jatuh ke nilai cadangan.
+  String? sessionExpiredTime,
   // Bawaannya "sedang mengisi": kebanyakan test hanya ingin melewati
   // tahap menunggu konektor. Kirim 2 untuk menguji penungguannya.
   int statusProcess = 3,
@@ -307,6 +311,7 @@ Map<String, dynamic> sessionCodeResponse({
     'connectorId': connectorId,
     'sessionCode': sessionCode,
     'statusProcess': statusProcess,
+    'sessionExpiredTime': ?sessionExpiredTime,
   },
 };
 

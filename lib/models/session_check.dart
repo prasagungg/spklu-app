@@ -30,6 +30,7 @@ class SessionCheck {
     this.connectorName = '',
     this.sessionCode = '',
     this.statusProcess,
+    this.sessionExpiredAt,
   });
 
   /// Order milik sesi itu. Dipakai halaman berikutnya untuk memantau
@@ -51,6 +52,14 @@ class SessionCheck {
   /// konektor — lihat [BackendStatus].
   final int? statusProcess;
 
+  /// Tenggat sesi ini, dari `sessionExpiredTime`.
+  ///
+  /// Dipakai sesi yang **dilanjutkan** lewat verifikasi kode sesi: ia
+  /// tidak melewati `push-order` maupun `payment-billing`, jadi tanpa
+  /// ini hitung mundurnya hanya angka karangan aplikasi. Untuk alur
+  /// beli dari awal, tenggat dari kedua endpoint itu yang dipakai.
+  final DateTime? sessionExpiredAt;
+
   factory SessionCheck.fromJson(Map<String, dynamic>? json) {
     // Ejaan `chargeboxId` dengan b kecil pernah dipakai endpoint ini
     // sebelum dirapikan jadi `chargeBoxId`. Keduanya tetap diterima
@@ -67,6 +76,14 @@ class SessionCheck {
       connectorName: json?['connectorName'] as String? ?? '',
       sessionCode: json?['sessionCode'] as String? ?? '',
       statusProcess: BackendStatus.parse(json?['statusProcess']),
+      // `sessionExpiredTime` ejaan di endpoint ini; `sessionExpired`
+      // dipakai `payment-billing`. Keduanya diterima supaya penyeragaman
+      // di sisi backend tidak diam-diam mematikan hitung mundurnya.
+      sessionExpiredAt: switch (json?['sessionExpiredTime'] ??
+          json?['sessionExpired']) {
+        final String value => DateTime.tryParse(value),
+        _ => null,
+      },
     );
   }
 

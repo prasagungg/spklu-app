@@ -4,11 +4,18 @@ import 'package:kossotrik/data/charge_point_repository.dart';
 import 'package:kossotrik/main.dart';
 import 'package:kossotrik/services/api_client.dart';
 
+import 'package:kossotrik/widgets/session_widgets.dart';
+
 import 'fixtures.dart';
 import 'flow_helpers.dart';
 
 class _Stub extends Interceptor {
-  _Stub(this.status, {this.statusProcess = 3, this.orderReadable = true});
+  _Stub(
+    this.status, {
+    this.statusProcess = 3,
+    this.orderReadable = true,
+    this.sessionExpiredTime,
+  });
 
   /// Status konektor pada `detail-chargerbox` — menentukan bisa
   /// ditekan atau tidak, dan perlu verifikasi kode sesi atau tidak.
@@ -21,6 +28,9 @@ class _Stub extends Interceptor {
   /// Rincian order bisa dibaca lewat `charging/detail`. Dimatikan untuk
   /// menguji jalan mundurnya.
   final bool orderReadable;
+
+  /// Tenggat sesi pada jawaban `manage-sessioncode`.
+  final String? sessionExpiredTime;
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
@@ -38,6 +48,7 @@ class _Stub extends Interceptor {
           '/booked-connector' => bookingResponse(),
           '/manage-sessioncode' => sessionCodeResponse(
             statusProcess: statusProcess,
+            sessionExpiredTime: sessionExpiredTime,
           ),
           // Kabelnya dianggap sudah terpasang; penungguannya
           // diuji tersendiri di connector_detection_poll_test.
@@ -63,6 +74,7 @@ Future<void> _tapConnector(
   int status, {
   int statusProcess = 3,
   bool orderReadable = true,
+  String? sessionExpiredTime,
 }) async {
   final repo = ChargePointRepository(
     client: ApiClient.withDio(
@@ -72,6 +84,7 @@ Future<void> _tapConnector(
             status,
             statusProcess: statusProcess,
             orderReadable: orderReadable,
+            sessionExpiredTime: sessionExpiredTime,
           ),
         ),
     ),
@@ -205,5 +218,39 @@ void main() {
     // Tidak ke mana-mana: sheet-nya masih terbuka.
     expect(find.text('Daftar Konektor'), findsOneWidget);
     expect(find.text('Pilih Nominal'), findsNothing);
+  });
+
+  /// Sesi yang dilanjutkan tidak melewati push-order maupun
+  /// payment-billing, jadi tenggatnya hanya bisa datang dari
+  /// `manage-sessioncode`. Tanpa itu hitung mundurnya cuma angka
+  /// cadangan sepuluh menit yang dikarang aplikasi.
+  group('hitung mundur sesi lanjutan', () {
+    testWidgets('memakai sessionExpiredTime dari manage-sessioncode', (
+      tester,
+    ) async {
+      final expiry = DateTime.now().toUtc().add(const Duration(minutes: 7));
+
+      await _tapConnector(
+        tester,
+        2,
+        statusProcess: 2,
+        sessionExpiredTime: expiry.toIso8601String(),
+      );
+      await _verify(tester);
+
+      expect(find.text('Hubungkan Konektor'), findsOneWidget);
+      final pill = tester.widget<CountdownPill>(find.byType(CountdownPill));
+      expect(pill.remaining.inSeconds, closeTo(420, 3));
+    });
+
+    testWidgets('tanpa tenggat jatuh ke cadangan sepuluh menit', (
+      tester,
+    ) async {
+      await _tapConnector(tester, 2, statusProcess: 2);
+      await _verify(tester);
+
+      final pill = tester.widget<CountdownPill>(find.byType(CountdownPill));
+      expect(pill.remaining, const Duration(minutes: 10));
+    });
   });
 }

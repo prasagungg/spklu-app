@@ -372,6 +372,7 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
       connector: connector,
       now: DateTime.now(),
       sessionCode: check.sessionCode,
+      expiresAt: check.sessionExpiredAt,
       orderId: check.orderId.isNotEmpty ? check.orderId : remembered ?? '',
     );
   }
