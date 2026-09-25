@@ -10,6 +10,7 @@ import '../services/api_exception.dart';
 import '../services/response_code.dart';
 import '../services/card_reader.dart';
 import '../theme/app_colors.dart';
+import '../widgets/cancel_transaction.dart';
 import '../widgets/expiry_ticker.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/primary_button.dart';
@@ -146,7 +147,7 @@ class _CardPaymentPageState extends State<CardPaymentPage>
       // sebagai "Missing Field: amount", pesan yang tidak berarti
       // apa-apa bagi petugas. Penyebabnya konektor yang tarifnya belum
       // diatur — `count-kwh` sudah mengembalikan total nol sejak
-      // halaman Pilih Nominal. Jadi itu yang dikatakan, tanpa mengirim
+      // halaman Pilih kWh. Jadi itu yang dikatakan, tanpa mengirim
       // permintaan yang pasti gagal.
       if (inquiry.totalAmount <= 0) {
         await _failBilling(
@@ -208,6 +209,17 @@ class _CardPaymentPageState extends State<CardPaymentPage>
   Widget build(BuildContext context) {
     final ready = _status == null || _status == CardReaderStatus.ready;
 
+    final help = SecondaryButton(
+      label: 'Bantuan',
+      trailingAsset: 'assets/icons/ic_support.svg',
+      onPressed: () => showHelpSheet(context),
+    );
+    // Selama hitung mundurnya masih berjalan pemesanannya berstatus
+    // PENDING_PAYMENT, jadi masih bisa dibatalkan. Dimatikan saat
+    // kartunya sedang diproses supaya pembatalan tidak berlomba dengan
+    // pembayaran yang sedang berjalan.
+    final cancel = CancelTransactionButton(enabled: !_accepted && !_inquiring);
+
     return PageScaffold(
       title: 'Pembayaran',
       subtitle: ready
@@ -220,20 +232,23 @@ class _CardPaymentPageState extends State<CardPaymentPage>
       headerExtra: CountdownPill(remaining: remaining),
       bottomBar: BottomActionBar(
         opaque: false,
+        // Tidak ada tombol bayar: kartu yang ditempelkan sendiri yang
+        // memajukan alur. "Batalkan Transaksi" duduk di antara dua
+        // tombol selama "Periksa Lagi" ada, dan di paling bawah saat
+        // hanya "Bantuan" yang tersisa.
         children: [
-          // Tidak ada tombol bayar: kartu yang ditempelkan sendiri yang
-          // memajukan alur.
-          if (!ready)
+          if (!ready) ...[
             PrimaryButton(
               label: 'Periksa Lagi',
               trailingAsset: 'assets/icons/ic_refresh.svg',
               onPressed: _recheck,
             ),
-          SecondaryButton(
-            label: 'Bantuan',
-            trailingAsset: 'assets/icons/ic_support.svg',
-            onPressed: () => showHelpSheet(context),
-          ),
+            cancel,
+            help,
+          ] else ...[
+            help,
+            cancel,
+          ],
         ],
       ),
       child: Column(

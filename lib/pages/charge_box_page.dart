@@ -94,7 +94,7 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
   void didPopNext() {
     debugPrint('[FLOW] Kembali ke Pilih Charge Box — memuat ulang daftar');
     // Pemesanan dilepas oleh halaman yang ditinggalkan pengguna — Kode
-    // Sesi dan Pilih Nominal, satu-satunya langkah sebelum order dibuat.
+    // Sesi dan Pilih kWh, satu-satunya langkah sebelum order dibuat.
     // Halaman ini juga dilewati saat pengguna kembali dari Riwayat
     // Transaksi, Pengaturan, atau alur yang sudah punya order, jadi ia
     // tidak boleh ikut membatalkan.

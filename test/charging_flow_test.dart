@@ -85,9 +85,9 @@ void main() {
     await tester.tap(find.text('Gun 1'));
     await passSessionCode(tester);
 
-    // 3. Pilih Nominal — tidak ada yang tercentang sejak awal, jadi
+    // 3. Pilih kWh — tidak ada yang tercentang sejak awal, jadi
     // rincian harga baru muncul setelah salah satu ditekan.
-    expect(find.text('Pilih Nominal'), findsOneWidget);
+    expect(find.text('Pilih kWh'), findsOneWidget);
     expect(find.text('Rincian Harga'), findsNothing);
     expect(
       tester
@@ -335,7 +335,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
     await passSessionCode(tester);
-    await expectHome('Pilih Nominal');
+    await expectHome('Pilih kWh');
 
     // Tidak ada pilihan yang tercentang sejak awal.
     await tester.tap(find.text('10'));

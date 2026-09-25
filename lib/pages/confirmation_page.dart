@@ -6,6 +6,7 @@ import '../models/charging_session.dart';
 import '../models/connector.dart';
 import '../models/order.dart';
 import '../theme/app_colors.dart';
+import '../widgets/cancel_transaction.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/price_breakdown.dart';
 import '../widgets/primary_button.dart';
@@ -60,6 +61,9 @@ class ConfirmationPage extends StatelessWidget {
             trailingAsset: 'assets/icons/ic_card_pay.svg',
             onPressed: () => _confirm(context),
           ),
+          // Ordernya sudah dibuat, tetapi pemesanannya masih
+          // PENDING_PAYMENT — backend masih menerima pembatalan.
+          const CancelTransactionButton(),
           SecondaryButton(
             label: 'Kembali',
             onPressed: () => Navigator.of(context).pop(),

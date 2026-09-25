@@ -85,11 +85,26 @@ Future<void> _pickConnector(WidgetTester tester, _Recorder recorder) async {
   await settleFrames(tester);
 }
 
+/// Menekan "Batalkan Transaksi" lalu menjawab sheet konfirmasinya.
+///
+/// [confirm] false menekan "Tidak", yang hanya menutup sheetnya.
+Future<void> _cancelTransaction(
+  WidgetTester tester, {
+  bool confirm = true,
+}) async {
+  // Halaman-halaman ini punya hitung mundur yang berdetak terus, jadi
+  // pumpAndSettle tidak akan pernah selesai.
+  await tester.tap(find.text('Batalkan Transaksi'));
+  await settleFrames(tester);
+  expect(find.text('Apakah Anda yakin?'), findsOneWidget);
+
+  await tester.tap(find.text(confirm ? 'Batalkan' : 'Tidak'));
+  await settleFrames(tester);
+}
+
 void main() {
   group('R0 saat konektor dipilih', () {
-    testWidgets('mengunci konektor lalu masuk ke Pilih Nominal', (
-      tester,
-    ) async {
+    testWidgets('mengunci konektor lalu masuk ke Pilih kWh', (tester) async {
       final recorder = _Recorder();
       await _pickConnector(tester, recorder);
 
@@ -104,7 +119,7 @@ void main() {
         // Backend memakai teks untuk nomor konektor.
         'connectorId': '1',
       });
-      expect(find.text('Pilih Nominal'), findsOneWidget);
+      expect(find.text('Pilih kWh'), findsOneWidget);
     });
 
     /// Inti dari booking: begitu konektornya tidak bersedia, pengguna
@@ -115,7 +130,7 @@ void main() {
       final recorder = _Recorder(bookingAccepted: false);
       await _pickConnector(tester, recorder);
 
-      expect(find.text('Pilih Nominal'), findsNothing);
+      expect(find.text('Pilih kWh'), findsNothing);
       expect(find.byType(ChargeBoxPage), findsOneWidget);
       expect(
         find.textContaining('baru saja diambil pengguna lain'),
@@ -189,10 +204,10 @@ void main() {
       final recorder = _Recorder();
       await _pickConnector(tester, recorder);
       await passSessionCode(tester);
-      expect(find.text('Pilih Nominal'), findsOneWidget);
+      expect(find.text('Pilih kWh'), findsOneWidget);
       expect(recorder.to('/cancelled-connector'), isEmpty);
 
-      // Kembali dari Pilih Nominal hanya mundur satu langkah, ke kode
+      // Kembali dari Pilih kWh hanya mundur satu langkah, ke kode
       // sesinya: pemesanannya masih dipegang pengguna ini.
       await tester.tap(find.text('Kembali'));
       await settleFrames(tester);
@@ -200,8 +215,7 @@ void main() {
       expect(recorder.to('/cancelled-connector'), isEmpty);
 
       // Yang melepasnya adalah keluar dari alurnya sama sekali.
-      await tester.tap(find.text('Batalkan Transaksi'));
-      await tester.pumpAndSettle();
+      await _cancelTransaction(tester);
       expect(find.text('Pilih Charge Box'), findsOneWidget);
 
       final cancel = recorder.to('/cancelled-connector').single;
@@ -215,7 +229,7 @@ void main() {
     });
 
     /// Sebelum order dibuat, keluar lewat tombol Home berarti batal —
-    /// baik dari halaman Kode Sesi maupun Pilih Nominal.
+    /// baik dari halaman Kode Sesi maupun Pilih kWh.
     testWidgets('tombol Home di Kode Sesi melepas', (tester) async {
       final recorder = _Recorder();
       await _pickConnector(tester, recorder);
@@ -229,11 +243,11 @@ void main() {
       expect(find.text('Pilih Charge Box'), findsOneWidget);
     });
 
-    testWidgets('tombol Home di Pilih Nominal melepas', (tester) async {
+    testWidgets('tombol Home di Pilih kWh melepas', (tester) async {
       final recorder = _Recorder();
       await _pickConnector(tester, recorder);
       await passSessionCode(tester);
-      expect(find.text('Pilih Nominal'), findsOneWidget);
+      expect(find.text('Pilih kWh'), findsOneWidget);
 
       await tester.tap(find.byType(HomeButton).last);
       await tester.pumpAndSettle();
@@ -284,6 +298,74 @@ void main() {
 
       expect(find.text('Pilih Charge Box'), findsOneWidget);
       expect(recorder.to('/cancelled-connector'), isEmpty);
+    });
+
+    /// "Batalkan Transaksi" ada sampai pembayaran berhasil: selama itu
+    /// pemesanannya berstatus HELD atau PENDING_PAYMENT, dua keadaan
+    /// yang masih diterima `cancelled-connector`.
+    testWidgets('"Tidak" pada konfirmasi tidak mengirim apa pun', (
+      tester,
+    ) async {
+      final recorder = _Recorder();
+      await _pickConnector(tester, recorder);
+      await passSessionCode(tester);
+      expect(find.text('Pilih kWh'), findsOneWidget);
+
+      await _cancelTransaction(tester, confirm: false);
+
+      expect(find.text('Apakah Anda yakin?'), findsNothing);
+      expect(find.text('Pilih kWh'), findsOneWidget);
+      expect(recorder.to('/cancelled-connector'), isEmpty);
+    });
+
+    testWidgets('Batalkan Transaksi di Pilih kWh melepas', (tester) async {
+      final recorder = _Recorder();
+      await _pickConnector(tester, recorder);
+      await passSessionCode(tester);
+
+      await _cancelTransaction(tester);
+
+      expect(recorder.to('/cancelled-connector'), hasLength(1));
+      expect(find.text('Pilih Charge Box'), findsOneWidget);
+    });
+
+    testWidgets('Batalkan Transaksi di Konfirmasi Pengisian melepas', (
+      tester,
+    ) async {
+      final recorder = _Recorder();
+      await _pickConnector(tester, recorder);
+      await passSessionCode(tester);
+
+      await tester.tap(find.text('10'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Lanjutkan'));
+      await tester.pumpAndSettle();
+      expect(find.text('Konfirmasi Pengisian'), findsOneWidget);
+
+      await _cancelTransaction(tester);
+
+      final cancel = recorder.to('/cancelled-connector').single;
+      expect((cancel.data as Map)['reservationId'], 'RESV-1');
+      expect(find.text('Pilih Charge Box'), findsOneWidget);
+    });
+
+    testWidgets('Batalkan Transaksi di Pembayaran melepas', (tester) async {
+      final recorder = _Recorder();
+      await _pickConnector(tester, recorder);
+      await passSessionCode(tester);
+
+      await tester.tap(find.text('10'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Lanjutkan'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Konfirmasi & Bayar'));
+      await _settle(tester);
+      expect(find.text('Pembayaran'), findsOneWidget);
+
+      await _cancelTransaction(tester);
+
+      expect(recorder.to('/cancelled-connector'), hasLength(1));
+      expect(find.text('Pilih Charge Box'), findsOneWidget);
     });
 
     /// Begitu pengisian jalan, konektornya sedang dipakai — bukan

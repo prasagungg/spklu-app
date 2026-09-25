@@ -7,6 +7,7 @@ import '../models/reservation.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/asset_slot.dart';
+import '../widgets/cancel_transaction.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/session_widgets.dart';
@@ -74,13 +75,9 @@ class _SessionCodePageState extends State<SessionCodePage> {
           const SizedBox(height: 16),
           PrimaryButton(label: 'Lanjutkan', onPressed: _continue),
           const SizedBox(height: 16),
-          DangerOutlineButton(
-            label: 'Batalkan Transaksi',
-            onPressed: () => releaseBooking(
-              context,
-              leave: () => Navigator.of(context).pop(),
-            ),
-          ),
+          // Sama dengan halaman-halaman setelahnya: ditanyakan dulu,
+          // baru pemesanannya dilepas.
+          const CancelTransactionButton(),
         ],
       ),
     );

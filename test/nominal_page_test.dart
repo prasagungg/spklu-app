@@ -225,6 +225,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Rincian Harga'), findsOneWidget);
+    // Catatannya ada di bawah rincian harga, di luar layar sejak
+    // "Batalkan Transaksi" menambah tinggi bilah tombolnya.
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.pumpAndSettle();
     expect(
       find.textContaining('Tarif konektor ini belum diatur'),
       findsOneWidget,

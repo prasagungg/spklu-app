@@ -6,7 +6,7 @@ import 'charging_scope.dart';
 /// menjalankan [leave] — bawaannya pulang ke halaman awal.
 ///
 /// **Hanya dipanggil dari halaman sebelum order dibuat**: Kode Sesi dan
-/// Pilih Nominal. Sejak `POST /transaction/push-order` berhasil, yang
+/// Pilih kWh. Sejak `POST /transaction/push-order` berhasil, yang
 /// menentukan nasib pemesanan adalah ordernya, dan melepas konektornya
 /// dari aplikasi hanya membuat order yang sudah ada menggantung.
 ///

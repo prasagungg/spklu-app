@@ -6,7 +6,7 @@ import '../models/order.dart';
 
 /// Data dummy untuk demo.
 ///
-/// [nominals] masih dipakai halaman Pilih Nominal — backend belum punya
+/// [nominals] masih dipakai halaman Pilih kWh — backend belum punya
 /// endpoint harga. [chargeBoxes] sudah tidak dipakai alur utama karena
 /// halaman pemilihan mengambil daftarnya dari `POST /list-chargerbox`; yang tersisa
 /// hanya pemakaiannya di test.

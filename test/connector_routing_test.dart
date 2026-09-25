@@ -128,7 +128,7 @@ void main() {
     expect(find.text('Verifikasi Sesi'), findsNothing);
     // Kode sesinya ditunjukkan dulu, baru pemilihan kWh.
     await passSessionCode(tester);
-    expect(find.text('Pilih Nominal'), findsOneWidget);
+    expect(find.text('Pilih kWh'), findsOneWidget);
   });
 
   testWidgets('konektor yang dipakai menuntut kode sesi dulu', (tester) async {
@@ -225,7 +225,7 @@ void main() {
 
     // Tidak ke mana-mana: sheet-nya masih terbuka.
     expect(find.text('Daftar Konektor'), findsOneWidget);
-    expect(find.text('Pilih Nominal'), findsNothing);
+    expect(find.text('Pilih kWh'), findsNothing);
   });
 
   /// Sesi yang dilanjutkan tidak melewati push-order maupun

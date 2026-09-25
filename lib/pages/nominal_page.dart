@@ -14,6 +14,7 @@ import '../services/response_code.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/asset_slot.dart';
+import '../widgets/cancel_transaction.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/price_breakdown.dart';
 import '../widgets/primary_button.dart';
@@ -21,7 +22,8 @@ import '../widgets/session_widgets.dart';
 import '../widgets/state_view.dart';
 import 'confirmation_page.dart';
 
-/// Frame Figma 204:3670 — "Pilih Nominal".
+/// Frame Figma 204:3670 — "Pilih Nominal" (judulnya di aplikasi
+/// "Pilih kWh").
 ///
 /// Pilihan kWh datang dari `GET /list-kwh`, dan harganya dari
 /// `POST /count-kwh` begitu salah satu dipilih. Keduanya milik backend:
@@ -207,12 +209,12 @@ class _NominalPageState extends State<NominalPage> {
     final price = _price;
 
     return PageScaffold(
-      title: 'Pilih Nominal',
+      title: 'Pilih kWh',
       // Order belum dibuat di sini, jadi keluar lewat tombol Home
       // berarti membatalkan — konektornya dikembalikan. "Kembali" di
       // bawah hanya mundur satu langkah, masih di dalam alur.
       headerAction: HomeButton(onTap: () => releaseBooking(context)),
-      subtitle: 'Pilih nominal kWh pengisian sesuai kebutuhan.',
+      subtitle: 'Pilih jumlah kWh pengisian sesuai kebutuhan.',
       titleTrailing: ExpiryCountdown(
         expiresAt: widget.expiresAt,
         compact: true,
@@ -235,6 +237,8 @@ class _NominalPageState extends State<NominalPage> {
                 ? null
                 : _continue,
           ),
+          // Pemesanannya masih HELD di tahap ini — boleh dibatalkan.
+          CancelTransactionButton(enabled: !_pushing),
           SecondaryButton(
             label: 'Kembali',
             onPressed: _pushing ? null : () => Navigator.of(context).pop(),

@@ -57,19 +57,22 @@ void main() {
     expect(counter.listCalls, greaterThanOrEqualTo(1), reason: 'pemuatan awal');
     expect(find.text('CB-SMR-01'), findsOneWidget);
 
-    // Masuk ke bottom sheet lalu ke Pilih Nominal.
+    // Masuk ke bottom sheet lalu ke Pilih kWh.
     await tester.tap(find.text('01'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gun 1'));
     await passSessionCode(tester);
-    expect(find.text('Pilih Nominal'), findsOneWidget);
+    expect(find.text('Pilih kWh'), findsOneWidget);
     final beforeBack = counter.listCalls;
 
     // Kembali lewat tombol Kembali, lalu keluar dari halaman kode sesi.
     await tester.tap(find.text('Kembali'));
     await settleFrames(tester);
+    // Pembatalan ditanyakan dulu lewat sheet konfirmasinya.
     await tester.tap(find.text('Batalkan Transaksi'));
-    await tester.pumpAndSettle();
+    await settleFrames(tester);
+    await tester.tap(find.text('Batalkan'));
+    await settleFrames(tester);
     expect(find.text('Pilih Charge Box'), findsOneWidget);
     expect(
       counter.listCalls,
