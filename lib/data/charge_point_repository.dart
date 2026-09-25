@@ -493,11 +493,19 @@ class ChargePointRepository {
   /// memang sedang tidak mengisi.
   Future<void> stopCharging({
     required String orderId,
+    String? sessionCode,
     CancelToken? cancelToken,
   }) async {
     final json = await _client.post<Map<String, dynamic>>(
       '/transaction/charging/stop',
-      body: {'orderId': orderId},
+      body: {
+        'orderId': orderId,
+        // Kode sesi yang diketik pengguna ikut dikirim sebagai bukti
+        // bahwa yang menghentikan memang pemilik sesinya. Dilewati bila
+        // tidak ada yang mengetiknya (mis. sesi tanpa verifikasi).
+        if (sessionCode != null && sessionCode.isNotEmpty)
+          'sessionCode': sessionCode,
+      },
       cancelToken: cancelToken,
     );
     _unwrap(json);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/charging_scope.dart';
+import '../data/final_energy.dart';
 import '../data/formatters.dart';
 import '../models/charging_session.dart';
 import '../services/api_exception.dart';
@@ -31,12 +32,6 @@ class StopConfirmPage extends StatefulWidget {
 }
 
 class _StopConfirmPageState extends State<StopConfirmPage> {
-  /// Charger masih menyalurkan daya beberapa saat setelah perintah
-  /// stop, jadi angka akhirnya ditunggu sampai `/progress` melaporkan
-  /// "finished" — bukan diambil dari nilai saat tombol ditekan.
-  static const _finalReadAttempts = 5;
-  static const _finalReadDelay = Duration(seconds: 1);
-
   bool _stopping = false;
 
   ChargingSession get session => widget.session;
@@ -63,44 +58,19 @@ class _StopConfirmPageState extends State<StopConfirmPage> {
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _stopping = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
       return;
     }
 
-    final finalEnergy = await _readFinalEnergy(scope);
+    final finalEnergy = await readFinalEnergy(
+      repository: scope.repository,
+      orderId: session.orderId,
+      fallbackKwh: energyKwh,
+    );
     if (!mounted) return;
     _goToFinished(finalEnergy);
-  }
-
-  /// Membaca `/progress` sampai sesi benar-benar berhenti, lalu memakai
-  /// angka energinya.
-  ///
-  /// Kalau sampai batas percobaan belum juga "finished", dipakai
-  /// bacaan terakhir yang berhasil — tetap lebih akurat daripada nilai
-  /// saat tombol ditekan. Kegagalan total jatuh ke nilai itu.
-  Future<double> _readFinalEnergy(ChargingScope scope) async {
-    var latest = energyKwh;
-
-    for (var attempt = 0; attempt < _finalReadAttempts; attempt++) {
-      await Future<void>.delayed(_finalReadDelay);
-      if (!mounted) return latest;
-
-      try {
-        final progress = await scope.repository.fetchChargingProgress(
-          orderId: session.orderId,
-        );
-
-        latest = progress.charged;
-        debugPrint('[FLOW] Bacaan akhir ${attempt + 1}: $progress');
-        if (progress.isFinished) return latest;
-      } on Object catch (_) {
-        // Dicoba lagi; kalau habis, pakai bacaan terakhir.
-      }
-    }
-
-    return latest;
   }
 
   void _goToFinished(double finalEnergyKwh) {
@@ -109,10 +79,8 @@ class _StopConfirmPageState extends State<StopConfirmPage> {
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<bool>(
-        builder: (_) => ChargingFinishedPage(
-          session: session,
-          energyKwh: finalEnergyKwh,
-        ),
+        builder: (_) =>
+            ChargingFinishedPage(session: session, energyKwh: finalEnergyKwh),
         settings: const RouteSettings(name: 'pengisian-selesai'),
       ),
     );
@@ -133,8 +101,9 @@ class _StopConfirmPageState extends State<StopConfirmPage> {
           ),
           SecondaryButton(
             label: 'Lanjut Pengisian',
-            onPressed:
-                _stopping ? null : () => Navigator.of(context).pop(false),
+            onPressed: _stopping
+                ? null
+                : () => Navigator.of(context).pop(false),
           ),
         ],
       ),

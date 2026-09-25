@@ -39,10 +39,10 @@ class FakeCardReader implements CardReader {
   /// uang elektroniknya — MIFARE Classic seperti e-Money dan TapCash —
   /// sehingga pembayaran jatuh ke nomor dari konfigurasi.
   void tap({String uid = '04A2B3C4', String cardNumber = ''}) => _onTap?.call(
-        TappedCard(
-          uid: uid,
-          technologies: const ['MifareClassic', 'NfcA'],
-          cardNumber: cardNumber,
-        ),
-      );
+    TappedCard(
+      uid: uid,
+      technologies: const ['MifareClassic', 'NfcA'],
+      cardNumber: cardNumber,
+    ),
+  );
 }

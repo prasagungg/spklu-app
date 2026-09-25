@@ -4,8 +4,10 @@ import 'package:kossotrik/config/host.dart';
 void main() {
   group('normalizeBaseUrl', () {
     test('alamat tanpa skema dianggap http', () {
-      expect(Host.normalizeBaseUrl('192.168.1.10:8080'),
-          'http://192.168.1.10:8080');
+      expect(
+        Host.normalizeBaseUrl('192.168.1.10:8080'),
+        'http://192.168.1.10:8080',
+      );
       expect(Host.normalizeBaseUrl('10.0.2.2'), 'http://10.0.2.2');
       expect(Host.normalizeBaseUrl('localhost:8080'), 'http://localhost:8080');
     });
@@ -24,8 +26,10 @@ void main() {
     });
 
     test('spasi di ujung diabaikan', () {
-      expect(Host.normalizeBaseUrl('  192.168.1.10:8080  '),
-          'http://192.168.1.10:8080');
+      expect(
+        Host.normalizeBaseUrl('  192.168.1.10:8080  '),
+        'http://192.168.1.10:8080',
+      );
     });
 
     test('kosong tetap kosong', () {

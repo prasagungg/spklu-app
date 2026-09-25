@@ -32,11 +32,11 @@ class _Recorder extends Interceptor {
         statusCode: 200,
         data: switch (options.path) {
           '/list-chargerbox' => listResponse([
-              chargeBoxJson(id: 'CB-SMR-01', nama: 'CB-SMR-01'),
-            ]),
+            chargeBoxJson(id: 'CB-SMR-01', nama: 'CB-SMR-01'),
+          ]),
           '/detail-chargerbox' => chargeBoxDetailResponse(
-              connectors: [connectorJson(status: _charging ? 2 : 1)],
-            ),
+            connectors: [connectorJson(status: _charging ? 2 : 1)],
+          ),
           '/booked-connector' => bookingResponse(accepted: bookingAccepted),
           '/manage-sessioncode' => sessionCodeResponse(),
           // Kabelnya dianggap sudah terpasang; penungguannya
@@ -48,9 +48,7 @@ class _Recorder extends Interceptor {
           '/transaction/push-order' => pushOrderResponse(),
           '/transaction/inquiry-billing' => inquiryBillingResponse(),
           '/transaction/payment-billing' => paymentBillingResponse(),
-          '/transaction/charging/ongoing-kwh' => ongoingKwhResponse(
-              status: 3,
-            ),
+          '/transaction/charging/ongoing-kwh' => ongoingKwhResponse(status: 3),
           _ => okResponse,
         },
       ),
@@ -89,15 +87,17 @@ Future<void> _pickConnector(WidgetTester tester, _Recorder recorder) async {
 
 void main() {
   group('R0 saat konektor dipilih', () {
-    testWidgets('mengunci konektor lalu masuk ke Pilih Nominal',
-        (tester) async {
+    testWidgets('mengunci konektor lalu masuk ke Pilih Nominal', (
+      tester,
+    ) async {
       final recorder = _Recorder();
       await _pickConnector(tester, recorder);
 
       await passSessionCode(tester);
 
-      final booking = recorder.requests
-          .firstWhere((r) => r.path == '/booked-connector');
+      final booking = recorder.requests.firstWhere(
+        (r) => r.path == '/booked-connector',
+      );
       expect(booking.method, 'POST');
       expect(booking.data, {
         'chargeBoxId': 'CB-SMR-01',
@@ -109,8 +109,9 @@ void main() {
 
     /// Inti dari booking: begitu konektornya tidak bersedia, pengguna
     /// tidak boleh menghabiskan waktu memilih nominal dan membayar.
-    testWidgets('konektor yang tidak bersedia menghentikan alur',
-        (tester) async {
+    testWidgets('konektor yang tidak bersedia menghentikan alur', (
+      tester,
+    ) async {
       final recorder = _Recorder(bookingAccepted: false);
       await _pickConnector(tester, recorder);
 
@@ -122,8 +123,9 @@ void main() {
       );
     });
 
-    testWidgets('penolakan memuat ulang daftar karena sudah basi',
-        (tester) async {
+    testWidgets('penolakan memuat ulang daftar karena sudah basi', (
+      tester,
+    ) async {
       final recorder = _Recorder(bookingAccepted: false);
       await _pickConnector(tester, recorder);
 
@@ -137,8 +139,7 @@ void main() {
   /// Tahap dinaikkan backend sendiri; aplikasi memesan sekali saja.
   /// Memanggil `booked-connector` lagi akan membuat pemesanan baru,
   /// bukan menaikkan tahap.
-  testWidgets('konektor dipesan sekali saja sepanjang alur',
-      (tester) async {
+  testWidgets('konektor dipesan sekali saja sepanjang alur', (tester) async {
     final recorder = _Recorder();
     await _pickConnector(tester, recorder);
     expect(recorder.bookings, 1);
@@ -155,13 +156,12 @@ void main() {
     final order = recorder.to('/transaction/push-order').single;
     expect((order.data as Map)['reservationId'], 'RESV-1');
 
-
     await tester.tap(find.text('Konfirmasi & Bayar'));
     await _settle(tester);
 
-    final reader = tester
-        .widget<SPKLUApp>(find.byType(SPKLUApp))
-        .cardReader as FakeCardReader;
+    final reader =
+        tester.widget<SPKLUApp>(find.byType(SPKLUApp)).cardReader
+            as FakeCardReader;
     reader.tap();
     await _settle(tester);
     // Inquiry tagihan menambah satu hop async sebelum halaman pindah.
@@ -169,7 +169,6 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     }
     await tester.pump(const Duration(milliseconds: 600));
-
 
     await tester.tap(find.text('Mulai Pengisian'));
     await _settle(tester);
@@ -186,8 +185,7 @@ void main() {
   });
 
   group('pembatalan saat alur ditinggalkan', () {
-    testWidgets('keluar dari alur pembelian melepas konektor',
-        (tester) async {
+    testWidgets('keluar dari alur pembelian melepas konektor', (tester) async {
       final recorder = _Recorder();
       await _pickConnector(tester, recorder);
       await passSessionCode(tester);
@@ -216,8 +214,7 @@ void main() {
       });
     });
 
-    testWidgets('tombol Home di tengah pembelian juga melepas',
-        (tester) async {
+    testWidgets('tombol Home di tengah pembelian juga melepas', (tester) async {
       final recorder = _Recorder();
       await _pickConnector(tester, recorder);
       await passSessionCode(tester);
@@ -239,8 +236,9 @@ void main() {
 
     /// Begitu pengisian jalan, konektornya sedang dipakai — bukan
     /// sekadar dipesan — jadi pulang ke daftar tidak boleh melepasnya.
-    testWidgets('pengisian yang sudah dimulai tidak ikut dibatalkan',
-        (tester) async {
+    testWidgets('pengisian yang sudah dimulai tidak ikut dibatalkan', (
+      tester,
+    ) async {
       final recorder = _Recorder();
       await _pickConnector(tester, recorder);
       await passSessionCode(tester);
@@ -253,9 +251,9 @@ void main() {
       await tester.tap(find.text('Konfirmasi & Bayar'));
       await _settle(tester);
 
-      final reader = tester
-          .widget<SPKLUApp>(find.byType(SPKLUApp))
-          .cardReader as FakeCardReader;
+      final reader =
+          tester.widget<SPKLUApp>(find.byType(SPKLUApp)).cardReader
+              as FakeCardReader;
       reader.tap();
       await _settle(tester);
       // Inquiry tagihan menambah satu hop async sebelum halaman pindah.
@@ -274,15 +272,16 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
       expect(find.text('Pengisian Dimulai'), findsOneWidget);
 
-      await tester.tap(find.text('Kembali ke Halaman Awal'));
+      await tester.tap(find.byType(HomeButton).first);
       await tester.pumpAndSettle();
 
       expect(find.text('Pilih Charge Box'), findsOneWidget);
       expect(recorder.to('/cancelled-connector'), isEmpty);
     });
 
-    testWidgets('menutup daftar konektor tanpa memilih tidak melepas apa pun',
-        (tester) async {
+    testWidgets('menutup daftar konektor tanpa memilih tidak melepas apa pun', (
+      tester,
+    ) async {
       final recorder = _Recorder();
       final repo = ChargePointRepository(
         client: ApiClient.withDio(Dio()..interceptors.add(recorder)),
@@ -316,9 +315,9 @@ void main() {
     await tester.tap(find.text('Konfirmasi & Bayar'));
     await _settle(tester);
 
-    final reader = tester
-        .widget<SPKLUApp>(find.byType(SPKLUApp))
-        .cardReader as FakeCardReader;
+    final reader =
+        tester.widget<SPKLUApp>(find.byType(SPKLUApp)).cardReader
+            as FakeCardReader;
     reader.tap();
     await _settle(tester);
     // Inquiry tagihan menambah satu hop async sebelum halaman pindah.
@@ -337,8 +336,9 @@ void main() {
 
   /// Kode sesi ada supaya pengguna bisa kembali ke sesinya sendiri;
   /// kalau kodenya tidak membuka apa-apa, layar itu tidak ada gunanya.
-  testWidgets('kode sesi membuka kembali sesi yang sedang mengisi',
-      (tester) async {
+  testWidgets('kode sesi membuka kembali sesi yang sedang mengisi', (
+    tester,
+  ) async {
     final recorder = _Recorder();
     await _pickConnector(tester, recorder);
     await passSessionCode(tester);
@@ -350,9 +350,9 @@ void main() {
     await tester.tap(find.text('Konfirmasi & Bayar'));
     await _settle(tester);
 
-    final reader = tester
-        .widget<SPKLUApp>(find.byType(SPKLUApp))
-        .cardReader as FakeCardReader;
+    final reader =
+        tester.widget<SPKLUApp>(find.byType(SPKLUApp)).cardReader
+            as FakeCardReader;
     reader.tap();
     await _settle(tester);
     for (var i = 0; i < 5; i++) {

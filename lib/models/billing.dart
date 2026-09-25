@@ -40,6 +40,7 @@ class BillingInquiry {
     this.idleFee = 0,
     this.serviceFee = 0,
     this.bankLog = '',
+    this.sessionExpiredAt,
   });
 
   final String orderId;
@@ -72,10 +73,28 @@ class BillingInquiry {
   /// pembayaran.
   final String bankLog;
 
+  /// Batas waktu sesi setelah dibayar, dari `sessionExpired`.
+  ///
+  /// Pembayaran memperbarui tenggatnya: sejak kartu didebit, pengguna
+  /// punya waktu sekian menit untuk memasang konektor dan memulai
+  /// pengisian. Inilah sumber hitung mundur di layar Hubungkan
+  /// Konektor, menggantikan batas waktu order yang dipakai layar
+  /// pembayaran.
+  final DateTime? sessionExpiredAt;
+
   factory BillingInquiry.fromJson(Map<String, dynamic>? json) {
     int rupiah(String key) => (json?[key] as num?)?.round() ?? 0;
 
+    // Backend memakai `sessionExpired` di sini, dan `sessionExpiredTime`
+    // pada push-order. Keduanya diterima supaya penyeragaman ejaan di
+    // sisi backend tidak diam-diam mematikan hitung mundurnya.
+    final expiry = json?['sessionExpired'] ?? json?['sessionExpiredTime'];
+
     return BillingInquiry(
+      sessionExpiredAt: switch (expiry) {
+        final String value => DateTime.tryParse(value),
+        _ => null,
+      },
       orderId: json?['orderId'] as String? ?? '',
       pspId: json?['pspId'] as String? ?? '',
       cardNumber: json?['cardNumber'] as String? ?? '',

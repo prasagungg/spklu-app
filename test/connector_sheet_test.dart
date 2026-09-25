@@ -27,15 +27,15 @@ class _Stub extends Interceptor {
         statusCode: 200,
         data: switch (options.path) {
           '/detail-chargerbox' => chargeBoxDetailResponse(
-              connectors: [
-                for (final id in ['1', '2'])
-                  connectorJson(
-                    id: id,
-                    nama: 'Gun $id',
-                    status: statusOf[id] ?? 1,
-                  ),
-              ],
-            ),
+            connectors: [
+              for (final id in ['1', '2'])
+                connectorJson(
+                  id: id,
+                  nama: 'Gun $id',
+                  status: statusOf[id] ?? 1,
+                ),
+            ],
+          ),
           '/transaction/history-transaction' => historyResponse(const []),
           _ => listResponse(),
         },
@@ -103,8 +103,9 @@ class _EmptyDetail extends Interceptor {
 void main() {
   /// Satu panggilan detail memberi seluruh konektor sekaligus —
   /// sebelumnya satu panggilan per konektor.
-  testWidgets('isi charge box diambil sekali saat sheet dibuka',
-      (tester) async {
+  testWidgets('isi charge box diambil sekali saat sheet dibuka', (
+    tester,
+  ) async {
     final stub = await _openSheet(tester);
 
     expect(stub.statusCalls, 1);
@@ -112,8 +113,9 @@ void main() {
 
   /// Daftar charge box melaporkan 1 untuk kedua konektor; yang benar
   /// datang dari `POST /status-konektor`.
-  testWidgets('status dari daftar ditimpa status hasil pemeriksaan',
-      (tester) async {
+  testWidgets('status dari daftar ditimpa status hasil pemeriksaan', (
+    tester,
+  ) async {
     await _openSheet(tester, statusOf: {'1': 2, '2': 1});
 
     expect(find.text('Sedang Digunakan'), findsOneWidget);
@@ -136,8 +138,9 @@ void main() {
 
   /// Riwayat dibuka dari header halaman Pilih Charge Box, bukan dari
   /// tiap kartu konektor: satu pintu masuk untuk seluruh lokasi.
-  testWidgets('kartu konektor tidak lagi membawa tombol riwayat',
-      (tester) async {
+  testWidgets('kartu konektor tidak lagi membawa tombol riwayat', (
+    tester,
+  ) async {
     await _openSheet(tester);
 
     expect(find.text('Riwayat Transaksi'), findsNothing);
@@ -152,14 +155,11 @@ void main() {
 
   /// Sheet yang dikosongkan oleh jawaban aneh jauh lebih buruk
   /// daripada sheet yang menampilkan data daftar apa adanya.
-  testWidgets('detail tanpa konektor tidak mengosongkan sheet',
-      (tester) async {
+  testWidgets('detail tanpa konektor tidak mengosongkan sheet', (tester) async {
     await tester.pumpWidget(
       ChargingScope(
         repository: ChargePointRepository(
-          client: ApiClient.withDio(
-            Dio()..interceptors.add(_EmptyDetail()),
-          ),
+          client: ApiClient.withDio(Dio()..interceptors.add(_EmptyDetail())),
         ),
         child: MaterialApp(
           theme: AppTheme.build(),
@@ -179,8 +179,7 @@ void main() {
     expect(find.text('Gun 2'), findsOneWidget);
   });
 
-  testWidgets('tidak ada polling setelah pemeriksaan pertama',
-      (tester) async {
+  testWidgets('tidak ada polling setelah pemeriksaan pertama', (tester) async {
     final stub = await _openSheet(tester);
     final afterOpen = stub.statusCalls;
 

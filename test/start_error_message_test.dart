@@ -4,10 +4,10 @@ import 'package:kossotrik/services/api_exception.dart';
 import 'package:kossotrik/services/response_code.dart';
 
 ApiException _error(String code, String message) => ApiException(
-      type: ApiErrorType.badRequest,
-      message: message,
-      responseCode: code,
-    );
+  type: ApiErrorType.badRequest,
+  message: message,
+  responseCode: code,
+);
 
 void main() {
   test('charger tidak terhubung diarahkan memilih charge box lain', () {

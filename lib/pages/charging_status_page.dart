@@ -3,16 +3,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../data/charging_scope.dart';
+import '../data/final_energy.dart';
 import '../data/formatters.dart';
 import '../config/env.dart';
 import '../models/charging_session.dart';
 import '../models/charging_progress.dart';
+import '../models/session_check.dart';
+import '../services/api_exception.dart';
+import '../services/response_code.dart';
 import '../theme/app_colors.dart';
 import '../widgets/asset_slot.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/primary_button.dart';
 import 'charging_finished_page.dart';
-import 'stop_confirm_page.dart';
+import 'session_verification_page.dart';
 
 /// Frame Figma 73:4979 — "Sedang Mengisi".
 ///
@@ -40,6 +44,24 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
 
   Timer? _ticker;
   bool _polling = false;
+
+  /// Perintah stop sedang berjalan — tombolnya dimatikan supaya tidak
+  /// terkirim dua kali.
+  bool _stopping = false;
+
+  /// Pengguna sedang mengakhiri sesi: layar verifikasi terbuka, atau
+  /// perintah stop sedang diproses.
+  ///
+  /// Polling yang **sudah terbang** sebelum tombol ditekan tetap akan
+  /// menjawab, dan jawabannya bisa berbunyi "selesai". Tanpa penanda
+  /// ini, jawaban itu mendorong halaman rincian akhir dari balik layar
+  /// verifikasi — halaman verifikasinya tergusur, lalu jalur stop
+  /// mendorong rincian akhir sekali lagi. Itulah "Pengisian Selesai
+  /// yang muncul dua kali dan tombolnya tidak bisa ditekan".
+  bool _ending = false;
+
+  /// Halaman rincian akhir sudah dibuka. Navigasi hanya boleh sekali.
+  bool _finished = false;
 
   /// Bacaan terakhir dari `ongoing-kwh` — sumber tunggal angka yang
   /// ditampilkan saat daring.
@@ -112,7 +134,9 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
       final progress = await _scope!.repository.fetchChargingProgress(
         orderId: widget.session.orderId,
       );
-      if (!mounted) return;
+      // Pengguna sudah masuk alur mengakhiri sesi selagi permintaan ini
+      // terbang — jawabannya tidak boleh lagi memindahkan halaman.
+      if (!mounted || _ending) return;
 
       setState(() => _progress = progress);
 
@@ -127,17 +151,22 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
     }
   }
 
-  /// Sesi berakhir di sisi charger, bukan lewat tombol di aplikasi.
+  /// Membuka rincian akhir, menggantikan layar pemantauan.
+  ///
+  /// Dipanggil dari dua arah — charger yang berhenti sendiri dan
+  /// perintah stop dari pengguna — jadi dijaga agar hanya jalan sekali.
+  /// Dorongan kedua akan menggusur rute yang salah dan membuat
+  /// halamannya tidak bisa ditekan.
   void _finish(double energyKwh) {
+    if (_finished || !mounted) return;
+    _finished = true;
     _ticker?.cancel();
     // Sesinya sudah tamat; tidak ada lagi yang perlu diingat.
     _scope?.booking.forget();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => ChargingFinishedPage(
-          session: widget.session,
-          energyKwh: energyKwh,
-        ),
+        builder: (_) =>
+            ChargingFinishedPage(session: widget.session, energyKwh: energyKwh),
       ),
     );
   }
@@ -148,14 +177,25 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
     super.dispose();
   }
 
+  /// "Akhiri Pengisian" — meminta kode sesi lebih dulu.
+  ///
+  /// Perintah stop **tidak** dikirim di sini. Pengguna harus mengetik
+  /// kode sesinya, dan kode itulah yang ikut dikirim ke
+  /// `POST /transaction/charging/stop`, sehingga hanya pemilik sesi
+  /// yang bisa menghentikan pengisian orang lain.
   Future<void> _stop() async {
+    if (_stopping || _finished) return;
+    _ending = true;
     _ticker?.cancel();
 
-    final confirmed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => StopConfirmPage(
-          session: widget.session,
-          energyKwh: _energyKwh,
+    final check = await Navigator.of(context).push<SessionCheck>(
+      MaterialPageRoute<SessionCheck>(
+        builder: (_) => SessionVerificationPage(
+          chargeBoxId: widget.session.chargeBox.id,
+          connectorId: widget.session.connector.id,
+          // Kodenya diteruskan ke /stop; backend yang memutuskan cocok
+          // atau tidak, jadi tidak perlu diperiksa dua kali.
+          checkWithBackend: false,
         ),
       ),
     );
@@ -163,9 +203,57 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
     if (!mounted) return;
 
     // Batal menghentikan — pemantauan dijalankan kembali.
-    if (confirmed != true) {
+    if (check == null) {
+      _ending = false;
       _ticker = _startTicker();
+      return;
     }
+
+    await _sendStop(check.sessionCode);
+  }
+
+  /// Mengirim perintah stop, lalu menunggu angka energi akhirnya.
+  Future<void> _sendStop(String sessionCode) async {
+    final scope = _scope;
+
+    // Tanpa scope, atau tanpa orderId — sesi yang dilanjutkan dari
+    // daftar charge box — tidak ada yang bisa dihentikan lewat backend.
+    if (scope == null || widget.session.orderId.isEmpty) {
+      debugPrint(
+        'Perintah stop DILEWATI: '
+        '${scope == null ? 'tidak ada ChargingScope' : 'sesi tanpa orderId'}.',
+      );
+      _finish(_energyKwh);
+      return;
+    }
+
+    setState(() => _stopping = true);
+
+    try {
+      await scope.repository.stopCharging(
+        orderId: widget.session.orderId,
+        sessionCode: sessionCode,
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _stopping = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(stopErrorMessage(e))));
+      // Sesinya masih jalan; pemantauan diteruskan.
+      _ending = false;
+      _ticker = _startTicker();
+      return;
+    }
+
+    final energy = await readFinalEnergy(
+      repository: scope.repository,
+      orderId: widget.session.orderId,
+      fallbackKwh: _energyKwh,
+    );
+    if (!mounted) return;
+
+    _finish(energy);
   }
 
   @override
@@ -177,7 +265,10 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
       bottomBar: BottomActionBar(
         opaque: false,
         children: [
-          DangerOutlineButton(label: 'Akhiri Pengisian', onPressed: _stop),
+          DangerOutlineButton(
+            label: _stopping ? 'Menghentikan…' : 'Akhiri Pengisian',
+            onPressed: _stopping ? null : _stop,
+          ),
           SecondaryButton(
             label: 'Kembali ke Halaman Awal',
             trailingAsset: 'assets/icons/ic_home_filled.svg',
@@ -218,3 +309,22 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
     );
   }
 }
+
+/// Menerjemahkan kegagalan `POST /transaction/charging/stop` jadi
+/// arahan yang bisa ditindaklanjuti pengguna.
+///
+/// Kode sesi yang salah ketik berakhir di sini, karena kode itu ikut
+/// dikirim bersama perintah stop dan backend yang menolaknya.
+String stopErrorMessage(ApiException e) => switch (e.responseCode) {
+  ResponseCode.transactionNotFound =>
+    'Kode sesi tidak cocok dengan pengisian ini. Coba masukkan lagi.',
+  ResponseCode.noActiveSession =>
+    'Tidak ada pengisian yang sedang berjalan di konektor ini.',
+  ResponseCode.invalidStatusTransition =>
+    'Pengisian ini sedang tidak bisa dihentikan. Coba lagi sebentar.',
+  ResponseCode.chargePointOffline =>
+    'Charge box sedang tidak terhubung ke controller. Coba lagi sebentar.',
+  ResponseCode.chargePointTimedOut =>
+    'Charger tidak menjawab tepat waktu. Coba lagi sebentar.',
+  _ => generalErrorMessage(e),
+};

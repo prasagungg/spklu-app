@@ -84,4 +84,56 @@ void main() {
   test('tanggal transaksi diformat untuk ditampilkan', () {
     expect(_session().formattedDate, '2026-09-16 18:40:39');
   });
+
+  group('batas waktu sesi', () {
+    test('sisa waktu dihitung dari tenggat dan tidak pernah negatif', () {
+      final now = DateTime(2026, 9, 16, 18, 40, 39);
+      final session = ChargingSession(
+        chargeBox: DemoData.chargeBoxes[3],
+        connector: DemoData.chargeBoxes[3].connectors.first,
+        sessionCode: '29',
+        reference: '81067',
+        createdAt: now,
+        expiresAt: now.add(const Duration(minutes: 9, seconds: 33)),
+      );
+
+      expect(session.remainingAt(now), const Duration(minutes: 9, seconds: 33));
+      // Lewat tenggat berhenti di nol, bukan menghitung mundur ke minus.
+      expect(
+        session.remainingAt(now.add(const Duration(minutes: 20))),
+        Duration.zero,
+      );
+    });
+
+    test('sesi tanpa tenggat tidak punya sisa waktu', () {
+      expect(_session().remainingAt(DateTime(2026)), isNull);
+    });
+
+    test('pembayaran memperbarui tenggat dengan sessionExpired tagihan', () {
+      final paid = _session().paidWith(
+        BillingInquiry.fromJson(const {
+          'orderId': 'ORDER-1',
+          'totalAmount': 25400,
+          'bankLog': 'BANKLOG-0001',
+          'sessionExpired': '2026-09-23T09:56:04Z',
+        }),
+      );
+
+      expect(paid.expiresAt, DateTime.utc(2026, 9, 23, 9, 56, 4));
+    });
+
+    test('tagihan tanpa sessionExpired membiarkan tenggat order', () {
+      final before = _session().expiresAt;
+
+      final paid = _session().paidWith(
+        BillingInquiry.fromJson(const {
+          'orderId': 'ORDER-1',
+          'totalAmount': 25400,
+          'bankLog': 'BANKLOG-0001',
+        }),
+      );
+
+      expect(paid.expiresAt, before);
+    });
+  });
 }

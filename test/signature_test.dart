@@ -91,8 +91,7 @@ void main() {
       );
     });
 
-    test('body yang sudah berupa String tidak diserialisasi ulang',
-        () async {
+    test('body yang sudah berupa String tidak diserialisasi ulang', () async {
       final c = _client();
 
       await c.dio.post<Map<String, dynamic>>(

@@ -107,14 +107,14 @@ void main() {
     expect(spklu.chargeBoxes.single.isActive, isTrue);
   });
 
-  test('daftar diminta lewat POST /list-chargerbox dengan idSpklu',
-      () async {
+  test('daftar diminta lewat POST /list-chargerbox dengan idSpklu', () async {
     final captured = <RequestOptions>[];
     final dio = Dio()
       ..interceptors.add(_StubAdapter(listResponse(), captured: captured));
 
-    await ChargePointRepository(client: ApiClient.withDio(dio))
-        .fetchChargeBoxes();
+    await ChargePointRepository(
+      client: ApiClient.withDio(dio),
+    ).fetchChargeBoxes();
 
     expect(captured.single.method, 'POST');
     expect(captured.single.path, '/list-chargerbox');
@@ -126,14 +126,14 @@ void main() {
     final dio = Dio()
       ..interceptors.add(_StubAdapter(listResponse(), captured: captured));
 
-    await ChargePointRepository(client: ApiClient.withDio(dio))
-        .fetchSpklu(idSpklu: 'SPKLU-LAIN');
+    await ChargePointRepository(
+      client: ApiClient.withDio(dio),
+    ).fetchSpklu(idSpklu: 'SPKLU-LAIN');
 
     expect(captured.single.data, {'idSpklu': 'SPKLU-LAIN'});
   });
 
-  test('chargeBoxes kosong menghasilkan daftar kosong, bukan error',
-      () async {
+  test('chargeBoxes kosong menghasilkan daftar kosong, bukan error', () async {
     final boxes = await _repositoryReturning(
       listResponse(const []),
     ).fetchChargeBoxes();
@@ -190,8 +190,9 @@ void main() {
           _StubAdapter(chargeBoxDetailResponse(), captured: captured),
         );
 
-      await ChargePointRepository(client: ApiClient.withDio(dio))
-          .fetchChargeBoxDetail(chargeBoxId: 'CB-SMR-01', number: 1);
+      await ChargePointRepository(
+        client: ApiClient.withDio(dio),
+      ).fetchChargeBoxDetail(chargeBoxId: 'CB-SMR-01', number: 1);
 
       expect(captured.single.method, 'POST');
       expect(captured.single.path, '/detail-chargerbox');
@@ -273,8 +274,9 @@ void main() {
       final dio = Dio()
         ..interceptors.add(_StubAdapter(_ok, captured: captured));
 
-      await ChargePointRepository(client: ApiClient.withDio(dio))
-          .startCharging(orderId: 'ORDER-1');
+      await ChargePointRepository(
+        client: ApiClient.withDio(dio),
+      ).startCharging(orderId: 'ORDER-1');
 
       expect(captured.single.method, 'POST');
       expect(captured.single.path, '/transaction/charging/start');
@@ -286,56 +288,55 @@ void main() {
       final dio = Dio()
         ..interceptors.add(_StubAdapter(_ok, captured: captured));
 
-      await ChargePointRepository(client: ApiClient.withDio(dio))
-          .stopCharging(orderId: 'ORDER-1');
+      await ChargePointRepository(
+        client: ApiClient.withDio(dio),
+      ).stopCharging(orderId: 'ORDER-1');
 
       expect(captured.single.path, '/transaction/charging/stop');
       expect(captured.single.data, {'orderId': 'ORDER-1'});
     });
 
-    test('charger yang tidak terhubung dilempar sebagai ApiException',
-        () async {
-      final repo = _repositoryFailing(
-        const {
+    test(
+      'charger yang tidak terhubung dilempar sebagai ApiException',
+      () async {
+        final repo = _repositoryFailing(const {
           'responseCode': '31',
           'responseMessage': 'Charging station CB-SMR-01 is not connected',
-        },
-        status: 503,
-      );
+        }, status: 503);
 
-      await expectLater(
-        repo.startCharging(orderId: 'ORDER-1'),
-        throwsA(
-          isA<ApiException>().having(
-            (e) => e.responseCode,
-            'responseCode',
-            ResponseCode.chargePointOffline,
+        await expectLater(
+          repo.startCharging(orderId: 'ORDER-1'),
+          throwsA(
+            isA<ApiException>().having(
+              (e) => e.responseCode,
+              'responseCode',
+              ResponseCode.chargePointOffline,
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
 
-    test('menghentikan yang tidak sedang mengisi dilempar apa adanya',
-        () async {
-      final repo = _repositoryFailing(
-        const {
+    test(
+      'menghentikan yang tidak sedang mengisi dilempar apa adanya',
+      () async {
+        final repo = _repositoryFailing(const {
           'responseCode': '06',
           'responseMessage': 'Invalid Status Transition',
-        },
-        status: 400,
-      );
+        }, status: 400);
 
-      await expectLater(
-        repo.stopCharging(orderId: 'ORDER-1'),
-        throwsA(
-          isA<ApiException>().having(
-            (e) => e.responseCode,
-            'responseCode',
-            ResponseCode.invalidStatusTransition,
+        await expectLater(
+          repo.stopCharging(orderId: 'ORDER-1'),
+          throwsA(
+            isA<ApiException>().having(
+              (e) => e.responseCode,
+              'responseCode',
+              ResponseCode.invalidStatusTransition,
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
   });
 
   group('kemajuan pengisian', () {
@@ -346,8 +347,9 @@ void main() {
           _StubAdapter(ongoingKwhResponse(), captured: captured),
         );
 
-      await ChargePointRepository(client: ApiClient.withDio(dio))
-          .fetchChargingProgress(orderId: 'ORDER-1');
+      await ChargePointRepository(
+        client: ApiClient.withDio(dio),
+      ).fetchChargingProgress(orderId: 'ORDER-1');
 
       expect(captured.single.method, 'POST');
       expect(captured.single.path, '/transaction/charging/ongoing-kwh');

@@ -9,9 +9,9 @@ import 'package:kossotrik/theme/app_theme.dart';
 // Tanpa ChargingScope halaman berjalan offline; daftarnya diberikan
 // langsung supaya test tidak menyentuh jaringan.
 Widget _app({List<ChargeBox>? chargeBoxes}) => MaterialApp(
-      theme: AppTheme.build(),
-      home: ChargeBoxPage(chargeBoxes: chargeBoxes ?? DemoData.chargeBoxes),
-    );
+  theme: AppTheme.build(),
+  home: ChargeBoxPage(chargeBoxes: chargeBoxes ?? DemoData.chargeBoxes),
+);
 
 void main() {
   group('Pilih Charge Box', () {
@@ -35,8 +35,9 @@ void main() {
       expect(find.text('Tidak Tersedia'), findsOneWidget);
     });
 
-    testWidgets('daftar kosong tidak membuat halaman gagal render',
-        (tester) async {
+    testWidgets('daftar kosong tidak membuat halaman gagal render', (
+      tester,
+    ) async {
       await tester.pumpWidget(_app(chargeBoxes: const []));
       await tester.pumpAndSettle();
 
@@ -44,8 +45,9 @@ void main() {
       expect(find.text('01'), findsNothing);
     });
 
-    testWidgets('menekan kartu membuka bottom sheet Daftar Konektor',
-        (tester) async {
+    testWidgets('menekan kartu membuka bottom sheet Daftar Konektor', (
+      tester,
+    ) async {
       await tester.pumpWidget(_app());
       await tester.pumpAndSettle();
 

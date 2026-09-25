@@ -295,10 +295,7 @@ void main() {
 
       expect(find.byType(TransactionHistoryCard), findsNWidgets(2));
       // Judul memakai nomor dan nama charge box.
-      expect(
-        find.text('04 - Kempower Satellite 200 kW'),
-        findsNWidgets(2),
-      );
+      expect(find.text('04 - Kempower Satellite 200 kW'), findsNWidgets(2));
       // Nama konektor, tipenya, lalu daya charge box — seperti desain.
       expect(find.text('Gun 1 - CCS2 - 200 kW DC'), findsNWidgets(2));
       expect(find.text('Rp12.700'), findsOneWidget);
@@ -334,14 +331,14 @@ void main() {
     });
 
     /// Daftar boleh dilihat siapa saja; rinciannya milik pemegang kode.
-    testWidgets('kartu ditekan meminta kode sesi lalu membuka rincian',
-        (tester) async {
+    testWidgets('kartu ditekan meminta kode sesi lalu membuka rincian', (
+      tester,
+    ) async {
       await _pump(
         tester,
         stub: _Stub(
           body: historyResponse([historyEntryJson()]),
-          detail: (code) =>
-              code == '29' ? transactionDetailResponse() : null,
+          detail: (code) => code == '29' ? transactionDetailResponse() : null,
         ),
       );
 
@@ -372,8 +369,9 @@ void main() {
     /// daftar. Menyembunyikannya berarti transaksinya hilang dari mata
     /// pengguna, jadi barisnya tetap ada memakai nama dari entrinya —
     /// tanpa nomor urut, yang hanya dimiliki daftar.
-    testWidgets('riwayat charge box di luar daftar tetap tampil',
-        (tester) async {
+    testWidgets('riwayat charge box di luar daftar tetap tampil', (
+      tester,
+    ) async {
       await _pump(
         tester,
         stub: _Stub(

@@ -33,6 +33,7 @@ class SessionVerificationPage extends StatefulWidget {
     required this.chargeBoxId,
     required this.connectorId,
     this.expectedCode,
+    this.checkWithBackend = true,
   });
 
   final String chargeBoxId;
@@ -41,6 +42,15 @@ class SessionVerificationPage extends StatefulWidget {
   /// Kode yang diterima saat tidak ada backend — mode offline untuk
   /// test. Default [Env.sessionPin].
   final String? expectedCode;
+
+  /// Memeriksa kode lewat `POST /manage-sessioncode` sebelum menutup
+  /// halaman.
+  ///
+  /// Dimatikan saat kode dikumpulkan untuk perintah lain yang sudah
+  /// membawanya sendiri — `POST /transaction/charging/stop` ikut
+  /// menerima `sessionCode` dan backend yang menolak bila salah, jadi
+  /// memeriksanya dua kali hanya menambah satu perjalanan jaringan.
+  final bool checkWithBackend;
 
   @override
   State<SessionVerificationPage> createState() =>
@@ -82,6 +92,12 @@ class _SessionVerificationPageState extends State<SessionVerificationPage> {
 
   Future<void> _verify() async {
     if (_checking) return;
+
+    // Kode hanya dikumpulkan; yang memeriksanya perintah berikutnya.
+    if (!widget.checkWithBackend) {
+      Navigator.of(context).pop(SessionCheck(sessionCode: _entered));
+      return;
+    }
 
     final repository = ChargingScope.maybeOf(context)?.repository;
 

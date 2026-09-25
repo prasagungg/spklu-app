@@ -67,8 +67,9 @@ Future<void> pumpStatus(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('alur lengkap: charge box sampai pengisian selesai',
-      (tester) async {
+  testWidgets('alur lengkap: charge box sampai pengisian selesai', (
+    tester,
+  ) async {
     final reader = await pumpFlow(tester);
 
     // 1. Pilih Charge Box — pilih nomor 04 (DC, dua konektor).
@@ -86,9 +87,11 @@ void main() {
     expect(find.text('Pilih Nominal'), findsOneWidget);
     expect(find.text('Rincian Harga'), findsNothing);
     expect(
-      tester.widget<PrimaryButton>(
-        find.widgetWithText(PrimaryButton, 'Lanjutkan'),
-      ).onPressed,
+      tester
+          .widget<PrimaryButton>(
+            find.widgetWithText(PrimaryButton, 'Lanjutkan'),
+          )
+          .onPressed,
       isNull,
     );
 
@@ -134,10 +137,7 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
     await tester.pump();
     expect(find.text('Konektor Terhubung'), findsOneWidget);
-    expect(
-      find.textContaining('Konektor berhasil terdeteksi'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Konektor berhasil terdeteksi'), findsOneWidget);
 
     await tester.tap(find.text('Mulai Pengisian'));
     await settle(tester);
@@ -158,13 +158,16 @@ void main() {
       moreOrLessEquals(card.center.dx, epsilon: 0.5),
     );
 
-    // 10. Pulang ke daftar — satu-satunya jalan keluar dari layar ini.
+    // 10. Pulang lewat tombol Home — layar tunggu tidak punya
+    //     tombol aksi, dan biasanya ia berpindah sendiri.
     //
     // Membuka sesinya lagi butuh konektor yang melapor "sedang
     // mengisi"; daftar dummy di mode offline selalu "tersedia", jadi
     // bagian itu diuji di test yang memakai backend tiruan
     // (app_wiring_test dan final_energy_test).
-    await tester.tap(find.text('Kembali ke Halaman Awal'));
+    // Transisi rute masih mengabaikan sentuhan beberapa frame.
+    await settle(tester);
+    await tester.tap(find.byType(HomeButton).first);
     await tester.pumpAndSettle();
     expect(find.text('Pilih Charge Box'), findsOneWidget);
   });
@@ -185,18 +188,8 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(find.text('0,8 kWh'), findsOneWidget);
 
-    // Akhiri pengisian -> layar konfirmasi.
-    await tester.tap(find.text('Akhiri Pengisian'));
-    await settle(tester);
-    expect(find.text('Akhiri Pengisian?'), findsOneWidget);
-    expect(find.text('Pembayaran Awal'), findsOneWidget);
-    expect(
-      find.text('Nilai akhir dihitung setelah charger berhenti.'),
-      findsOneWidget,
-    );
-
-    // Konfirmasi -> Pengisian Selesai dengan rincian akhir.
-    await tester.tap(find.text('Ya, Akhiri Pengisian'));
+    // Akhiri pengisian -> verifikasi kode sesi -> Pengisian Selesai.
+    await endCharging(tester);
     await settle(tester);
     expect(find.text('Pengisian Selesai'), findsOneWidget);
     expect(find.text('Energi Tersalur'), findsOneWidget);
@@ -207,14 +200,68 @@ void main() {
     );
   });
 
-  testWidgets('Lanjut Pengisian membatalkan penghentian sesi', (tester) async {
+  testWidgets('Pengisian Dimulai berpindah sendiri ke layar pemantauan', (
+    tester,
+  ) async {
+    final box = DemoData.chargeBoxes[3];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.build(),
+        home: ChargingStartedPage(
+          session: ChargingSession.fromOrder(
+            chargeBox: box,
+            connector: box.connectors.first,
+            order: DemoData.orderFor(DemoData.priceFor(10)),
+            now: DateTime(2026, 9, 16, 18, 40, 39),
+          ),
+          // Produksi mengacak 2-4 detik; test menentukannya supaya
+          // hasilnya tidak bergantung pada angka acak.
+          waitFor: const Duration(seconds: 3),
+        ),
+      ),
+    );
+    await settle(tester);
+
+    // Kode sesi masih ditunjukkan selama menunggu.
+    expect(find.text('Pengisian Dimulai'), findsOneWidget);
+    expect(find.text('Simpan Kode Sesi Anda'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 3));
+    await settle(tester);
+    // Transisi rute perlu beberapa frame lagi sebelum layar tunggu
+    // benar-benar lepas dari pohon widget.
+    await settle(tester);
+
+    expect(find.text('Sedang Mengisi'), findsOneWidget);
+    // Menggantikan layar tunggu, bukan menumpuk di atasnya.
+    expect(find.text('Pengisian Dimulai'), findsNothing);
+  });
+
+  testWidgets(
+    'Akhiri Pengisian belum menghentikan apa pun sebelum kode diisi',
+    (tester) async {
+      await pumpStatus(tester);
+
+      await tester.tap(find.text('Akhiri Pengisian'));
+      await settle(tester);
+
+      // Yang muncul keypad, bukan rincian akhir.
+      expect(find.text('Verifikasi Sesi'), findsOneWidget);
+      expect(find.text('Pengisian Selesai'), findsNothing);
+    },
+  );
+
+  testWidgets('Kembali dari Verifikasi Sesi membatalkan penghentian', (
+    tester,
+  ) async {
     await pumpStatus(tester);
 
     await tester.tap(find.text('Akhiri Pengisian'));
     await settle(tester);
-    expect(find.text('Akhiri Pengisian?'), findsOneWidget);
+    expect(find.text('Verifikasi Sesi'), findsOneWidget);
 
-    await tester.tap(find.text('Lanjut Pengisian'));
+    await tester.tap(find.text('Kembali'));
     await settle(tester);
 
     // Kembali ke layar status, dan penghitungan energi jalan lagi.
@@ -224,8 +271,9 @@ void main() {
     expect(find.textContaining('kWh'), findsOneWidget);
   });
 
-  testWidgets('tombol Mulai Pengisian nonaktif sebelum konektor terdeteksi',
-      (tester) async {
+  testWidgets('tombol Mulai Pengisian nonaktif sebelum konektor terdeteksi', (
+    tester,
+  ) async {
     final reader = await pumpFlow(tester);
 
     await tester.tap(find.text('04'));
@@ -254,8 +302,8 @@ void main() {
     // Dipakai .last karena rute yang ditinggalkan masih ada di pohon
     // widget selama animasi transisi.
     PrimaryButton startButton() => tester.widget<PrimaryButton>(
-          find.widgetWithText(PrimaryButton, 'Mulai Pengisian').last,
-        );
+      find.widgetWithText(PrimaryButton, 'Mulai Pengisian').last,
+    );
 
     expect(find.text('Hubungkan Konektor'), findsOneWidget);
     expect(startButton().onPressed, isNull);
@@ -266,8 +314,9 @@ void main() {
     expect(startButton().onPressed, isNotNull);
   });
 
-  testWidgets('setiap halaman selain halaman awal punya tombol Home',
-      (tester) async {
+  testWidgets('setiap halaman selain halaman awal punya tombol Home', (
+    tester,
+  ) async {
     final reader = await pumpFlow(tester);
 
     // Halaman awal tidak perlu tombol pulang.
@@ -327,17 +376,14 @@ void main() {
 
     await expectHome('Sedang Mengisi');
 
-    await tester.tap(find.text('Akhiri Pengisian'));
-    await settle(tester);
-    await expectHome('Akhiri Pengisian?');
-
-    await tester.tap(find.text('Ya, Akhiri Pengisian'));
+    await endCharging(tester);
     await settle(tester);
     await expectHome('Pengisian Selesai');
   });
 
-  testWidgets('tombol Home mengembalikan ke halaman awal dari mana pun',
-      (tester) async {
+  testWidgets('tombol Home mengembalikan ke halaman awal dari mana pun', (
+    tester,
+  ) async {
     await pumpFlow(tester);
 
     await tester.tap(find.text('04'));

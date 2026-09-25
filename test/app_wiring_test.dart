@@ -40,23 +40,24 @@ class _Recorder extends Interceptor {
 /// ditekan — kalau dua-duanya hidup, tap-nya jadi ambigu dan bisa
 /// memilih konektor yang salah.
 Map<String, dynamic> _list() => listResponse([
-      chargeBoxJson(
-        id: 'CB-SMR-01',
-        nama: 'CB-SMR-01',
-        connectors: [
-          connectorJson(id: '1'),
-          connectorJson(id: '2', nama: 'Gun 2', status: 0),
-        ],
-      ),
-    ]);
+  chargeBoxJson(
+    id: 'CB-SMR-01',
+    nama: 'CB-SMR-01',
+    connectors: [
+      connectorJson(id: '1'),
+      connectorJson(id: '2', nama: 'Gun 2', status: 0),
+    ],
+  ),
+]);
 
 const _ok = okResponse;
 
 void main() {
   /// Riwayat dibuka dari header halaman awal, dan seluruhnya datang
   /// dari satu `GET /transaction/history-transaction` tanpa body.
-  testWidgets('tombol riwayat di halaman awal membuka seluruh riwayat',
-      (tester) async {
+  testWidgets('tombol riwayat di halaman awal membuka seluruh riwayat', (
+    tester,
+  ) async {
     final recorder = _Recorder(
       (path) => switch (path) {
         '/list-chargerbox' => _list(),
@@ -82,8 +83,9 @@ void main() {
     expect(calls.single.data, isNull);
   });
 
-  testWidgets('menekan Mulai Pengisian benar-benar mengirim POST /start',
-      (tester) async {
+  testWidgets('menekan Mulai Pengisian benar-benar mengirim POST /start', (
+    tester,
+  ) async {
     final recorder = _Recorder(
       (path) => switch (path) {
         '/list-chargerbox' => _list(),
@@ -107,18 +109,14 @@ void main() {
 
     final reader = FakeCardReader();
 
-
-    await tester.pumpWidget(
-      SPKLUApp(repository: repo, cardReader: reader),
-    );
+    await tester.pumpWidget(SPKLUApp(repository: repo, cardReader: reader));
     await tester.pumpAndSettle();
 
     // Daftar charge box datang dari POST /list-chargerbox.
     expect(recorder.to('/list-chargerbox'), isNotEmpty);
-    expect(
-      recorder.to('/list-chargerbox').single.data,
-      {'idSpklu': Env.idSpklu},
-    );
+    expect(recorder.to('/list-chargerbox').single.data, {
+      'idSpklu': Env.idSpklu,
+    });
     expect(find.text('CB-SMR-01'), findsOneWidget);
 
     await tester.tap(find.text('01'));
@@ -179,8 +177,9 @@ void main() {
     expect(find.text('29'), findsOneWidget);
   });
 
-  testWidgets('halaman status mem-polling /progress dan pindah saat selesai',
-      (tester) async {
+  testWidgets('halaman status mem-polling /progress dan pindah saat selesai', (
+    tester,
+  ) async {
     var progressStatus = 3;
     var charged = 0.0;
 
@@ -226,10 +225,7 @@ void main() {
 
     final reader = FakeCardReader();
 
-
-    await tester.pumpWidget(
-      SPKLUApp(repository: repo, cardReader: reader),
-    );
+    await tester.pumpWidget(SPKLUApp(repository: repo, cardReader: reader));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('01'));
@@ -297,8 +293,9 @@ void main() {
     expect(find.text('Energi Tersalur'), findsOneWidget);
   });
 
-  testWidgets('Akhiri Pengisian mengirim /stop dengan connectorId',
-      (tester) async {
+  testWidgets('Akhiri Pengisian mengirim /stop dengan connectorId', (
+    tester,
+  ) async {
     // Setelah perintah start, konektornya melapor sedang mengisi —
     // seperti backend sungguhan, sehingga sesinya bisa dibuka lagi.
     var charging = false;
@@ -351,10 +348,7 @@ void main() {
 
     final reader = FakeCardReader();
 
-
-    await tester.pumpWidget(
-      SPKLUApp(repository: repo, cardReader: reader),
-    );
+    await tester.pumpWidget(SPKLUApp(repository: repo, cardReader: reader));
     await tester.pumpAndSettle();
     await tester.tap(find.text('01'));
     await tester.pumpAndSettle();
@@ -394,19 +388,18 @@ void main() {
     await reopenChargingSession(tester);
     expect(find.text('Sedang Mengisi'), findsOneWidget);
 
-    await tester.tap(find.text('Akhiri Pengisian'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('Akhiri Pengisian?'), findsOneWidget);
-
-    await tester.tap(find.text('Ya, Akhiri Pengisian'));
+    await endCharging(tester);
     for (var i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
 
     final stops = recorder.to('/transaction/charging/stop');
     expect(stops, hasLength(1));
-    expect(stops.single.data, {'orderId': 'YZ00ZG5SP9HUNVRPTZH69Y7POW'});
+    // Kode sesi yang diketik ikut dikirim bersama perintah stop.
+    expect(stops.single.data, {
+      'orderId': 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
+      'sessionCode': '29',
+    });
 
     // Setelah stop, aplikasi membaca ongoing-kwh sampai selesai
     // sebelum menampilkan rincian akhir.

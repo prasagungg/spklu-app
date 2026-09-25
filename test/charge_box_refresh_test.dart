@@ -61,8 +61,9 @@ void main() {
     expect(find.text('CB-SMR-02'), findsOneWidget);
   });
 
-  testWidgets('charge box yang hilang dari backend ikut hilang saat ditarik',
-      (tester) async {
+  testWidgets('charge box yang hilang dari backend ikut hilang saat ditarik', (
+    tester,
+  ) async {
     var ids = ['CB-SMR-01', 'CB-SMR-02'];
     final stub = _Stub(() => _list(ids));
     final repo = ChargePointRepository(

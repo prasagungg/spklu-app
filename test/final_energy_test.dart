@@ -29,16 +29,16 @@ class _Stub extends Interceptor {
         requestOptions: options,
         data: switch (options.path) {
           '/list-chargerbox' => listResponse([
-              chargeBoxJson(id: 'CB-SMR-01', nama: 'CB-SMR-01'),
-            ]),
+            chargeBoxJson(id: 'CB-SMR-01', nama: 'CB-SMR-01'),
+          ]),
           '/booked-connector' => bookingResponse(),
           '/manage-sessioncode' => sessionCodeResponse(),
           // Kabelnya dianggap sudah terpasang; penungguannya
           // diuji tersendiri di connector_detection_poll_test.
           '/check-status-connector' => connectorStatusResponse(),
           '/detail-chargerbox' => chargeBoxDetailResponse(
-              connectors: [connectorJson(status: _charging ? 2 : 1)],
-            ),
+            connectors: [connectorJson(status: _charging ? 2 : 1)],
+          ),
           '/list-kwh' => kwhOptionsResponse(),
           '/count-kwh' => countKwhResponse(),
           '/transaction/push-order' => pushOrderResponse(),
@@ -103,9 +103,7 @@ Future<void> _runUntilCharging(WidgetTester tester, _Stub stub) async {
   await reopenChargingSession(tester);
   expect(find.text('Sedang Mengisi'), findsOneWidget);
 
-  await tester.tap(find.text('Akhiri Pengisian'));
-  await _settle(tester);
-  await tester.tap(find.text('Ya, Akhiri Pengisian'));
+  await endCharging(tester);
 }
 
 void main() {
@@ -150,8 +148,9 @@ void main() {
     expect(find.text('Rp9.144'), findsOneWidget);
   });
 
-  testWidgets('kWh akhir diambil dari /progress terakhir, bukan saat ditekan',
-      (tester) async {
+  testWidgets('kWh akhir diambil dari /progress terakhir, bukan saat ditekan', (
+    tester,
+  ) async {
     // Saat tombol ditekan energinya 0,003 kWh; charger masih
     // menyalurkan daya sampai akhirnya berhenti di 0,017 kWh.
     var status = 3;
@@ -214,9 +213,7 @@ void main() {
     await tester.pump();
     expect(find.text('0,003 kWh'), findsOneWidget);
 
-    await tester.tap(find.text('Akhiri Pengisian'));
-    await _settle(tester);
-    await tester.tap(find.text('Ya, Akhiri Pengisian'));
+    await endCharging(tester);
 
     // Charger berhenti dan melaporkan angka akhir yang lebih besar.
     status = 4;

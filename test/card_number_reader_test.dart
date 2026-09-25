@@ -13,10 +13,10 @@ final _notFound = _bytes([0x6A, 0x82]);
 
 /// Satu simpul BER-TLV: tag, panjang, lalu isinya.
 List<int> _tlv(List<int> tag, List<int> value) => [
-      ...tag,
-      value.length,
-      ...value,
-    ];
+  ...tag,
+  value.length,
+  ...value,
+];
 
 /// Kartu palsu yang menjawab APDU seperti kartu EMV sungguhan.
 ///
@@ -41,10 +41,13 @@ class _FakeCard {
       if (String.fromCharCodes(name) == '2PAY.SYS.DDF01') {
         // FCI PPSE: 6F ( 84 <nama> A5 ( BF0C ( 61 ( 4F <aid> ) ) ) )
         final entry = _tlv([0x61], _tlv([0x4F], aid));
-        final fci = _tlv([0x6F], [
-          ..._tlv([0x84], [0x31, 0x50]),
-          ..._tlv([0xA5], _tlv([0xBF, 0x0C], entry)),
-        ]);
+        final fci = _tlv(
+          [0x6F],
+          [
+            ..._tlv([0x84], [0x31, 0x50]),
+            ..._tlv([0xA5], _tlv([0xBF, 0x0C], entry)),
+          ],
+        );
         return _ok(fci);
       }
       // SELECT aplikasi: tidak menyebut nomor kartunya.
@@ -93,8 +96,18 @@ void main() {
   group('nomor kartu', () {
     test('diambil dari tag 5A tanpa pengisi F', () {
       final record = _bytes([
-        0x70, 0x0A,
-        0x5A, 0x08, 0x60, 0x19, 0x21, 0x34, 0x56, 0x78, 0x90, 0x12,
+        0x70,
+        0x0A,
+        0x5A,
+        0x08,
+        0x60,
+        0x19,
+        0x21,
+        0x34,
+        0x56,
+        0x78,
+        0x90,
+        0x12,
       ]);
 
       expect(panFrom(record), '6019213456789012');
@@ -103,7 +116,16 @@ void main() {
     /// Nomor yang lebih pendek dari tempatnya diisi nibble "F".
     test('pengisi F di ujung dibuang', () {
       final record = _bytes([
-        0x5A, 0x08, 0x60, 0x19, 0x21, 0x34, 0x56, 0x78, 0x90, 0xFF,
+        0x5A,
+        0x08,
+        0x60,
+        0x19,
+        0x21,
+        0x34,
+        0x56,
+        0x78,
+        0x90,
+        0xFF,
       ]);
 
       expect(panFrom(record), '60192134567890');
@@ -112,9 +134,19 @@ void main() {
     /// Track 2 menggabungkan nomor dan tanggal kedaluwarsa, dipisah "D".
     test('diambil dari Track 2 sebelum pemisah D', () {
       final record = _bytes([
-        0x57, 0x0B,
-        0x60, 0x19, 0x21, 0x34, 0x56, 0x78, 0x90, 0x12,
-        0xD2, 0x81, 0x22,
+        0x57,
+        0x0B,
+        0x60,
+        0x19,
+        0x21,
+        0x34,
+        0x56,
+        0x78,
+        0x90,
+        0x12,
+        0xD2,
+        0x81,
+        0x22,
       ]);
 
       expect(panFrom(record), '6019213456789012');
@@ -129,8 +161,18 @@ void main() {
     test('mengikuti PPSE lalu membaca record pertama', () async {
       final card = _FakeCard(
         recordPayload: [
-          0x70, 0x0A,
-          0x5A, 0x08, 0x60, 0x19, 0x21, 0x34, 0x56, 0x78, 0x90, 0x12,
+          0x70,
+          0x0A,
+          0x5A,
+          0x08,
+          0x60,
+          0x19,
+          0x21,
+          0x34,
+          0x56,
+          0x78,
+          0x90,
+          0x12,
         ],
       );
 
@@ -161,8 +203,7 @@ void main() {
       expect(await readCardNumber(disconnect), isEmpty);
     });
 
-    test('kartu tanpa nomor di record mana pun menghasilkan kosong',
-        () async {
+    test('kartu tanpa nomor di record mana pun menghasilkan kosong', () async {
       final card = _FakeCard(recordPayload: [0x70, 0x02, 0x82, 0x00]);
 
       expect(await readCardNumber(card.transceive), isEmpty);

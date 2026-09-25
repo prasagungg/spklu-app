@@ -65,18 +65,16 @@ void main() {
     ApiConfig.apply(Env.apiBaseUrl);
   });
 
-  testWidgets('isian awal memakai alamat yang sedang dipakai',
-      (tester) async {
+  testWidgets('isian awal memakai alamat yang sedang dipakai', (tester) async {
     await _pumpPage(tester, _Stub());
 
-    final field = tester.widget<TextField>(
-      find.byKey(ApiConfigPage.fieldKey),
-    );
+    final field = tester.widget<TextField>(find.byKey(ApiConfigPage.fieldKey));
     expect(field.controller!.text, Env.apiBaseUrl);
   });
 
-  testWidgets('alamat tanpa skema ditampilkan lengkap sebagai http',
-      (tester) async {
+  testWidgets('alamat tanpa skema ditampilkan lengkap sebagai http', (
+    tester,
+  ) async {
     await _pumpPage(tester, _Stub());
 
     await tester.enterText(
@@ -91,15 +89,13 @@ void main() {
     );
   });
 
-  testWidgets('Hubungkan memakai alamat baru lalu membuka daftar charge box',
-      (tester) async {
+  testWidgets('Hubungkan memakai alamat baru lalu membuka daftar charge box', (
+    tester,
+  ) async {
     final stub = _Stub();
     await _pumpPage(tester, stub);
 
-    await tester.enterText(
-      find.byKey(ApiConfigPage.fieldKey),
-      '10.0.2.2:8080',
-    );
+    await tester.enterText(find.byKey(ApiConfigPage.fieldKey), '10.0.2.2:8080');
     await tester.pump();
     await tester.tap(find.text('Hubungkan'));
     await tester.pumpAndSettle();
@@ -112,8 +108,9 @@ void main() {
     expect(find.byType(ChargeBoxPage), findsOneWidget);
   });
 
-  testWidgets('alamat tersimpan sehingga terpakai lagi setelah dibuka ulang',
-      (tester) async {
+  testWidgets('alamat tersimpan sehingga terpakai lagi setelah dibuka ulang', (
+    tester,
+  ) async {
     await _pumpPage(tester, _Stub());
 
     await tester.enterText(
@@ -130,8 +127,9 @@ void main() {
     expect(await ApiConfig.restore(), 'http://192.168.4.21:9000');
   });
 
-  testWidgets('alamat yang tidak bisa dihubungi tidak melanjutkan',
-      (tester) async {
+  testWidgets('alamat yang tidak bisa dihubungi tidak melanjutkan', (
+    tester,
+  ) async {
     await _pumpPage(tester, _Stub(fail: true));
 
     await tester.enterText(
@@ -164,8 +162,9 @@ void main() {
     expect(prefs.getString('spklu_api_base_url'), isNull);
   });
 
-  testWidgets('Lanjut Tanpa Uji masuk walau controller sedang mati',
-      (tester) async {
+  testWidgets('Lanjut Tanpa Uji masuk walau controller sedang mati', (
+    tester,
+  ) async {
     final stub = _Stub(fail: true);
     await _pumpPage(tester, stub);
 
@@ -197,8 +196,9 @@ void main() {
     );
   });
 
-  testWidgets('tombol di header daftar charge box kembali ke konfigurasi',
-      (tester) async {
+  testWidgets('tombol di header daftar charge box kembali ke konfigurasi', (
+    tester,
+  ) async {
     await _pumpPage(tester, _Stub());
 
     await tester.tap(find.text('Hubungkan'));

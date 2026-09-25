@@ -59,8 +59,7 @@ void main() {
     expect(find.text('Sedang Mengisi'), findsOneWidget);
   });
 
-  testWidgets('polling ongoing-kwh pertama mengisi angkanya',
-      (tester) async {
+  testWidgets('polling ongoing-kwh pertama mengisi angkanya', (tester) async {
     final repo = ChargePointRepository(
       client: ApiClient.withDio(Dio()..interceptors.add(_Stub(0.127))),
     );
@@ -86,8 +85,7 @@ void main() {
 
   /// Sesi yang dilanjutkan dari daftar charge box tidak membawa
   /// orderId, jadi tidak ada yang bisa ditanyakan.
-  testWidgets('sesi tanpa orderId tidak menanyakan apa pun',
-      (tester) async {
+  testWidgets('sesi tanpa orderId tidak menanyakan apa pun', (tester) async {
     final stub = _Stub(0.5);
     final repo = ChargePointRepository(
       client: ApiClient.withDio(Dio()..interceptors.add(stub)),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kossotrik/widgets/page_scaffold.dart';
 
 /// Memajukan halaman yang punya timer berulang, yang membuat
 /// pumpAndSettle tidak pernah selesai.
@@ -49,13 +50,28 @@ Future<void> reopenChargingSession(
   expect(find.text('Pengisian Dimulai'), findsOneWidget);
   expect(find.text(code), findsOneWidget);
 
-  await tester.tap(find.text('Kembali ke Halaman Awal'));
+  // Layar tunggu tidak punya tombol aksi; jalan pulang lebih awal hanya
+  // lewat tombol Home di header.
+  await tester.tap(find.byType(HomeButton).first);
   await tester.pumpAndSettle();
 
   await tester.tap(find.text(badge));
   await tester.pumpAndSettle();
   await tester.tap(find.text(connector));
   await tester.pumpAndSettle();
+
+  await enterSessionCode(tester, code);
+}
+
+/// Dari layar "Sedang Mengisi": mengakhiri pengisian.
+///
+/// Perintah stop tidak terkirim saat "Akhiri Pengisian" ditekan —
+/// halaman Verifikasi Sesi muncul lebih dulu, dan kode yang diketik
+/// ikut dikirim bersama `/stop`.
+Future<void> endCharging(WidgetTester tester, {String code = '29'}) async {
+  await tester.tap(find.text('Akhiri Pengisian'));
+  await settleFrames(tester);
+  expect(find.text('Verifikasi Sesi'), findsOneWidget);
 
   await enterSessionCode(tester, code);
 }

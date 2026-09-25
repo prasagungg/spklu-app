@@ -205,7 +205,10 @@ void main() {
   group('halaman', () {
     testWidgets('riwayat kosong menjelaskan dirinya', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(theme: AppTheme.build(), home: ApiLogPage(store: ApiLogStore())),
+        MaterialApp(
+          theme: AppTheme.build(),
+          home: ApiLogPage(store: ApiLogStore()),
+        ),
       );
 
       expect(find.textContaining('Belum ada panggilan'), findsOneWidget);
@@ -216,7 +219,10 @@ void main() {
       await _call(tester, store, body: '{"idSpklu":"SPKLU-SMR"}');
 
       await tester.pumpWidget(
-        MaterialApp(theme: AppTheme.build(), home: ApiLogPage(store: store)),
+        MaterialApp(
+          theme: AppTheme.build(),
+          home: ApiLogPage(store: store),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -232,12 +238,16 @@ void main() {
       expect(find.textContaining('{"idSpklu":"SPKLU-SMR"}'), findsOneWidget);
     });
 
-    testWidgets('daftar ikut berubah saat panggilan baru masuk',
-        (tester) async {
+    testWidgets('daftar ikut berubah saat panggilan baru masuk', (
+      tester,
+    ) async {
       final store = ApiLogStore();
 
       await tester.pumpWidget(
-        MaterialApp(theme: AppTheme.build(), home: ApiLogPage(store: store)),
+        MaterialApp(
+          theme: AppTheme.build(),
+          home: ApiLogPage(store: store),
+        ),
       );
       expect(find.textContaining('Belum ada panggilan'), findsOneWidget);
 
@@ -253,7 +263,10 @@ void main() {
       await _call(tester, store, path: '/status-konektor');
 
       await tester.pumpWidget(
-        MaterialApp(theme: AppTheme.build(), home: ApiLogPage(store: store)),
+        MaterialApp(
+          theme: AppTheme.build(),
+          home: ApiLogPage(store: store),
+        ),
       );
       await tester.pumpAndSettle();
       expect(find.byType(ListTile), findsNWidgets(2));
@@ -270,15 +283,20 @@ void main() {
       await _call(tester, store);
 
       await tester.pumpWidget(
-        MaterialApp(theme: AppTheme.build(), home: ApiLogPage(store: store)),
+        MaterialApp(
+          theme: AppTheme.build(),
+          home: ApiLogPage(store: store),
+        ),
       );
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byKey(ApiLogPage.filterKey), 'zzz');
       await tester.pumpAndSettle();
 
-      expect(find.text('Tidak ada yang cocok dengan penyaring.'),
-          findsOneWidget);
+      expect(
+        find.text('Tidak ada yang cocok dengan penyaring.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('tombol hapus mengosongkan daftar', (tester) async {
@@ -286,7 +304,10 @@ void main() {
       await _call(tester, store);
 
       await tester.pumpWidget(
-        MaterialApp(theme: AppTheme.build(), home: ApiLogPage(store: store)),
+        MaterialApp(
+          theme: AppTheme.build(),
+          home: ApiLogPage(store: store),
+        ),
       );
       await tester.pumpAndSettle();
 

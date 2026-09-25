@@ -153,8 +153,9 @@ void main() {
 
     /// Yang dibawa pulang dari verifikasi menentukan langkah
     /// berikutnya: kode sesinya, tahap transaksinya, dan ordernya.
-    testWidgets('kode benar menutup halaman dengan hasil pemeriksaan',
-        (tester) async {
+    testWidgets('kode benar menutup halaman dengan hasil pemeriksaan', (
+      tester,
+    ) async {
       await _open(tester, stub: _Stub(statusProcess: 3, orderId: 'ORDER-9'));
 
       await _enter(tester, '29');

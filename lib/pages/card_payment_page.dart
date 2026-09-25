@@ -41,10 +41,12 @@ class CardPaymentPage extends StatefulWidget {
 }
 
 class _CardPaymentPageState extends State<CardPaymentPage> {
-  static const _limit = Duration(minutes: 10);
+  /// Dipakai hanya bila order tidak membawa batas waktu — sesi yang
+  /// dilanjutkan dari daftar, dan mode offline untuk test.
+  static const _fallbackLimit = Duration(minutes: 10);
 
   Timer? _ticker;
-  Duration _remaining = _limit;
+  late Duration _remaining = _remainingNow() ?? _fallbackLimit;
 
   CardReader? _reader;
   CardReaderStatus? _status;
@@ -68,9 +70,21 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
         timer.cancel();
         return;
       }
-      setState(() => _remaining -= const Duration(seconds: 1));
+      // Sisa waktu dihitung ulang dari batas waktu order, bukan dengan
+      // mengurangi satu detik: hitungannya tetap benar walau timer
+      // tersendat atau layar sempat ditinggalkan.
+      setState(
+        () => _remaining =
+            _remainingNow() ?? _remaining - const Duration(seconds: 1),
+      );
     });
   }
+
+  /// Sisa waktu menurut `sessionExpiredTime` milik order.
+  ///
+  /// Null bila ordernya tidak membawa batas waktu — pemanggil jatuh ke
+  /// hitungan lokal.
+  Duration? _remainingNow() => widget.session.remainingAt(DateTime.now());
 
   @override
   void didChangeDependencies() {

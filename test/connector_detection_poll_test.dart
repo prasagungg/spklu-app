@@ -9,6 +9,7 @@ import 'package:kossotrik/pages/connect_connector_page.dart';
 import 'package:kossotrik/services/api_client.dart';
 import 'package:kossotrik/theme/app_theme.dart';
 import 'package:kossotrik/widgets/primary_button.dart';
+import 'package:kossotrik/widgets/session_widgets.dart';
 
 import 'fixtures.dart';
 
@@ -71,8 +72,8 @@ Future<_Stub> _pump(WidgetTester tester, {String status = 'Available'}) async {
 }
 
 PrimaryButton _startButton(WidgetTester tester) => tester.widget<PrimaryButton>(
-      find.widgetWithText(PrimaryButton, 'Mulai Pengisian'),
-    );
+  find.widgetWithText(PrimaryButton, 'Mulai Pengisian'),
+);
 
 /// Satu putaran polling.
 Future<void> _tick(WidgetTester tester) async {
@@ -122,8 +123,9 @@ void main() {
     expect(_startButton(tester).onPressed, isNotNull);
   });
 
-  testWidgets('pemeriksaan berhenti setelah konektor terdeteksi',
-      (tester) async {
+  testWidgets('pemeriksaan berhenti setelah konektor terdeteksi', (
+    tester,
+  ) async {
     final stub = await _pump(tester, status: 'Preparing');
 
     await _tick(tester);
@@ -150,8 +152,9 @@ void main() {
 
   /// Charger bisa melewati "Preparing" bila sesinya sudah jalan; kalau
   /// keadaan sesudahnya tidak ikut dihitung, halamannya menggantung.
-  testWidgets('status sesudah Preparing juga berarti kabelnya terpasang',
-      (tester) async {
+  testWidgets('status sesudah Preparing juga berarti kabelnya terpasang', (
+    tester,
+  ) async {
     await _pump(tester, status: 'SuspendedEV');
 
     await _tick(tester);
@@ -166,10 +169,37 @@ void main() {
 
     await _tick(tester);
 
-    expect(
-      find.textContaining('tidak bisa dipakai (Faulted)'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('tidak bisa dipakai (Faulted)'), findsOneWidget);
     expect(_startButton(tester).onPressed, isNull);
+  });
+
+  testWidgets('hitung mundur dibaca dari sessionExpired tagihan', (
+    tester,
+  ) async {
+    final box = ChargeBox.fromJson(chargeBoxJson(), number: 1);
+    final expiry = DateTime.now().add(const Duration(minutes: 8, seconds: 31));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.build(),
+        home: ConnectConnectorPage(
+          session: ChargingSession(
+            chargeBox: box,
+            connector: box.connectors.single,
+            sessionCode: '29',
+            reference: '81067',
+            createdAt: DateTime(2026),
+            orderId: 'ORDER-1',
+            // Tenggat yang dikirim payment-billing, bukan sepuluh menit
+            // tetap milik aplikasi.
+            expiresAt: expiry,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final pill = tester.widget<CountdownPill>(find.byType(CountdownPill));
+    expect(pill.remaining.inSeconds, closeTo(511, 2));
   });
 }

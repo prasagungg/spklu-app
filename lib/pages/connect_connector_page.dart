@@ -41,12 +41,14 @@ class ConnectConnectorPage extends StatefulWidget {
 }
 
 class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
-  static const _limit = Duration(minutes: 10);
+  /// Dipakai hanya bila tagihannya tidak membawa batas waktu — sesi
+  /// yang dilanjutkan dari daftar, dan mode offline untuk test.
+  static const _fallbackLimit = Duration(minutes: 10);
   static const _simulationDelay = Duration(seconds: 3);
 
   Timer? _ticker;
   Timer? _detection;
-  Duration _remaining = _limit;
+  late Duration _remaining = _remainingNow() ?? _fallbackLimit;
   bool _connected = false;
   bool _starting = false;
 
@@ -70,9 +72,22 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
         timer.cancel();
         return;
       }
-      setState(() => _remaining -= const Duration(seconds: 1));
+      // Dihitung ulang dari tenggat, bukan dikurangi satu detik, supaya
+      // angkanya tetap benar walau timer tersendat.
+      setState(
+        () => _remaining =
+            _remainingNow() ?? _remaining - const Duration(seconds: 1),
+      );
     });
   }
+
+  /// Sisa waktu menurut `sessionExpired` pada jawaban
+  /// `POST /transaction/payment-billing`.
+  ///
+  /// Pembayaran yang memperbarui tenggat sesi, jadi hitung mundur di
+  /// sini melanjutkan dari sana — bukan mengulang dari sepuluh menit.
+  /// Null bila sesinya tidak membawa batas waktu.
+  Duration? _remainingNow() => widget.session.remainingAt(DateTime.now());
 
   @override
   void didChangeDependencies() {

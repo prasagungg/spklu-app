@@ -43,20 +43,18 @@ const _ok = okResponse;
 final _list = listResponse([chargeBoxJson(id: 'CB-SMR-01', nama: 'CB-SMR-01')]);
 
 void main() {
-  testWidgets('daftar dimuat ulang tiap kembali ke Pilih Charge Box',
-      (tester) async {
+  testWidgets('daftar dimuat ulang tiap kembali ke Pilih Charge Box', (
+    tester,
+  ) async {
     final counter = _Counter();
     final repo = ChargePointRepository(
       client: ApiClient.withDio(Dio()..interceptors.add(counter)),
     );
 
-    await tester.pumpWidget(
-      SPKLUApp(repository: repo),
-    );
+    await tester.pumpWidget(SPKLUApp(repository: repo));
     await tester.pumpAndSettle();
 
-    expect(counter.listCalls, greaterThanOrEqualTo(1),
-        reason: 'pemuatan awal');
+    expect(counter.listCalls, greaterThanOrEqualTo(1), reason: 'pemuatan awal');
     expect(find.text('CB-SMR-01'), findsOneWidget);
 
     // Masuk ke bottom sheet lalu ke Pilih Nominal.
@@ -73,8 +71,11 @@ void main() {
     await tester.tap(find.text('Batalkan Transaksi'));
     await tester.pumpAndSettle();
     expect(find.text('Pilih Charge Box'), findsOneWidget);
-    expect(counter.listCalls, greaterThan(beforeBack),
-        reason: 'kembali harus memuat ulang');
+    expect(
+      counter.listCalls,
+      greaterThan(beforeBack),
+      reason: 'kembali harus memuat ulang',
+    );
 
     // Masuk lebih dalam, lalu pulang lewat tombol Home.
     await tester.tap(find.text('01'));

@@ -13,16 +13,15 @@ Map<String, dynamic> connectorJson({
   String type = 'CCS2',
   String arus = 'DC',
   Object? estimasi,
-}) =>
-    {
-      'connectorId': id,
-      'chargeboxId': chargeBoxId,
-      'status': status,
-      'namaKonektor': nama,
-      'typeConnector': type,
-      'connectorTypeCurrent': arus,
-      'estimatimationAvailable': estimasi,
-    };
+}) => {
+  'connectorId': id,
+  'chargeboxId': chargeBoxId,
+  'status': status,
+  'namaKonektor': nama,
+  'typeConnector': type,
+  'connectorTypeCurrent': arus,
+  'estimatimationAvailable': estimasi,
+};
 
 Map<String, dynamic> chargeBoxJson({
   String id = 'CB-SMR-01',
@@ -56,15 +55,12 @@ Map<String, dynamic> chargeBoxDetailResponse({
   final box = chargeBoxJson(id: id, nama: nama, connectors: connectors)
     ..remove('daya');
 
-  return {
-    'responseCode': '00',
-    'responseMessage': 'Success',
-    'data': box,
-  };
+  return {'responseCode': '00', 'responseMessage': 'Success', 'data': box};
 }
 
 /// Amplop lengkap `POST /list-chargerbox`.
-Map<String, dynamic> listResponse([List<Map<String, dynamic>>? chargeBoxes]) => {
+Map<String, dynamic> listResponse([List<Map<String, dynamic>>? chargeBoxes]) =>
+    {
       'responseCode': '00',
       'responseMessage': 'Success',
       'data': {
@@ -76,12 +72,13 @@ Map<String, dynamic> listResponse([List<Map<String, dynamic>>? chargeBoxes]) => 
     };
 
 /// Amplop `GET /list-kwh`.
-Map<String, dynamic> kwhOptionsResponse([List<num> list = const [10, 20, 30]]) =>
-    {
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {'list': list},
-    };
+Map<String, dynamic> kwhOptionsResponse([
+  List<num> list = const [10, 20, 30],
+]) => {
+  'responseCode': '00',
+  'responseMessage': 'Success',
+  'data': {'list': list},
+};
 
 /// Amplop `POST /count-kwh`.
 Map<String, dynamic> countKwhResponse({
@@ -89,26 +86,25 @@ Map<String, dynamic> countKwhResponse({
   int rpTotal = 27135,
   String chargeBoxId = 'CB-SMR-01',
   String connectorId = '1',
-}) =>
-    {
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {
-        'chargeBoxId': chargeBoxId,
-        'connectorId': connectorId,
-        'kwh': kwh,
-        'rpJaminanSpklu': 0,
-        'rpAdmin': 0,
-        'rpDiskon': 0,
-        'rpPerKwh': 2466.78,
-        'rpPpj': 2467,
-        'rpPpn': 0,
-        'rpTotal': rpTotal,
-        'rpLayanan': 0,
-        'rpMaterai': 0,
-        'idleFee': 0,
-      },
-    };
+}) => {
+  'responseCode': '00',
+  'responseMessage': 'Success',
+  'data': {
+    'chargeBoxId': chargeBoxId,
+    'connectorId': connectorId,
+    'kwh': kwh,
+    'rpJaminanSpklu': 0,
+    'rpAdmin': 0,
+    'rpDiskon': 0,
+    'rpPerKwh': 2466.78,
+    'rpPpj': 2467,
+    'rpPpn': 0,
+    'rpTotal': rpTotal,
+    'rpLayanan': 0,
+    'rpMaterai': 0,
+    'idleFee': 0,
+  },
+};
 
 /// Amplop `POST /transaction/push-order`.
 Map<String, dynamic> pushOrderResponse({
@@ -117,31 +113,30 @@ Map<String, dynamic> pushOrderResponse({
   String orderId = 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
   String sessionCode = '29',
   String partnerReference = '81067',
-}) =>
-    {
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {
-        'orderId': orderId,
-        'chargeBoxId': 'CB-SMR-01',
-        'chargeBoxName': 'Kempower Satellite 200 kW',
-        'connectorName': 'Gun 1',
-        'connectorId': '1',
-        'partnerReference': partnerReference,
-        'sessionCode': sessionCode,
-        'sessionExpiredTime': '2026-09-22T04:22:14Z',
-        'kwh': kwh,
-        'rpPerKwh': 2466,
-        'rpPpj': 740,
-        'rpPpn': 0,
-        'rpTotal': rpTotal,
-        'rpLayanan': 0,
-        'rpMaterai': 0,
-        'rpKwh': 24660,
-        'idleFee': 0,
-        'serviceFee': 0,
-      },
-    };
+}) => {
+  'responseCode': '00',
+  'responseMessage': 'Success',
+  'data': {
+    'orderId': orderId,
+    'chargeBoxId': 'CB-SMR-01',
+    'chargeBoxName': 'Kempower Satellite 200 kW',
+    'connectorName': 'Gun 1',
+    'connectorId': '1',
+    'partnerReference': partnerReference,
+    'sessionCode': sessionCode,
+    'sessionExpiredTime': '2026-09-22T04:22:14Z',
+    'kwh': kwh,
+    'rpPerKwh': 2466,
+    'rpPpj': 740,
+    'rpPpn': 0,
+    'rpTotal': rpTotal,
+    'rpLayanan': 0,
+    'rpMaterai': 0,
+    'rpKwh': 24660,
+    'idleFee': 0,
+    'serviceFee': 0,
+  },
+};
 
 /// Amplop `POST /transaction/inquiry-billing`.
 Map<String, dynamic> inquiryBillingResponse({
@@ -151,24 +146,23 @@ Map<String, dynamic> inquiryBillingResponse({
   // `num`, bukan `int`: tagihan sungguhan kerap pecahan (25161.156),
   // dan itulah angka yang harus dikirim balik saat membayar.
   num totalAmount = 25400,
-}) =>
-    {
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {
-        'orderId': orderId,
-        'pspId': pspId,
-        'cardNumber': cardNumber,
-        'amount': totalAmount,
-        'fee': 0,
-        'idleFee': 0,
-        'serviceFee': 0,
-        'totalAmount': totalAmount,
-        // Backend mengirimnya kosong di sini; yang berlaku dari
-        // push-order.
-        'sessionCode': '',
-      },
-    };
+}) => {
+  'responseCode': '00',
+  'responseMessage': 'Success',
+  'data': {
+    'orderId': orderId,
+    'pspId': pspId,
+    'cardNumber': cardNumber,
+    'amount': totalAmount,
+    'fee': 0,
+    'idleFee': 0,
+    'serviceFee': 0,
+    'totalAmount': totalAmount,
+    // Backend mengirimnya kosong di sini; yang berlaku dari
+    // push-order.
+    'sessionCode': '',
+  },
+};
 
 /// Amplop `POST /transaction/payment-billing`.
 ///
@@ -178,12 +172,17 @@ Map<String, dynamic> paymentBillingResponse({
   String orderId = 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
   num totalAmount = 25400,
   String bankLog = '1231408098812345678100500',
+  String sessionExpired = '2026-09-23T09:56:04Z',
 }) {
   final body = inquiryBillingResponse(
     orderId: orderId,
     totalAmount: totalAmount,
   );
-  (body['data'] as Map<String, dynamic>)['bankLog'] = bankLog;
+  final data = body['data'] as Map<String, dynamic>;
+  data['bankLog'] = bankLog;
+  // Pembayaran memperbarui tenggat sesi; inilah sumber hitung mundur di
+  // layar Hubungkan Konektor.
+  data['sessionExpired'] = sessionExpired;
 
   return body;
 }
@@ -198,18 +197,17 @@ Map<String, dynamic> connectorStatusResponse({
   String status = 'Preparing',
   String chargeBoxId = 'CB-SMR-01',
   String connectorId = '1',
-}) =>
-    {
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {
-        'chargeBoxId': chargeBoxId,
-        'chargeboxName': 'Kempower Satellite 200 kW',
-        'connectorName': 'Gun $connectorId',
-        'connectorId': connectorId,
-        'connectorStatus': status,
-      },
-    };
+}) => {
+  'responseCode': '00',
+  'responseMessage': 'Success',
+  'data': {
+    'chargeBoxId': chargeBoxId,
+    'chargeboxName': 'Kempower Satellite 200 kW',
+    'connectorName': 'Gun $connectorId',
+    'connectorId': connectorId,
+    'connectorStatus': status,
+  },
+};
 
 /// Amplop `POST /transaction/detail-history-transaction`.
 ///
@@ -222,34 +220,33 @@ Map<String, dynamic> transactionDetailResponse({
   num rpPakai = 32500,
   num rpSisa = 17500,
   num kwhPakai = 6.4,
-}) =>
-    {
-      'response_code': '00',
-      'response_message': 'Success',
-      'data': {
-        'orderId': orderId,
-        'chargeboxId': 'CB-SMR-01',
-        'chargeboxName': 'Kempower Satellite 200 kW',
-        'connectorId': 1,
-        'connectorName': 'Gun 1',
-        'namaSpklu': 'SPKLU PLN PUSAT',
-        'pspId': 'EM-BNI',
-        'cardNumber': '601••••••••••890',
-        'status': 4,
-        'tglCatat': '2026-09-23T09:28:44Z',
-        'kwhPesan': 10,
-        'kwhPakai': kwhPakai,
-        'sisaKwh': 3.6,
-        'rpPesan': rpPesan,
-        'rpPakai': rpPakai,
-        'rpSisa': rpSisa,
-        'hargaKwh': 2466,
-        'rpLayanan': null,
-        'rpMaterai': null,
-        'firstSoc': null,
-        'idleFee': 0,
-      },
-    };
+}) => {
+  'response_code': '00',
+  'response_message': 'Success',
+  'data': {
+    'orderId': orderId,
+    'chargeboxId': 'CB-SMR-01',
+    'chargeboxName': 'Kempower Satellite 200 kW',
+    'connectorId': 1,
+    'connectorName': 'Gun 1',
+    'namaSpklu': 'SPKLU PLN PUSAT',
+    'pspId': 'EM-BNI',
+    'cardNumber': '601••••••••••890',
+    'status': 4,
+    'tglCatat': '2026-09-23T09:28:44Z',
+    'kwhPesan': 10,
+    'kwhPakai': kwhPakai,
+    'sisaKwh': 3.6,
+    'rpPesan': rpPesan,
+    'rpPakai': rpPakai,
+    'rpSisa': rpSisa,
+    'hargaKwh': 2466,
+    'rpLayanan': null,
+    'rpMaterai': null,
+    'firstSoc': null,
+    'idleFee': 0,
+  },
+};
 
 /// Amplop `POST /transaction/charging/detail`.
 ///
@@ -263,34 +260,33 @@ Map<String, dynamic> chargingDetailResponse({
   num rpPesan = 25400,
   num rpPakai = 16256,
   num rpSisa = 9144,
-}) =>
-    {
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {
-        'orderId': orderId,
-        'chargeboxId': 'CB-SMR-01',
-        'chargeboxName': 'Kempower Satellite 200 kW',
-        'connectorName': 'Gun 1',
-        'connectorId': '1',
-        'status': 4,
-        'kwhPesan': kwhPesan,
-        'kwhPakai': kwhPakai,
-        'sisaKwh': 3.6,
-        'rpPesan': rpPesan,
-        'rpPakai': rpPakai,
-        'rpSisa': rpSisa,
-        'hargaKwh': 2466,
-        'chargeDuration': '120',
-        'chargeDurationInMinutes': '2',
-        'rpMaterai': null,
-        'firstSoc': null,
-        'lastSoc': null,
-        'idleFee': 0,
-        'serviceFee': 0,
-        'tglCatat': '2026-09-24T04:08:39Z',
-      },
-    };
+}) => {
+  'responseCode': '00',
+  'responseMessage': 'Success',
+  'data': {
+    'orderId': orderId,
+    'chargeboxId': 'CB-SMR-01',
+    'chargeboxName': 'Kempower Satellite 200 kW',
+    'connectorName': 'Gun 1',
+    'connectorId': '1',
+    'status': 4,
+    'kwhPesan': kwhPesan,
+    'kwhPakai': kwhPakai,
+    'sisaKwh': 3.6,
+    'rpPesan': rpPesan,
+    'rpPakai': rpPakai,
+    'rpSisa': rpSisa,
+    'hargaKwh': 2466,
+    'chargeDuration': '120',
+    'chargeDurationInMinutes': '2',
+    'rpMaterai': null,
+    'firstSoc': null,
+    'lastSoc': null,
+    'idleFee': 0,
+    'serviceFee': 0,
+    'tglCatat': '2026-09-24T04:08:39Z',
+  },
+};
 
 Map<String, dynamic> sessionCodeResponse({
   String orderId = 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
@@ -300,20 +296,19 @@ Map<String, dynamic> sessionCodeResponse({
   int statusProcess = 3,
   String chargeBoxId = 'CB-SMR-01',
   String connectorId = '1',
-}) =>
-    {
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {
-        'orderId': orderId,
-        'chargeBoxId': chargeBoxId,
-        'chargeBoxName': 'Kempower Satellite 200 kW',
-        'connectorName': 'Gun $connectorId',
-        'connectorId': connectorId,
-        'sessionCode': sessionCode,
-        'statusProcess': statusProcess,
-      },
-    };
+}) => {
+  'responseCode': '00',
+  'responseMessage': 'Success',
+  'data': {
+    'orderId': orderId,
+    'chargeBoxId': chargeBoxId,
+    'chargeBoxName': 'Kempower Satellite 200 kW',
+    'connectorName': 'Gun $connectorId',
+    'connectorId': connectorId,
+    'sessionCode': sessionCode,
+    'statusProcess': statusProcess,
+  },
+};
 
 /// Amplop `POST /booked-connector`.
 ///
@@ -324,40 +319,38 @@ Map<String, dynamic> bookingResponse({
   String sessionCode = '29',
   String chargeBoxId = 'CB-SMR-01',
   String connectorId = '1',
-}) =>
-    {
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {
-        'chargeBoxId': chargeBoxId,
-        'chargeboxName': 'Kempower Satellite 200 kW',
-        'connectorName': 'Gun $connectorId',
-        'connectorId': connectorId,
-        // Tahapnya ditetapkan backend sendiri.
-        'connectorStatus': 'R0',
-        'sessionExpired': '2026-09-23T09:56:04Z',
-        'reservationId': reservationId,
-        'sessionCode': sessionCode,
-        'status': accepted,
-      },
-    };
+}) => {
+  'responseCode': '00',
+  'responseMessage': 'Success',
+  'data': {
+    'chargeBoxId': chargeBoxId,
+    'chargeboxName': 'Kempower Satellite 200 kW',
+    'connectorName': 'Gun $connectorId',
+    'connectorId': connectorId,
+    // Tahapnya ditetapkan backend sendiri.
+    'connectorStatus': 'R0',
+    'sessionExpired': '2026-09-23T09:56:04Z',
+    'reservationId': reservationId,
+    'sessionCode': sessionCode,
+    'status': accepted,
+  },
+};
 
 /// Amplop `POST /cancelled-connector`.
 Map<String, dynamic> cancellationResponse({
   String chargeBoxId = 'CB-SMR-01',
   String connectorId = '1',
-}) =>
-    {
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {
-        'chargeBoxId': chargeBoxId,
-        'chargeBoxName': 'Kempower Satellite 200 kW',
-        'connectorName': 'Gun $connectorId',
-        'connectorId': connectorId,
-        'statusMessage': 'Connector Cancelled',
-      },
-    };
+}) => {
+  'responseCode': '00',
+  'responseMessage': 'Success',
+  'data': {
+    'chargeBoxId': chargeBoxId,
+    'chargeBoxName': 'Kempower Satellite 200 kW',
+    'connectorName': 'Gun $connectorId',
+    'connectorId': connectorId,
+    'statusMessage': 'Connector Cancelled',
+  },
+};
 
 /// Amplop `POST /transaction/charging/ongoing-kwh`.
 Map<String, dynamic> ongoingKwhResponse({
@@ -368,50 +361,47 @@ Map<String, dynamic> ongoingKwhResponse({
   int status = 2,
   num power = 0,
   int chargeDurationS = 0,
-}) =>
-    {
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {
-        'orderId': orderId,
-        'chargeBoxName': 'Kempower Satellite 200 kW',
-        'chargeBoxId': 'CB-SMR-01',
-        'connectorName': 'Gun 1',
-        'orderKwh': orderKwh,
-        'charged': charged,
-        'remaining': remaining ?? (orderKwh - charged),
-        'status': status,
-        'lastSoc': null,
-        'firstSoc': null,
-        'power': power,
-        'chargeDurationS': chargeDurationS,
-        'chargeDurationM': chargeDurationS ~/ 60,
-        'estRemainingTime': 0,
-        'powerActiveImport': 0,
-        'estimatedCharged': 0,
-      },
-    };
+}) => {
+  'responseCode': '00',
+  'responseMessage': 'Success',
+  'data': {
+    'orderId': orderId,
+    'chargeBoxName': 'Kempower Satellite 200 kW',
+    'chargeBoxId': 'CB-SMR-01',
+    'connectorName': 'Gun 1',
+    'orderKwh': orderKwh,
+    'charged': charged,
+    'remaining': remaining ?? (orderKwh - charged),
+    'status': status,
+    'lastSoc': null,
+    'firstSoc': null,
+    'power': power,
+    'chargeDurationS': chargeDurationS,
+    'chargeDurationM': chargeDurationS ~/ 60,
+    'estRemainingTime': 0,
+    'powerActiveImport': 0,
+    'estimatedCharged': 0,
+  },
+};
 
 /// Amplop `GET /transaction/history-transaction` — seluruh riwayat
 /// dalam satu jawaban.
-Map<String, dynamic> historyResponse([
-  List<Map<String, dynamic>>? list,
-]) =>
-    {
-      'responseCode': '00',
-      'responseMessage': 'Success',
-      'data': {
-        'list': list ??
-            [
-              historyEntryJson(),
-              historyEntryJson(
-                orderId: '5SZJ9T6XLDUVP26LNPN89PDNA4',
-                totalAmount: 50000,
-                createdDate: '2026-09-21T09:42:00Z',
-              ),
-            ],
-      },
-    };
+Map<String, dynamic> historyResponse([List<Map<String, dynamic>>? list]) => {
+  'responseCode': '00',
+  'responseMessage': 'Success',
+  'data': {
+    'list':
+        list ??
+        [
+          historyEntryJson(),
+          historyEntryJson(
+            orderId: '5SZJ9T6XLDUVP26LNPN89PDNA4',
+            totalAmount: 50000,
+            createdDate: '2026-09-21T09:42:00Z',
+          ),
+        ],
+  },
+};
 
 /// Satu entri riwayat. `pspId` dan `cardNumber` kosong berarti
 /// transaksinya tidak pernah sampai dibayar.
@@ -428,18 +418,17 @@ Map<String, dynamic> historyEntryJson({
   String chargeBoxName = 'Kempower Satellite 200 kW',
   Object? connectorId = '1',
   String connectorName = 'Gun 1',
-}) =>
-    {
-      'pspId': pspId,
-      'cardNumber': cardNumber,
-      'orderId': orderId,
-      'totalAmount': totalAmount,
-      'createdDate': createdDate,
-      'chargeboxId': chargeBoxId,
-      'chargeboxName': chargeBoxName,
-      'connectorId': connectorId,
-      'connectorName': connectorName,
-    };
+}) => {
+  'pspId': pspId,
+  'cardNumber': cardNumber,
+  'orderId': orderId,
+  'totalAmount': totalAmount,
+  'createdDate': createdDate,
+  'chargeboxId': chargeBoxId,
+  'chargeboxName': chargeBoxName,
+  'connectorId': connectorId,
+  'connectorName': connectorName,
+};
 
 /// Balasan sukses tanpa isi, untuk `/start` dan `/stop`.
 const okResponse = {'responseCode': '00', 'responseMessage': 'Success'};

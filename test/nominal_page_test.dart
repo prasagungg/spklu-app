@@ -46,8 +46,7 @@ class _Stub extends Interceptor {
       return;
     }
 
-    if (options_.path == '/transaction/push-order' &&
-        orderErrorCode != null) {
+    if (options_.path == '/transaction/push-order' && orderErrorCode != null) {
       handler.reject(
         DioException.badResponse(
           statusCode: 409,
@@ -72,12 +71,12 @@ class _Stub extends Interceptor {
         data: switch (options_.path) {
           '/list-kwh' => kwhOptionsResponse(options),
           '/count-kwh' => countKwhResponse(
-              kwh: (options_.data as Map)['kwh'] as num,
-              rpTotal: rpTotal,
-            ),
+            kwh: (options_.data as Map)['kwh'] as num,
+            rpTotal: rpTotal,
+          ),
           '/transaction/push-order' => pushOrderResponse(
-              kwh: (options_.data as Map)['kwh'] as num,
-            ),
+            kwh: (options_.data as Map)['kwh'] as num,
+          ),
           _ => okResponse,
         },
       ),
@@ -118,9 +117,8 @@ Future<_Stub> _pump(
   return it;
 }
 
-PrimaryButton _continueButton(WidgetTester tester) => tester.widget<PrimaryButton>(
-      find.widgetWithText(PrimaryButton, 'Lanjutkan'),
-    );
+PrimaryButton _continueButton(WidgetTester tester) => tester
+    .widget<PrimaryButton>(find.widgetWithText(PrimaryButton, 'Lanjutkan'));
 
 void main() {
   /// Kartunya sempit — tiga per baris — jadi desainnya menulis
@@ -137,8 +135,7 @@ void main() {
 
   /// Hitung mundurnya milik pemesanan, jadi sisa waktunya diteruskan
   /// dari halaman Kode Sesi — bukan sepuluh menit yang dimulai ulang.
-  testWidgets('hitung mundur meneruskan batas waktu pemesanan',
-      (tester) async {
+  testWidgets('hitung mundur meneruskan batas waktu pemesanan', (tester) async {
     await _pump(
       tester,
       expiresAt: DateTime.now().add(const Duration(minutes: 5, seconds: 30)),
@@ -159,8 +156,9 @@ void main() {
     expect(_continueButton(tester).onPressed, isNull);
   });
 
-  testWidgets('memilih kWh menghitung harganya lewat /count-kwh',
-      (tester) async {
+  testWidgets('memilih kWh menghitung harganya lewat /count-kwh', (
+    tester,
+  ) async {
     final stub = await _pump(tester);
 
     await tester.tap(find.text('20'));
@@ -175,8 +173,7 @@ void main() {
     });
   });
 
-  testWidgets('rincian harga menampilkan angka dari backend',
-      (tester) async {
+  testWidgets('rincian harga menampilkan angka dari backend', (tester) async {
     await _pump(tester);
 
     await tester.tap(find.text('10'));
@@ -219,21 +216,25 @@ void main() {
   /// Konektor yang tarifnya belum diatur dihargai Rp0 oleh backend.
   /// Ordernya boleh dibuat, tetapi tagihannya pasti ditolak saat
   /// membayar — jadi alurnya dihentikan sebelum kartu ditempelkan.
-  testWidgets('total Rp0 menahan Lanjutkan dan menyebut sebabnya',
-      (tester) async {
+  testWidgets('total Rp0 menahan Lanjutkan dan menyebut sebabnya', (
+    tester,
+  ) async {
     await _pump(tester, stub: _Stub(rpTotal: 0));
 
     await tester.tap(find.text('10'));
     await tester.pumpAndSettle();
 
     expect(find.text('Rincian Harga'), findsOneWidget);
-    expect(find.textContaining('Tarif konektor ini belum diatur'),
-        findsOneWidget);
+    expect(
+      find.textContaining('Tarif konektor ini belum diatur'),
+      findsOneWidget,
+    );
     expect(_continueButton(tester).onPressed, isNull);
   });
 
-  testWidgets('harga yang gagal dihitung tidak membuka Lanjutkan',
-      (tester) async {
+  testWidgets('harga yang gagal dihitung tidak membuka Lanjutkan', (
+    tester,
+  ) async {
     await _pump(tester, stub: _Stub(failCount: true));
 
     await tester.tap(find.text('10'));
@@ -275,8 +276,7 @@ void main() {
     /// Rincian di halaman konfirmasi datang dari order, bukan dari
     /// perkiraan `/count-kwh` — termasuk biaya listrik yang hanya
     /// dikirim order.
-    testWidgets('halaman konfirmasi memakai angka dari order',
-        (tester) async {
+    testWidgets('halaman konfirmasi memakai angka dari order', (tester) async {
       await _pump(tester);
 
       await tester.tap(find.text('10'));
@@ -292,8 +292,9 @@ void main() {
       expect(find.text('Rp27.135'), findsNothing);
     });
 
-    testWidgets('order yang tertunda dijelaskan, bukan sekadar gagal',
-        (tester) async {
+    testWidgets('order yang tertunda dijelaskan, bukan sekadar gagal', (
+      tester,
+    ) async {
       await _pump(tester, stub: _Stub(orderErrorCode: '16'));
 
       await tester.tap(find.text('10'));
@@ -308,8 +309,7 @@ void main() {
       );
     });
 
-    testWidgets('kode tak dikenal memakai pesan asli backend',
-        (tester) async {
+    testWidgets('kode tak dikenal memakai pesan asli backend', (tester) async {
       await _pump(tester, stub: _Stub(orderErrorCode: '77'));
 
       await tester.tap(find.text('10'));
@@ -331,12 +331,15 @@ void main() {
       await tester.tap(find.text('Lanjutkan'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Server sedang bermasalah. Coba lagi sebentar.'),
-          findsOneWidget);
+      expect(
+        find.text('Server sedang bermasalah. Coba lagi sebentar.'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('tanda tangan yang ditolak menunjuk ke kredensial',
-        (tester) async {
+    testWidgets('tanda tangan yang ditolak menunjuk ke kredensial', (
+      tester,
+    ) async {
       await _pump(tester, stub: _Stub(orderErrorCode: '13'));
 
       await tester.tap(find.text('10'));

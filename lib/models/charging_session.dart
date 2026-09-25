@@ -19,6 +19,7 @@ class ChargingSession {
     this.price,
     this.orderId = '',
     this.billing,
+    this.expiresAt,
   });
 
   final ChargeBox chargeBox;
@@ -45,6 +46,29 @@ class ChargingSession {
   /// dan pembayarannya berhasil.
   final BillingInquiry? billing;
 
+  /// Batas waktu order ini, dari `sessionExpiredTime` pada
+  /// `POST /transaction/push-order`.
+  ///
+  /// Inilah sumber hitung mundur "Selesaikan dalam" — bukan durasi
+  /// tetap di aplikasi, karena backend yang menentukan kapan ordernya
+  /// kedaluwarsa (setelah itu ia membalas kode `22`).
+  ///
+  /// Null pada sesi yang dilanjutkan dari daftar charge box: ordernya
+  /// tidak dibuat di unit ini, jadi batas waktunya tidak diketahui.
+  final DateTime? expiresAt;
+
+  /// Sisa waktu order terhadap [now], tidak pernah negatif.
+  ///
+  /// Dihitung ulang dari jam dinding setiap kali dipanggil supaya
+  /// hitung mundur tetap benar walau layar sempat ditinggalkan.
+  Duration? remainingAt(DateTime now) {
+    final expiry = expiresAt;
+    if (expiry == null) return null;
+
+    final left = expiry.difference(now);
+    return left.isNegative ? Duration.zero : left;
+  }
+
   /// Salinan dengan bukti pembayarannya.
   ChargingSession paidWith(BillingInquiry billing) => ChargingSession(
         chargeBox: chargeBox,
@@ -55,6 +79,9 @@ class ChargingSession {
         price: price,
         orderId: orderId,
         billing: billing,
+        // Pembayaran memperbarui tenggat sesinya; batas waktu order
+        // hanya dipakai selama belum ada yang dibayar.
+        expiresAt: billing.sessionExpiredAt ?? expiresAt,
       );
 
   /// Yang benar-benar dibayar pengguna.
@@ -103,6 +130,7 @@ class ChargingSession {
       sessionCode: order.sessionCode,
       reference: order.partnerReference,
       createdAt: now,
+      expiresAt: order.sessionExpiredAt,
     );
   }
 

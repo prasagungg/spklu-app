@@ -7,11 +7,11 @@ import 'package:kossotrik/models/connector.dart';
 import 'fixtures.dart';
 
 Connector _connector({int status = 1, Object? estimasi}) => ChargeBox.fromJson(
-      chargeBoxJson(
-        connectors: [connectorJson(status: status, estimasi: estimasi)],
-      ),
-      number: 1,
-    ).connectors.single;
+  chargeBoxJson(
+    connectors: [connectorJson(status: status, estimasi: estimasi)],
+  ),
+  number: 1,
+).connectors.single;
 
 void main() {
   group('status konektor dari /list-chargerbox', () {
@@ -160,10 +160,7 @@ void main() {
     });
 
     test('charge box yang dimatikan tidak bisa dipakai', () {
-      final box = ChargeBox.fromJson(
-        chargeBoxJson(isActive: false),
-        number: 1,
-      );
+      final box = ChargeBox.fromJson(chargeBoxJson(isActive: false), number: 1);
 
       expect(box.isAvailable, isFalse);
     });
@@ -198,10 +195,7 @@ void main() {
     test('keterangan konektor memakai daya charge box', () {
       final box = ChargeBox.fromJson(chargeBoxJson(), number: 1);
 
-      expect(
-        box.connectors.single.describeWith(box.daya),
-        'CCS2 - 200 kW DC',
-      );
+      expect(box.connectors.single.describeWith(box.daya), 'CCS2 - 200 kW DC');
     });
 
     test('tanpa daya, jatuh ke tipe dan arusnya saja', () {

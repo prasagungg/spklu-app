@@ -14,6 +14,7 @@ import 'package:kossotrik/pages/card_payment_page.dart';
 import 'package:kossotrik/pages/payment_success_page.dart';
 import 'package:kossotrik/services/card_reader.dart';
 import 'package:kossotrik/theme/app_theme.dart';
+import 'package:kossotrik/widgets/session_widgets.dart';
 
 import 'fake_card_reader.dart';
 import 'fixtures.dart';
@@ -71,8 +72,7 @@ class _Billing extends Interceptor {
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     requests.add(options);
 
-    if (errorCode != null &&
-        (errorPath == null || options.path == errorPath)) {
+    if (errorCode != null && (errorPath == null || options.path == errorPath)) {
       handler.reject(
         DioException.badResponse(
           statusCode: 400,
@@ -96,11 +96,11 @@ class _Billing extends Interceptor {
         statusCode: 200,
         data: switch (options.path) {
           '/transaction/inquiry-billing' => inquiryBillingResponse(
-              totalAmount: totalAmount,
-            ),
+            totalAmount: totalAmount,
+          ),
           '/transaction/payment-billing' => paymentBillingResponse(
-              totalAmount: totalAmount,
-            ),
+            totalAmount: totalAmount,
+          ),
           _ => okResponse,
         },
       ),
@@ -142,6 +142,8 @@ Future<void> settleNetwork(WidgetTester tester) async {
 }
 
 void main() {
+  _countdownTests();
+
   group('inquiry billing', () {
     testWidgets('tap kartu menanyakan tagihan ordernya', (tester) async {
       final reader = FakeCardReader();
@@ -151,8 +153,9 @@ void main() {
       reader.tap();
       await settleNetwork(tester);
 
-      final call = billing.requests
-          .firstWhere((r) => r.path == '/transaction/inquiry-billing');
+      final call = billing.requests.firstWhere(
+        (r) => r.path == '/transaction/inquiry-billing',
+      );
       expect(call.method, 'POST');
       expect(call.data, {
         'orderId': 'ORDER-1',
@@ -164,8 +167,7 @@ void main() {
 
     /// Nominalnya harus persis dari inquiry: total order pun ditolak
     /// backend sebagai "Amount mismatch".
-    testWidgets('pembayaran memakai totalAmount dari inquiry',
-        (tester) async {
+    testWidgets('pembayaran memakai totalAmount dari inquiry', (tester) async {
       final reader = FakeCardReader();
       final billing = _Billing(totalAmount: 145670);
       await _pumpOnline(tester, reader, billing);
@@ -173,8 +175,9 @@ void main() {
       reader.tap();
       await settleNetwork(tester);
 
-      final call = billing.requests
-          .firstWhere((r) => r.path == '/transaction/payment-billing');
+      final call = billing.requests.firstWhere(
+        (r) => r.path == '/transaction/payment-billing',
+      );
       expect(call.data, {
         'orderId': 'ORDER-1',
         'amount': 145670,
@@ -192,8 +195,9 @@ void main() {
     /// Tagihan sungguhan kerap pecahan. Dibulatkan lebih dulu,
     /// nominalnya berselisih dari inquiry dan backend membalas
     /// "Amount mismatch" (25) — pembayaran tidak pernah bisa selesai.
-    testWidgets('nominal pecahan dikirim persis, tanpa dibulatkan',
-        (tester) async {
+    testWidgets('nominal pecahan dikirim persis, tanpa dibulatkan', (
+      tester,
+    ) async {
       final reader = FakeCardReader();
       final billing = _Billing(totalAmount: 25161.156);
       await _pumpOnline(tester, reader, billing);
@@ -201,8 +205,9 @@ void main() {
       reader.tap();
       await settleNetwork(tester);
 
-      final call = billing.requests
-          .firstWhere((r) => r.path == '/transaction/payment-billing');
+      final call = billing.requests.firstWhere(
+        (r) => r.path == '/transaction/payment-billing',
+      );
       expect((call.data as Map)['amount'], 25161.156);
       expect(find.byType(PaymentSuccessPage), findsOneWidget);
     });
@@ -210,8 +215,9 @@ void main() {
     /// Konektor yang tarifnya belum diatur dihargai nol sampai ke
     /// inquiry. Mengirimkannya sebagai `amount` dibalas "Missing Field:
     /// amount" — pesan yang menyesatkan.
-    testWidgets('tagihan nol dijelaskan, bukan dikirim ke pembayaran',
-        (tester) async {
+    testWidgets('tagihan nol dijelaskan, bukan dikirim ke pembayaran', (
+      tester,
+    ) async {
       final reader = FakeCardReader();
       final billing = _Billing(totalAmount: 0);
       await _pumpOnline(tester, reader, billing);
@@ -233,8 +239,9 @@ void main() {
     /// Kartu yang mengungkapkan nomornya dipakai apa adanya; yang
     /// tidak — MIFARE Classic seperti e-Money — jatuh ke nomor dari
     /// konfigurasi.
-    testWidgets('nomor dari kartu dipakai bila kartunya membukanya',
-        (tester) async {
+    testWidgets('nomor dari kartu dipakai bila kartunya membukanya', (
+      tester,
+    ) async {
       final reader = FakeCardReader();
       final billing = _Billing();
       await _pumpOnline(tester, reader, billing);
@@ -255,8 +262,7 @@ void main() {
       }
     });
 
-    testWidgets('kartu tanpa nomor jatuh ke nomor konfigurasi',
-        (tester) async {
+    testWidgets('kartu tanpa nomor jatuh ke nomor konfigurasi', (tester) async {
       final reader = FakeCardReader();
       final billing = _Billing();
       await _pumpOnline(tester, reader, billing);
@@ -264,13 +270,13 @@ void main() {
       reader.tap();
       await settleNetwork(tester);
 
-      final call = billing.requests
-          .firstWhere((r) => r.path == '/transaction/inquiry-billing');
+      final call = billing.requests.firstWhere(
+        (r) => r.path == '/transaction/inquiry-billing',
+      );
       expect((call.data as Map)['cardNumber'], Env.cardNumber);
     });
 
-    testWidgets('tagihan ditanyakan lebih dulu, baru dibayar',
-        (tester) async {
+    testWidgets('tagihan ditanyakan lebih dulu, baru dibayar', (tester) async {
       final reader = FakeCardReader();
       final billing = _Billing();
       await _pumpOnline(tester, reader, billing);
@@ -306,8 +312,9 @@ void main() {
       );
     });
 
-    testWidgets('pembayaran gagal tidak menghitungnya sebagai dibayar',
-        (tester) async {
+    testWidgets('pembayaran gagal tidak menghitungnya sebagai dibayar', (
+      tester,
+    ) async {
       final reader = FakeCardReader();
       await _pumpOnline(
         tester,
@@ -349,8 +356,7 @@ void main() {
       );
     });
 
-    testWidgets('gagal menagih membuka lagi pembacaan kartu',
-        (tester) async {
+    testWidgets('gagal menagih membuka lagi pembacaan kartu', (tester) async {
       final reader = FakeCardReader();
       await _pumpOnline(tester, reader, _Billing(errorCode: '05'));
 
@@ -387,8 +393,9 @@ void main() {
     expect(find.text('Menunggu Kartu'), findsOneWidget);
   });
 
-  testWidgets('pembaca langsung menunggu kartu saat halaman dibuka',
-      (tester) async {
+  testWidgets('pembaca langsung menunggu kartu saat halaman dibuka', (
+    tester,
+  ) async {
     final reader = FakeCardReader();
     await pumpPayment(tester, reader);
 
@@ -419,8 +426,9 @@ void main() {
 
   /// Android melaporkan kartu yang sama berulang selama masih menempel.
   /// Tap kedua tidak boleh mendorong halaman untuk kedua kalinya.
-  testWidgets('kartu yang terbaca berkali-kali hanya dihitung sekali',
-      (tester) async {
+  testWidgets('kartu yang terbaca berkali-kali hanya dihitung sekali', (
+    tester,
+  ) async {
     final reader = FakeCardReader();
     await pumpPayment(tester, reader);
 
@@ -434,8 +442,9 @@ void main() {
     expect(find.byType(PaymentSuccessPage), findsOneWidget);
   });
 
-  testWidgets('NFC yang dimatikan dijelaskan, bukan dibiarkan menggantung',
-      (tester) async {
+  testWidgets('NFC yang dimatikan dijelaskan, bukan dibiarkan menggantung', (
+    tester,
+  ) async {
     await pumpPayment(
       tester,
       FakeCardReader(reportedStatus: CardReaderStatus.disabled),
@@ -446,8 +455,9 @@ void main() {
     expect(find.text('Periksa Lagi'), findsOneWidget);
   });
 
-  testWidgets('perangkat tanpa NFC diberi tahu dan diarahkan ke petugas',
-      (tester) async {
+  testWidgets('perangkat tanpa NFC diberi tahu dan diarahkan ke petugas', (
+    tester,
+  ) async {
     await pumpPayment(
       tester,
       FakeCardReader(reportedStatus: CardReaderStatus.unsupported),
@@ -457,8 +467,7 @@ void main() {
     expect(find.text('Menunggu Kartu'), findsNothing);
   });
 
-  testWidgets('Periksa Lagi memeriksa ulang kesiapan pembaca',
-      (tester) async {
+  testWidgets('Periksa Lagi memeriksa ulang kesiapan pembaca', (tester) async {
     final reader = FakeCardReader(reportedStatus: CardReaderStatus.disabled);
     await pumpPayment(tester, reader);
 
@@ -478,5 +487,51 @@ void main() {
     await tester.pump();
 
     expect(reader.stopCount, greaterThan(0));
+  });
+}
+
+void _countdownTests() {
+  testWidgets('hitung mundur dibaca dari sessionExpiredTime order', (
+    tester,
+  ) async {
+    final expiry = DateTime.now().add(const Duration(minutes: 9, seconds: 33));
+    final box = DemoData.chargeBoxes[3];
+    final session = ChargingSession.fromOrder(
+      chargeBox: box,
+      connector: box.connectors.first,
+      order: Order(
+        orderId: 'ORDER-1',
+        sessionCode: '29',
+        partnerReference: '81067',
+        kwh: 19.5,
+        rpTotal: 50000,
+        sessionExpiredAt: expiry,
+      ),
+      now: DateTime(2026, 9, 16, 18, 40, 39),
+    );
+
+    await tester.pumpWidget(
+      CardReaderScope(
+        reader: FakeCardReader(),
+        child: MaterialApp(
+          theme: AppTheme.build(),
+          home: CardPaymentPage(session: session),
+        ),
+      ),
+    );
+    await settle(tester);
+
+    final pill = tester.widget<CountdownPill>(find.byType(CountdownPill));
+    // Batas waktu order, bukan 10 menit tetap milik aplikasi.
+    expect(pill.remaining.inSeconds, closeTo(573, 2));
+  });
+
+  testWidgets('tanpa batas waktu order, hitung mundur jatuh ke 10 menit', (
+    tester,
+  ) async {
+    await pumpPayment(tester, FakeCardReader());
+
+    final pill = tester.widget<CountdownPill>(find.byType(CountdownPill));
+    expect(pill.remaining, const Duration(minutes: 10));
   });
 }

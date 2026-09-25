@@ -1,27 +1,80 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../models/charging_session.dart';
 import '../theme/app_colors.dart';
 import '../widgets/asset_slot.dart';
 import '../widgets/page_scaffold.dart';
-import '../widgets/primary_button.dart';
 import '../widgets/session_widgets.dart';
+import 'charging_status_page.dart';
 
 /// Frame Figma 204:5174 (sebelumnya 73:3667) — "Pengisian Dimulai".
 ///
-/// Inilah akhir alur normal: muncul setelah perintah start berhasil,
-/// dan mengulang kode sesi dari `POST /booked-connector` sekali lagi
-/// sebelum pengguna pergi.
+/// Muncul setelah perintah start berhasil dan mengulang kode sesi
+/// sekali lagi, lalu **berpindah sendiri** ke layar pemantauan.
 ///
-/// **Layar baterai yang terus naik bukan di sini.** Alur normal berhenti
-/// di halaman ini dan pulang ke daftar charge box, mengikuti desain.
-/// Untuk memantau atau menghentikan pengisiannya, pengguna menekan
-/// konektor yang sedang dipakai itu dari daftar, memasukkan kode sesi
-/// ini, lalu `ChargingStatusPage` yang menampilkan kemajuannya.
-class ChargingStartedPage extends StatelessWidget {
-  const ChargingStartedPage({super.key, required this.session});
+/// Charger butuh beberapa detik sebelum melaporkan kWh pertamanya —
+/// controller hanya meneruskan perintah start, jadi `ongoing-kwh` masih
+/// menjawab nol sesaat. Halaman ini mengisi jeda itu: ia menahan
+/// pengguna [_minWait]–[_maxWait] detik sambil menunjukkan kode sesi,
+/// baru kemudian membuka `ChargingStatusPage`.
+///
+/// **Ini layar tunggu, jadi tidak ada tombol aksi.** Satu-satunya jalan
+/// keluar lebih awal adalah tombol Home di header, yang dipasang
+/// `PageScaffold` di semua halaman; pengisian jalan terus di charger.
+class ChargingStartedPage extends StatefulWidget {
+  const ChargingStartedPage({super.key, required this.session, this.waitFor});
 
   final ChargingSession session;
+
+  /// Lama menahan sebelum pindah. Kosong berarti diacak
+  /// [_minWait]–[_maxWait] detik; diisi hanya oleh test supaya
+  /// hasilnya tidak bergantung pada angka acak.
+  final Duration? waitFor;
+
+  @override
+  State<ChargingStartedPage> createState() => _ChargingStartedPageState();
+}
+
+class _ChargingStartedPageState extends State<ChargingStartedPage> {
+  static const _minWait = 2;
+  static const _maxWait = 4;
+
+  Timer? _advance;
+
+  ChargingSession get session => widget.session;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final wait =
+        widget.waitFor ??
+        Duration(seconds: _minWait + Random().nextInt(_maxWait - _minWait + 1));
+    debugPrint('[FLOW] Pengisian Dimulai menahan ${wait.inSeconds} detik');
+
+    _advance = Timer(wait, _openStatus);
+  }
+
+  @override
+  void dispose() {
+    _advance?.cancel();
+    super.dispose();
+  }
+
+  /// Berpindah ke layar pemantauan, menggantikan halaman ini supaya
+  /// tombol kembali tidak memulangkan ke layar tunggu.
+  void _openStatus() {
+    if (!mounted) return;
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => ChargingStatusPage(session: session),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,17 +83,8 @@ class ChargingStartedPage extends StatelessWidget {
       subtitle: session.breadcrumb,
       titleAlign: TextAlign.center,
       backgroundColor: AppColors.pageBackgroundPlain,
-      bottomBar: BottomActionBar(
-        opaque: false,
-        children: [
-          PrimaryButton(
-            label: 'Kembali ke Halaman Awal',
-            trailingAsset: 'assets/icons/ic_home_filled.svg',
-            onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
-          ),
-          const _Footnote(),
-        ],
-      ),
+      // Tidak ada tombol: halaman ini berpindah sendiri, jadi tidak ada
+      // yang perlu ditekan pengguna.
       child: Column(
         children: [
           const Expanded(
@@ -49,11 +93,19 @@ class ChargingStartedPage extends StatelessWidget {
               fit: BoxFit.contain,
             ),
           ),
-          const HintStrip(text: 'Pengisian sedang berlangsung...'),
+          // Panel tunggu yang sama dengan "Menunggu Kartu" dan
+          // "Menunggu konektor terdeteksi" — spinner berputar selama
+          // charger menyiapkan sesinya.
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: WaitingPanel(label: 'Menyiapkan pengisian…'),
+          ),
+          const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SessionCodeCard(code: session.sessionCode),
           ),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -99,10 +151,7 @@ class SessionCodeCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 16,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
               // Anak Stack yang tidak diposisikan hanya selebar isinya
               // dan menempel ke kiri; tanpa lebar penuh, kode sesinya
               // terlihat bergeser dari tengah kartu.
@@ -145,30 +194,6 @@ class SessionCodeCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// "Pengisian tetap berjalan." (73:3732)
-class _Footnote extends StatelessWidget {
-  const _Footnote();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        AssetSlot('assets/icons/ic_info_circle.svg', width: 20, height: 20),
-        SizedBox(width: 6),
-        Text(
-          'Pengisian tetap berjalan.',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w400,
-            color: AppColors.icon,
-          ),
-        ),
-      ],
     );
   }
 }

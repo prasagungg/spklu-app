@@ -18,13 +18,11 @@ class _Stub extends Interceptor {
       Response<Map<String, dynamic>>(
         requestOptions: options,
         data: switch (options.path) {
-          '/transaction/charging/ongoing-kwh' => ongoingKwhResponse(
-              status: 3,
-            ),
+          '/transaction/charging/ongoing-kwh' => ongoingKwhResponse(status: 3),
           // Status sebenarnya datang dari sini, bukan dari daftar.
           '/detail-chargerbox' => chargeBoxDetailResponse(
-              connectors: [connectorJson(status: status)],
-            ),
+            connectors: [connectorJson(status: status)],
+          ),
           '/booked-connector' => bookingResponse(),
           '/manage-sessioncode' => sessionCodeResponse(),
           // Kabelnya dianggap sudah terpasang; penungguannya
@@ -36,11 +34,8 @@ class _Stub extends Interceptor {
           '/transaction/inquiry-billing' => inquiryBillingResponse(),
           '/transaction/payment-billing' => paymentBillingResponse(),
           _ => listResponse([
-              chargeBoxJson(
-                nama: 'CB-SMR-01',
-                connectors: [connectorJson()],
-              ),
-            ]),
+            chargeBoxJson(nama: 'CB-SMR-01', connectors: [connectorJson()]),
+          ]),
         },
         statusCode: 200,
       ),
@@ -76,8 +71,9 @@ Future<void> _verify(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('status 1 membuka alur pembelian tanpa verifikasi',
-      (tester) async {
+  testWidgets('status 1 membuka alur pembelian tanpa verifikasi', (
+    tester,
+  ) async {
     await _tapConnector(tester, 1);
 
     expect(find.text('Verifikasi Sesi'), findsNothing);
@@ -102,8 +98,7 @@ void main() {
     expect(find.text('Pembayaran'), findsOneWidget);
   });
 
-  testWidgets('status 0 melanjutkan pemesanan yang sudah ada',
-      (tester) async {
+  testWidgets('status 0 melanjutkan pemesanan yang sudah ada', (tester) async {
     await _tapConnector(tester, 0);
     await _verify(tester);
 
@@ -125,8 +120,9 @@ void main() {
     expect(find.text('Verifikasi Sesi'), findsNothing);
   });
 
-  testWidgets('status tak dikenal membuat konektornya tidak bisa ditekan',
-      (tester) async {
+  testWidgets('status tak dikenal membuat konektornya tidak bisa ditekan', (
+    tester,
+  ) async {
     final repo = ChargePointRepository(
       client: ApiClient.withDio(Dio()..interceptors.add(_Stub(9))),
     );

@@ -31,12 +31,11 @@ class _Probe extends StatelessWidget {
 }
 
 void main() {
-  testWidgets('scope di atas MaterialApp terlihat dari rute yang di-push',
-      (tester) async {
+  testWidgets('scope di atas MaterialApp terlihat dari rute yang di-push', (
+    tester,
+  ) async {
     await tester.pumpWidget(
-      ChargingScope(
-        child: const MaterialApp(home: _Probe('home')),
-      ),
+      ChargingScope(child: const MaterialApp(home: _Probe('home'))),
     );
     await tester.pumpAndSettle();
     expect(find.text('home: ADA'), findsOneWidget);
@@ -46,13 +45,10 @@ void main() {
     expect(find.text('pushed: ADA'), findsOneWidget);
   });
 
-  testWidgets(
-      'scope sebagai home: TIDAK terlihat dari rute yang di-push — '
+  testWidgets('scope sebagai home: TIDAK terlihat dari rute yang di-push — '
       'inilah sebab /start pernah tidak terkirim', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: ChargingScope(child: const _Probe('home')),
-      ),
+      MaterialApp(home: ChargingScope(child: const _Probe('home'))),
     );
     await tester.pumpAndSettle();
     expect(find.text('home: ADA'), findsOneWidget);
@@ -65,8 +61,9 @@ void main() {
     expect(find.text('pushed: TIDAK ADA'), findsOneWidget);
   });
 
-  testWidgets('SPKLUApp memasang scope sehingga rute lanjutan melihatnya',
-      (tester) async {
+  testWidgets('SPKLUApp memasang scope sehingga rute lanjutan melihatnya', (
+    tester,
+  ) async {
     late BuildContext pushedContext;
 
     await tester.pumpWidget(
