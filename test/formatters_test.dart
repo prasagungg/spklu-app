@@ -49,12 +49,15 @@ void main() {
     });
   });
 
-  group('formatKwh apa adanya', () {
-    test('dipakai untuk kWh yang dibeli, selalu satu desimal', () {
-      expect(formatKwh(19.5), '19,5 kWh');
-      expect(formatKwh(7.8), '7,8 kWh');
-      // Sengaja tidak beralih satuan — ini nilai kontrak, bukan meter.
-      expect(formatKwh(0.127), '0,1 kWh');
+  group('formatKwhNumber', () {
+    /// Angka kWh ditampilkan persis seperti yang dikirim backend: 10
+    /// tetap "10", bukan "10,0", dan 1.6 tetap "1,6".
+    test('apa adanya, tanpa desimal karangan', () {
+      expect(formatKwhNumber(10), '10');
+      expect(formatKwhNumber(1.6), '1,6');
+      expect(formatKwhNumber(0.127), '0,127');
+      expect(formatEnergy(10), '10 kWh');
+      expect(formatEnergy(1.6), '1,6 kWh');
     });
   });
 

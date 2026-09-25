@@ -104,7 +104,7 @@ class CostRows extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        DetailRow(label: 'Total kWh dibeli', value: formatKwh(price.kwh)),
+        DetailRow(label: 'Total kWh dibeli', value: formatEnergy(price.kwh)),
         const SizedBox(height: 12),
         DetailRow(label: 'Tarif per kWh', value: formatRupiah(price.rpPerKwh)),
         // Hanya order yang mengirim biaya energi sebagai angka

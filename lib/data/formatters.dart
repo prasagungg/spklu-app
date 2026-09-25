@@ -34,29 +34,21 @@ String _plain(num value) =>
 
 /// Angka kWh tanpa satuan, untuk kartu pilihan yang sempit (204:3717).
 ///
-/// Pilihan dari `GET /list-kwh` selalu bulat, dan desainnya menulisnya
-/// begitu — "10", bukan "10,0". Nilai pecahan tetap ditampilkan apa
-/// adanya kalau suatu saat backend mengirimnya.
+/// Apa adanya seperti [formatEnergy], hanya tanpa satuannya: 10 -> "10",
+/// 1.6 -> "1,6".
 String formatKwhNumber(double kwh) => kwh == kwh.roundToDouble()
-    ? kwh.round().toString()
-    : kwh.toStringAsFixed(1).replaceAll('.', ',');
-
-/// 19.5 -> "19,5 kWh" (koma desimal, gaya Indonesia).
-///
-/// Dipakai untuk nilai yang memang dalam satuan kWh, mis. kWh yang
-/// dibeli pada rincian harga.
-String formatKwh(double kwh) {
-  final text = kwh.toStringAsFixed(1).replaceAll('.', ',');
-  return '$text kWh';
-}
+    ? kwh.toStringAsFixed(0)
+    : kwh.toString().replaceAll('.', ',');
 
 /// Bentuk [formatEnergy] untuk nilai yang dilaporkan dalam Wh.
 ///
 /// 3 -> "0,003 kWh" | 127 -> "0,127 kWh" | 6400 -> "6,4 kWh"
 String formatEnergyWh(num watthours) => formatEnergy(watthours / 1000);
 
-/// Energi tersalur — `charged` dari
-/// `POST /transaction/charging/ongoing-kwh` — **apa adanya**.
+/// Angka kWh **apa adanya**, dengan satuannya.
+///
+/// Dipakai untuk semua nilai kWh di layar: yang dibeli, yang tersalur,
+/// yang terpakai, dan sisanya.
 ///
 /// Angkanya tidak dibulatkan dan desimalnya tidak dipangkas: yang
 /// tampil di layar adalah bacaan backend persis seperti yang dikirim,

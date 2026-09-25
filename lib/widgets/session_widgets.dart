@@ -435,8 +435,11 @@ class IconDetailRow extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Text(label, style: AppTheme.rowLabel),
-        const Spacer(),
-        Flexible(
+        const SizedBox(width: 12),
+        // Expanded, bukan Spacer + Flexible: keduanya berbobot sama,
+        // jadi ruang sisanya terbagi dua dan nilainya berhenti di
+        // tengah alih-alih menempel ke kanan.
+        Expanded(
           child: Text(
             value,
             overflow: TextOverflow.ellipsis,

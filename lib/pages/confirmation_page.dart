@@ -97,8 +97,8 @@ class ConfirmationPage extends StatelessWidget {
                 const _Separator(),
                 IconDetailRow(
                   asset: 'assets/icons/ic_nominal.svg',
-                  label: 'Nominal',
-                  value: formatKwh(order.kwh),
+                  label: 'kWh Pesan',
+                  value: formatEnergy(order.kwh),
                 ),
                 const SizedBox(height: 12),
                 // Blok rincian biaya berlatar #ECF5FE (73:2643).

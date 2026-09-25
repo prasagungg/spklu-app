@@ -57,9 +57,9 @@ class TransactionDetailPage extends StatelessWidget {
           _Card(
             title: 'Energi',
             rows: [
-              (label: 'kWh Dibeli', value: formatKwh(detail.orderedKwh)),
-              (label: 'kWh Terpakai', value: formatKwh(detail.usedKwh)),
-              (label: 'Sisa kWh', value: formatKwh(detail.remainingKwh)),
+              (label: 'kWh Dibeli', value: formatEnergy(detail.orderedKwh)),
+              (label: 'kWh Terpakai', value: formatEnergy(detail.usedKwh)),
+              (label: 'Sisa kWh', value: formatEnergy(detail.remainingKwh)),
               if (detail.pricePerKwh > 0)
                 (
                   label: 'Tarif per kWh',
