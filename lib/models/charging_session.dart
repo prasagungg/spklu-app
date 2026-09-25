@@ -103,11 +103,15 @@ class ChargingSession {
     required Connector connector,
     required DateTime now,
     String orderId = '',
+    String sessionCode = '',
   }) {
     return ChargingSession(
       chargeBox: chargeBox,
       connector: connector,
-      sessionCode: '-',
+      // Kode sesi ikut dibawa bila pengguna baru saja mengetiknya:
+      // halaman Hubungkan Konektor memakainya untuk menanyakan tahap
+      // proses lewat `manage-sessioncode`.
+      sessionCode: sessionCode.isEmpty ? '-' : sessionCode,
       reference: '-',
       createdAt: now,
       orderId: orderId,

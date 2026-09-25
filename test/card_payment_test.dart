@@ -142,6 +142,8 @@ Future<void> settleNetwork(WidgetTester tester) async {
 }
 
 void main() {
+  _resumedSessionTests();
+
   _countdownTests();
 
   group('inquiry billing', () {
@@ -535,5 +537,52 @@ void _countdownTests() {
 
     final pill = tester.widget<CountdownPill>(find.byType(CountdownPill));
     expect(pill.remaining, const Duration(minutes: 10));
+  });
+}
+
+void _resumedSessionTests() {
+  /// Sesi yang dilanjutkan dari daftar masuk langsung ke halaman
+  /// pembayaran, tanpa membawa rincian order. Halaman "Pembayaran
+  /// Berhasil" sempat memaksa rincian itu ada dan jatuh dengan
+  /// "Null check operator used on a null value".
+  testWidgets('sesi lanjutan tanpa rincian order tetap bisa dibayar', (
+    tester,
+  ) async {
+    final box = DemoData.chargeBoxes[3];
+    final reader = FakeCardReader();
+    final billing = _Billing(totalAmount: 25161.14);
+    final repo = ChargePointRepository(
+      client: ApiClient.withDio(Dio()..interceptors.add(billing)),
+    );
+
+    await tester.pumpWidget(
+      ChargingScope(
+        repository: repo,
+        child: CardReaderScope(
+          reader: reader,
+          child: MaterialApp(
+            theme: AppTheme.build(),
+            home: CardPaymentPage(
+              session: ChargingSession.resumed(
+                chargeBox: box,
+                connector: box.connectors.first,
+                now: DateTime(2026, 9, 25),
+                orderId: 'ORDER-1',
+                sessionCode: '70',
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await settle(tester);
+
+    reader.tap();
+    await settleNetwork(tester);
+
+    expect(find.byType(PaymentSuccessPage), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    // Yang ditampilkan angka yang benar-benar didebit.
+    expect(find.text('Rp25.161,14'), findsWidgets);
   });
 }

@@ -9,8 +9,10 @@ import '../models/session_check.dart';
 import '../app_route_observer.dart';
 import '../data/charge_point_repository.dart';
 import '../data/charging_scope.dart';
+import '../models/backend_status.dart';
 import '../models/charge_box.dart';
 import '../models/charging_session.dart';
+import '../models/order.dart';
 import '../models/connector.dart';
 import '../services/api_exception.dart';
 import '../theme/app_colors.dart';
@@ -20,6 +22,9 @@ import '../widgets/connector_sheet.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/state_view.dart';
 import '../widgets/status_chip.dart';
+import 'charging_finished_page.dart';
+import 'connect_connector_page.dart';
+import 'confirmation_page.dart';
 import 'card_payment_page.dart';
 import 'charging_status_page.dart';
 import 'session_code_page.dart';
@@ -88,46 +93,12 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
   @override
   void didPopNext() {
     debugPrint('[FLOW] Kembali ke Pilih Charge Box — memuat ulang daftar');
-    // Pengguna sampai di sini berarti ia keluar dari alur pembelian.
-    // Booking yang masih dipegang harus dilepas, kalau tidak
-    // konektornya terkunci selamanya.
-    unawaited(_cancelAbandonedBooking());
+    // Pemesanan dilepas oleh halaman yang ditinggalkan pengguna — Kode
+    // Sesi dan Pilih Nominal, satu-satunya langkah sebelum order dibuat.
+    // Halaman ini juga dilewati saat pengguna kembali dari Riwayat
+    // Transaksi, Pengaturan, atau alur yang sudah punya order, jadi ia
+    // tidak boleh ikut membatalkan.
     _load();
-  }
-
-  /// Melepas booking yang ditinggalkan pengguna.
-  ///
-  /// Tidak melakukan apa-apa bila pengisian sudah dimulai: sejak
-  /// `/start` berhasil, [ActiveBooking] dilupakan, jadi kembalinya
-  /// pengguna ke daftar tidak membatalkan sesi yang sedang jalan.
-  ///
-  /// Kegagalannya hanya dicatat. Pengguna sudah pergi dari alur itu;
-  /// memunculkan error atas sesuatu yang tidak ia minta hanya
-  /// membingungkan.
-  Future<void> _cancelAbandonedBooking() async {
-    final scope = ChargingScope.maybeOf(context);
-    final booking = scope?.booking;
-    if (scope == null || booking == null || !booking.isHeld) return;
-
-    // Sesi yang sudah mengisi bukan booking yang ditinggalkan —
-    // membatalkannya akan menghentikan pengisian orang.
-    if (booking.isCharging) return;
-
-    final chargeBoxId = booking.chargeBoxId!;
-    final connectorId = booking.connectorId!;
-    final reservationId = booking.reservationId ?? '';
-    booking.forget();
-
-    try {
-      final result = await scope.repository.cancelConnector(
-        chargeBoxId: chargeBoxId,
-        connectorId: connectorId,
-        reservationId: reservationId,
-      );
-      debugPrint('[FLOW] Booking ditinggalkan, dilepas: $result');
-    } on Object catch (e) {
-      debugPrint('[FLOW] Booking gagal dilepas: $e');
-    }
   }
 
   /// Memuat daftar. Data lama dipertahankan selama pemuatan berlangsung
@@ -179,10 +150,7 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
 
     // Konektor yang bukan "Available" sudah diklaim, jadi pengguna
     // harus membuktikan kepemilikan sesi lebih dulu dengan kode yang
-    // ditunjukkan di halaman "Pengisian Dimulai".
-    var verifiedOrderId = '';
-    Reservation? reservation;
-
+    // ditunjukkan saat sesinya dimulai.
     if (!connector.isAvailable) {
       final expected = ChargingScope.maybeOf(
         context,
@@ -198,50 +166,43 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
         ),
       );
       if (check == null || !mounted) return;
-      verifiedOrderId = check.orderId;
-      // Konektor yang sudah dipesan orang lain dilanjutkan dengan
-      // pemesanan yang sudah ada, bukan dipesan ulang.
-      reservation = Reservation(
-        accepted: true,
-        reservationId: check.reservationId,
-        sessionCode: check.sessionCode,
+
+      // Tahap transaksinya yang menentukan tujuan, bukan status
+      // konektor: `statusProcess` menyebut sampai mana sesi itu
+      // berjalan, dan pengguna dikembalikan tepat ke langkah itu.
+      final destination = await _resumeDestination(box, connector, check);
+      if (destination == null || !mounted) return;
+
+      debugPrint(
+        '[FLOW] statusProcess ${check.statusProcess} — '
+        'menuju ${destination.runtimeType}',
       );
-    } else {
-      // Konektor bebas: pesan dulu atas nama pengguna ini sebelum ia
-      // menghabiskan waktu memilih nominal dan membayar.
-      reservation = await _book(box, connector);
-      if (reservation == null || !mounted) return;
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => destination));
+
+      // Pemesanan dilepas oleh halaman Kode Sesi, satu-satunya tempat
+      // pengguna membatalkan sebelum apa pun dibeli.
+      //
+      // Pemuatan ulang ditangani didPopNext saat rute di atas ditutup.
+      return;
     }
 
-    // Tujuannya ditentukan status konektor: yang masih bebas memulai
-    // pembelian, sisanya melanjutkan sesi yang sudah dipegang orang —
-    // masing-masing pada langkah tempat sesi itu berhenti.
-    final destination = switch (connector.status) {
-      // Kode sesinya ditunjukkan dulu — pengguna memerlukannya untuk
-      // kembali ke sesi ini. "Dipesan" berarti pemesanan sudah ada
-      // tetapi belum dibeli, jadi jalurnya sama.
-      ConnectorStatus.available || ConnectorStatus.reserved => SessionCodePage(
-        chargeBox: box,
-        connector: connector,
-        reservation: reservation,
-      ),
-      // Ordernya sudah dibuat tetapi belum dibayar: sesinya dilanjutkan
-      // di halaman pembayaran, dan nominalnya ditanyakan ulang lewat
-      // inquiry begitu kartu ditempelkan.
-      ConnectorStatus.awaitingPayment => CardPaymentPage(
-        session: _resume(box, connector, verifiedOrderId),
-      ),
-      ConnectorStatus.inUse => ChargingStatusPage(
-        session: _resume(box, connector, verifiedOrderId),
-      ),
-      // Status tak dikenal tidak bisa ditekan, jadi cabang ini tak
-      // terpakai.
-      ConnectorStatus.unavailable => null,
-    };
-    if (destination == null) return;
+    // Konektor bebas: pesan dulu atas nama pengguna ini sebelum ia
+    // menghabiskan waktu memilih nominal dan membayar.
+    final reservation = await _book(box, connector);
+    if (reservation == null || !mounted) return;
+
+    // Kode sesinya ditunjukkan dulu — pengguna memerlukannya untuk
+    // kembali ke sesi ini.
+    final destination = SessionCodePage(
+      chargeBox: box,
+      connector: connector,
+      reservation: reservation,
+    );
 
     debugPrint(
-      '[FLOW] Konektor ${connector.id} berstatus ${connector.statusCode} — '
+      '[FLOW] Konektor ${connector.id} dipesan — '
       'menuju ${destination.runtimeType}',
     );
 
@@ -249,6 +210,86 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => destination));
     // Pemuatan ulang ditangani didPopNext saat rute di atas ditutup.
+  }
+
+  /// Halaman tempat sesi yang sudah berjalan dilanjutkan, ditentukan
+  /// `statusProcess` pada jawaban `POST /manage-sessioncode`.
+  ///
+  /// | `statusProcess` | Tahap | Halaman |
+  /// |---|---|---|
+  /// | 0 | pemesanan | Konfirmasi Pengisian |
+  /// | 1 | belum bayar | Konfirmasi Pengisian |
+  /// | 2 | hubungkan konektor | Hubungkan Konektor |
+  /// | 3 | proses pengisian | Sedang Mengisi |
+  /// | 4 | pengisian selesai | Pengisian Selesai |
+  ///
+  /// Order yang belum dibayar dikembalikan ke konfirmasi, bukan langsung
+  /// ke pembaca kartu: pengguna perlu melihat lagi apa yang akan
+  /// dibayarnya sebelum menempelkan kartu.
+  ///
+  /// Angka yang tidak dikenal — termasuk jawaban tanpa `statusProcess` —
+  /// ikut ke konfirmasi, langkah paling awal yang masih bisa
+  /// dilanjutkan tanpa menebak apa pun.
+  Future<Widget?> _resumeDestination(
+    ChargeBox box,
+    Connector connector,
+    SessionCheck check,
+  ) async {
+    final session = _resume(box, connector, check);
+
+    return switch (check.statusProcess) {
+      BackendStatus.awaitingConnector => ConnectConnectorPage(session: session),
+      BackendStatus.charging => ChargingStatusPage(session: session),
+      // Angka energinya diambil halaman itu sendiri lewat
+      // `charging/detail`; nol hanya nilai awal sebelum jawabannya tiba.
+      BackendStatus.finished => ChargingFinishedPage(
+        session: session,
+        energyKwh: 0,
+      ),
+      // 0 pemesanan, 1 belum bayar, dan angka yang tidak dikenal.
+      _ => await _confirmationFor(box, connector, session),
+    };
+  }
+
+  /// Halaman konfirmasi untuk sesi yang ordernya sudah dibuat tetapi
+  /// belum dikonfirmasi.
+  ///
+  /// Rincian ordernya tidak ikut di jawaban `manage-sessioncode`, jadi
+  /// diambil lewat `POST /transaction/charging/detail`. Bila ordernya
+  /// tidak bisa dibaca — belum ada, atau permintaannya gagal — pengguna
+  /// diantar ke halaman pembayaran alih-alih ditahan di layar kosong.
+  Future<Widget?> _confirmationFor(
+    ChargeBox box,
+    Connector connector,
+    ChargingSession session,
+  ) async {
+    final repository = _repository;
+    if (repository == null || session.orderId.isEmpty) {
+      return CardPaymentPage(session: session);
+    }
+
+    try {
+      final detail = await repository.fetchChargingDetail(
+        orderId: session.orderId,
+      );
+      if (detail.orderId.isEmpty) return CardPaymentPage(session: session);
+
+      return ConfirmationPage(
+        chargeBox: box,
+        connector: connector,
+        order: Order(
+          orderId: detail.orderId,
+          sessionCode: session.sessionCode,
+          partnerReference: session.reference,
+          kwh: detail.orderedKwh,
+          rpTotal: detail.paidAmount,
+          rpPerKwh: detail.pricePerKwh,
+        ),
+      );
+    } on Object catch (e) {
+      debugPrint('[FLOW] Rincian order gagal dibaca: $e');
+      return CardPaymentPage(session: session);
+    }
   }
 
   /// Memesan konektor lewat `POST /booked-connector`.
@@ -320,7 +361,7 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
   ChargingSession _resume(
     ChargeBox box,
     Connector connector,
-    String verifiedOrderId,
+    SessionCheck check,
   ) {
     final remembered = ChargingScope.maybeOf(
       context,
@@ -330,7 +371,8 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
       chargeBox: box,
       connector: connector,
       now: DateTime.now(),
-      orderId: verifiedOrderId.isNotEmpty ? verifiedOrderId : remembered ?? '',
+      sessionCode: check.sessionCode,
+      orderId: check.orderId.isNotEmpty ? check.orderId : remembered ?? '',
     );
   }
 

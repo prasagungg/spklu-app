@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/release_booking.dart';
 import '../models/charge_box.dart';
 import '../models/connector.dart';
 import '../models/reservation.dart';
@@ -18,10 +19,9 @@ import 'nominal_page.dart';
 /// sejak memilih nozzle, jauh sebelum membayar, dan memerlukannya untuk
 /// kembali ke sesinya sendiri.
 ///
-/// "Batalkan Transaksi" cukup menutup halaman: kembalinya pengguna ke
-/// daftar charge box sudah melepas pemesanan yang ditinggalkan, lewat
-/// satu jalur yang sama dengan tombol Home dan tombol kembali
-/// perangkat.
+/// Kedua jalan keluarnya — "Batalkan Transaksi" dan tombol Home —
+/// melepas pemesanan lebih dulu: dari sini pengguna batal sebelum ada
+/// apa pun yang dibeli.
 class SessionCodePage extends StatefulWidget {
   const SessionCodePage({
     super.key,
@@ -55,6 +55,7 @@ class _SessionCodePageState extends State<SessionCodePage> {
   Widget build(BuildContext context) {
     return PageScaffold(
       backgroundColor: AppColors.pageBackgroundPlain,
+      headerAction: HomeButton(onTap: () => releaseBooking(context)),
       headerExtra: ExpiryCountdown(expiresAt: widget.reservation.expiredAt),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -70,7 +71,10 @@ class _SessionCodePageState extends State<SessionCodePage> {
           const SizedBox(height: 16),
           DangerOutlineButton(
             label: 'Batalkan Transaksi',
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => releaseBooking(
+              context,
+              leave: () => Navigator.of(context).pop(),
+            ),
           ),
         ],
       ),

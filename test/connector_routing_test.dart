@@ -8,9 +8,19 @@ import 'fixtures.dart';
 import 'flow_helpers.dart';
 
 class _Stub extends Interceptor {
-  _Stub(this.status);
+  _Stub(this.status, {this.statusProcess = 3, this.orderReadable = true});
 
+  /// Status konektor pada `detail-chargerbox` — menentukan bisa
+  /// ditekan atau tidak, dan perlu verifikasi kode sesi atau tidak.
   final int status;
+
+  /// Tahap transaksi pada `manage-sessioncode` — menentukan halaman
+  /// tempat sesi yang sudah berjalan dilanjutkan.
+  final int statusProcess;
+
+  /// Rincian order bisa dibaca lewat `charging/detail`. Dimatikan untuk
+  /// menguji jalan mundurnya.
+  final bool orderReadable;
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
@@ -19,12 +29,16 @@ class _Stub extends Interceptor {
         requestOptions: options,
         data: switch (options.path) {
           '/transaction/charging/ongoing-kwh' => ongoingKwhResponse(status: 3),
+          '/transaction/charging/detail' =>
+            orderReadable ? chargingDetailResponse() : okResponse,
           // Status sebenarnya datang dari sini, bukan dari daftar.
           '/detail-chargerbox' => chargeBoxDetailResponse(
             connectors: [connectorJson(status: status)],
           ),
           '/booked-connector' => bookingResponse(),
-          '/manage-sessioncode' => sessionCodeResponse(),
+          '/manage-sessioncode' => sessionCodeResponse(
+            statusProcess: statusProcess,
+          ),
           // Kabelnya dianggap sudah terpasang; penungguannya
           // diuji tersendiri di connector_detection_poll_test.
           '/check-status-connector' => connectorStatusResponse(),
@@ -44,9 +58,23 @@ class _Stub extends Interceptor {
 }
 
 /// Membuka bottom sheet lalu menekan konektor satu-satunya.
-Future<void> _tapConnector(WidgetTester tester, int status) async {
+Future<void> _tapConnector(
+  WidgetTester tester,
+  int status, {
+  int statusProcess = 3,
+  bool orderReadable = true,
+}) async {
   final repo = ChargePointRepository(
-    client: ApiClient.withDio(Dio()..interceptors.add(_Stub(status))),
+    client: ApiClient.withDio(
+      Dio()
+        ..interceptors.add(
+          _Stub(
+            status,
+            statusProcess: statusProcess,
+            orderReadable: orderReadable,
+          ),
+        ),
+    ),
   );
 
   await tester.pumpWidget(SPKLUApp(repository: repo));
@@ -82,29 +110,62 @@ void main() {
     expect(find.text('Pilih Nominal'), findsOneWidget);
   });
 
-  testWidgets('status 2 membuka layar pemantauan', (tester) async {
+  testWidgets('konektor yang dipakai menuntut kode sesi dulu', (tester) async {
     await _tapConnector(tester, 2);
-    await _verify(tester);
 
-    expect(find.text('Sedang Mengisi'), findsOneWidget);
+    expect(find.text('Verifikasi Sesi'), findsOneWidget);
   });
 
-  /// Ordernya sudah dibuat tetapi belum dibayar; sesinya dilanjutkan
-  /// tepat di langkah itu.
-  testWidgets('status 3 melanjutkan ke pembayaran', (tester) async {
-    await _tapConnector(tester, 3);
-    await _verify(tester);
+  /// Sesi yang sudah berjalan dilanjutkan tepat pada langkahnya, dan
+  /// yang menentukan langkah itu adalah `statusProcess` dari
+  /// `manage-sessioncode` — bukan status konektor.
+  group('lanjutan sesi mengikuti statusProcess', () {
+    /// Order yang belum dibayar dikembalikan ke konfirmasi dulu —
+    /// pengguna perlu melihat lagi apa yang akan dibayarnya.
+    testWidgets('1 belum bayar membuka Konfirmasi Pengisian', (tester) async {
+      await _tapConnector(tester, 3, statusProcess: 1);
+      await _verify(tester);
 
-    expect(find.text('Pembayaran'), findsOneWidget);
-  });
+      expect(find.text('Konfirmasi Pengisian'), findsOneWidget);
+    });
 
-  testWidgets('status 0 melanjutkan pemesanan yang sudah ada', (tester) async {
-    await _tapConnector(tester, 0);
-    await _verify(tester);
+    testWidgets('0 pemesanan membuka Konfirmasi Pengisian', (tester) async {
+      await _tapConnector(tester, 0, statusProcess: 0);
+      await _verify(tester);
 
-    // Pemesanan sudah ada; kodenya ditunjukkan lalu memilih kWh.
-    await passSessionCode(tester);
-    expect(find.text('Pilih Nominal'), findsOneWidget);
+      expect(find.text('Konfirmasi Pengisian'), findsOneWidget);
+    });
+
+    testWidgets('2 membuka Hubungkan Konektor', (tester) async {
+      await _tapConnector(tester, 3, statusProcess: 2);
+      await _verify(tester);
+
+      expect(find.textContaining('Konektor Terhubung'), findsNothing);
+      expect(find.text('Hubungkan Konektor'), findsOneWidget);
+    });
+
+    testWidgets('3 membuka Sedang Mengisi', (tester) async {
+      await _tapConnector(tester, 2, statusProcess: 3);
+      await _verify(tester);
+
+      expect(find.text('Sedang Mengisi'), findsOneWidget);
+    });
+
+    testWidgets('4 membuka Pengisian Selesai', (tester) async {
+      await _tapConnector(tester, 2, statusProcess: 4);
+      await _verify(tester);
+
+      expect(find.text('Pengisian Selesai'), findsOneWidget);
+    });
+
+    /// Tanpa rincian order yang bisa dibaca, konfirmasi tidak punya
+    /// angka untuk ditampilkan — pengguna diantar ke pembayaran.
+    testWidgets('tanpa rincian order jatuh ke Pembayaran', (tester) async {
+      await _tapConnector(tester, 0, statusProcess: 0, orderReadable: false);
+      await _verify(tester);
+
+      expect(find.text('Pembayaran'), findsOneWidget);
+    });
   });
 
   /// "Selesai" ikut ke layar pemantauan; `ongoing-kwh` yang menentukan,

@@ -214,7 +214,38 @@ void main() {
       });
     });
 
-    testWidgets('tombol Home di tengah pembelian juga melepas', (tester) async {
+    /// Sebelum order dibuat, keluar lewat tombol Home berarti batal —
+    /// baik dari halaman Kode Sesi maupun Pilih Nominal.
+    testWidgets('tombol Home di Kode Sesi melepas', (tester) async {
+      final recorder = _Recorder();
+      await _pickConnector(tester, recorder);
+      expect(find.text('Kode Sesi'), findsOneWidget);
+
+      await tester.tap(find.byType(HomeButton).last);
+      await tester.pumpAndSettle();
+
+      final cancel = recorder.to('/cancelled-connector').single;
+      expect((cancel.data as Map)['reservationId'], 'RESV-1');
+      expect(find.text('Pilih Charge Box'), findsOneWidget);
+    });
+
+    testWidgets('tombol Home di Pilih Nominal melepas', (tester) async {
+      final recorder = _Recorder();
+      await _pickConnector(tester, recorder);
+      await passSessionCode(tester);
+      expect(find.text('Pilih Nominal'), findsOneWidget);
+
+      await tester.tap(find.byType(HomeButton).last);
+      await tester.pumpAndSettle();
+
+      expect(recorder.to('/cancelled-connector'), hasLength(1));
+      expect(find.text('Pilih Charge Box'), findsOneWidget);
+    });
+
+    /// Sejak `push-order` berhasil, nasib pemesanan ditentukan ordernya.
+    /// Melepas konektornya dari aplikasi hanya membuat order yang sudah
+    /// ada menggantung.
+    testWidgets('tombol Home setelah push-order tidak melepas', (tester) async {
       final recorder = _Recorder();
       await _pickConnector(tester, recorder);
       await passSessionCode(tester);
@@ -224,14 +255,35 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Lanjutkan'));
       await tester.pumpAndSettle();
+      expect(recorder.to('/transaction/push-order'), hasLength(1));
       expect(find.text('Konfirmasi Pengisian'), findsOneWidget);
 
       await tester.tap(find.byType(HomeButton).last);
       await tester.pumpAndSettle();
 
-      final cancel = recorder.to('/cancelled-connector').single;
-      expect((cancel.data as Map)['reservationId'], 'RESV-1');
       expect(find.text('Pilih Charge Box'), findsOneWidget);
+      expect(recorder.to('/cancelled-connector'), isEmpty);
+    });
+
+    /// Halaman pembayaran pun sudah punya order di belakangnya.
+    testWidgets('tombol Home di Pembayaran tidak melepas', (tester) async {
+      final recorder = _Recorder();
+      await _pickConnector(tester, recorder);
+      await passSessionCode(tester);
+
+      await tester.tap(find.text('10'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Lanjutkan'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Konfirmasi & Bayar'));
+      await _settle(tester);
+      expect(find.text('Pembayaran'), findsOneWidget);
+
+      await tester.tap(find.byType(HomeButton).last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pilih Charge Box'), findsOneWidget);
+      expect(recorder.to('/cancelled-connector'), isEmpty);
     });
 
     /// Begitu pengisian jalan, konektornya sedang dipakai — bukan

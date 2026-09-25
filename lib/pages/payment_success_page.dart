@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/formatters.dart';
 import '../models/charging_session.dart';
+import '../models/kwh_price.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/asset_slot.dart';
@@ -42,9 +43,11 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    // Halaman ini hanya dicapai lewat alur pembelian, jadi harganya
-    // dipastikan ada.
-    final price = session.price!;
+    // Sesi yang dilanjutkan dari daftar tidak membawa rincian order —
+    // ia masuk langsung ke halaman pembayaran, jadi halaman ini pun
+    // bisa dicapai tanpa `price`. Yang selalu ada setelah kartu
+    // ditempelkan adalah tagihannya.
+    final price = session.price;
 
     return PageScaffold(
       backgroundColor: AppColors.pageBackgroundPlain,
@@ -81,11 +84,12 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
           ),
           const SizedBox(height: 16),
           SessionInfoRow(
-            nominalLabel: formatRupiah(session.paidAmount ?? price.rpTotal),
+            nominalLabel: formatRupiah(session.paidAmount ?? 0),
             sessionCode: session.sessionCode,
           ),
           const SizedBox(height: 16),
           _TransactionDetail(
+            price: price,
             session: session,
             expanded: _detailExpanded,
             onToggle: () => setState(() => _detailExpanded = !_detailExpanded),
@@ -99,17 +103,23 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> {
 /// Kartu "Detail Transaksi" (73:3229) yang bisa dilipat.
 class _TransactionDetail extends StatelessWidget {
   const _TransactionDetail({
+    required this.price,
     required this.session,
     required this.expanded,
     required this.onToggle,
   });
 
+  final PriceBreakdown? price;
   final ChargingSession session;
   final bool expanded;
   final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
+    // Disalin ke variabel lokal supaya bisa dipromosikan jadi non-null
+    // di bawah; field publik tidak bisa.
+    final breakdown = price;
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -167,10 +177,19 @@ class _TransactionDetail extends StatelessWidget {
                   value: session.formattedDate,
                   muted: true,
                 ),
+                // Rincian per baris hanya ada bila ordernya dibuat di
+                // unit ini. Tanpa itu yang bisa dipertanggungjawabkan
+                // cuma angka yang benar-benar didebit.
+                if (breakdown != null) ...[
+                  const SizedBox(height: 12),
+                  CostRows(price: breakdown),
+                ],
                 const SizedBox(height: 12),
-                CostRows(price: session.price!),
-                const SizedBox(height: 12),
-                TotalRow(amount: session.price!.rpTotal),
+                // Total rincian order bila ada — angkanya harus cocok
+                // dengan baris-baris di atasnya. Sesi lanjutan tidak
+                // punya rincian itu, jadi yang ditampilkan angka yang
+                // benar-benar didebit.
+                TotalRow(amount: breakdown?.rpTotal ?? session.paidAmount ?? 0),
               ],
             ),
             crossFadeState: expanded

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/charge_point_repository.dart';
 import '../data/charging_scope.dart';
+import '../data/release_booking.dart';
 import '../data/demo_data.dart';
 import '../data/formatters.dart';
 import '../models/charge_box.dart';
@@ -207,6 +208,10 @@ class _NominalPageState extends State<NominalPage> {
 
     return PageScaffold(
       title: 'Pilih Nominal',
+      // Order belum dibuat di sini, jadi keluar lewat tombol Home
+      // berarti membatalkan — konektornya dikembalikan. "Kembali" di
+      // bawah hanya mundur satu langkah, masih di dalam alur.
+      headerAction: HomeButton(onTap: () => releaseBooking(context)),
       subtitle: 'Pilih nominal kWh pengisian sesuai kebutuhan.',
       titleTrailing: ExpiryCountdown(
         expiresAt: widget.expiresAt,
