@@ -111,8 +111,16 @@ class SecondaryButton extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Ikon ikut warna label. Sebagian aset digambar putih untuk
+            // tombol utama yang latarnya biru; dipasang apa adanya di
+            // sini, ia hilang di atas tombol putih.
             if (leadingAsset != null) ...[
-              AssetSlot(leadingAsset!, width: 24, height: 24),
+              AssetSlot(
+                leadingAsset!,
+                width: 24,
+                height: 24,
+                color: AppColors.primary,
+              ),
               const SizedBox(width: 8),
             ],
             Flexible(
@@ -124,7 +132,12 @@ class SecondaryButton extends StatelessWidget {
             ),
             if (trailingAsset != null) ...[
               const SizedBox(width: 8),
-              AssetSlot(trailingAsset!, width: 28, height: 28),
+              AssetSlot(
+                trailingAsset!,
+                width: 28,
+                height: 28,
+                color: AppColors.primary,
+              ),
             ],
           ],
         ),

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kossotrik/widgets/primary_button.dart';
+import 'package:kossotrik/widgets/asset_slot.dart';
+import 'package:kossotrik/theme/app_colors.dart';
 import 'package:kossotrik/data/demo_data.dart';
 import 'package:kossotrik/models/charge_box.dart';
 import 'package:kossotrik/models/connector.dart';
@@ -14,6 +17,8 @@ Widget _app({List<ChargeBox>? chargeBoxes}) => MaterialApp(
 );
 
 void main() {
+  _secondaryButtonIconTests();
+
   group('Pilih Charge Box', () {
     testWidgets('menampilkan judul dan daftar dummy', (tester) async {
       await tester.pumpWidget(_app());
@@ -103,5 +108,31 @@ void main() {
       expect(mahal.rpTotal, greaterThan(murah.rpTotal));
       expect(murah.rpPerKwh, mahal.rpPerKwh);
     });
+  });
+}
+
+void _secondaryButtonIconTests() {
+  /// Sebagian aset ikon digambar putih untuk tombol utama yang latarnya
+  /// biru. Dipasang apa adanya di tombol sekunder yang putih, ikonnya
+  /// hilang — persis yang terjadi pada "Kembali ke Halaman Awal".
+  testWidgets('ikon tombol sekunder diwarnai seperti labelnya', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.build(),
+        home: Scaffold(
+          body: SecondaryButton(
+            label: 'Kembali ke Halaman Awal',
+            trailingAsset: 'assets/icons/ic_home_filled.svg',
+            leadingAsset: 'assets/icons/ic_arrow_left.svg',
+            onPressed: () {},
+          ),
+        ),
+      ),
+    );
+
+    final icons = tester.widgetList<AssetSlot>(find.byType(AssetSlot)).toList();
+
+    expect(icons, hasLength(2));
+    expect(icons.every((i) => i.color == AppColors.primary), isTrue);
   });
 }
