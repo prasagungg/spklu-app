@@ -17,7 +17,9 @@ Future<Connector?> showConnectorSheet(BuildContext context, ChargeBox box) {
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) => _ConnectorSheet(chargeBox: box),
+    // Ditutup lewat tombol X di sheet, bukan gesture kembali perangkat.
+    builder: (_) =>
+        PopScope(canPop: false, child: _ConnectorSheet(chargeBox: box)),
   );
 }
 

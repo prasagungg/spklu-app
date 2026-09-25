@@ -8,6 +8,7 @@ import 'package:kossotrik/models/charging_session.dart';
 import 'package:kossotrik/pages/charging_status_page.dart';
 import 'package:kossotrik/services/api_client.dart';
 import 'package:kossotrik/theme/app_theme.dart';
+import 'package:kossotrik/widgets/battery_gauge.dart';
 
 import 'fixtures.dart';
 
@@ -106,5 +107,53 @@ void main() {
 
     // Jatuh ke simulasi lokal, bukan angka dari backend.
     expect(find.text('0,500 kWh'), findsNothing);
+  });
+
+  /// Tinggi cairan baterai = energi tersalur dibagi kWh yang dipesan.
+  /// `ongoingKwhResponse` memesan 10 kWh.
+  testWidgets('baterai terisi sesuai porsi kWh yang tersalur', (tester) async {
+    final repo = ChargePointRepository(
+      client: ApiClient.withDio(Dio()..interceptors.add(_Stub(1))),
+    );
+
+    await tester.pumpWidget(
+      ChargingScope(
+        repository: repo,
+        child: MaterialApp(
+          theme: AppTheme.build(),
+          home: ChargingStatusPage(session: _session()),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(tester.widget<BatteryGauge>(find.byType(BatteryGauge)).fill, 0);
+
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+
+    // 1 kWh dari 10 kWh yang dipesan.
+    expect(tester.widget<BatteryGauge>(find.byType(BatteryGauge)).fill, 0.1);
+  });
+
+  /// Charger kerap menyalurkan sedikit lebih dari pesanan.
+  testWidgets('bacaan melebihi pesanan berhenti di penuh', (tester) async {
+    final repo = ChargePointRepository(
+      client: ApiClient.withDio(Dio()..interceptors.add(_Stub(12))),
+    );
+
+    await tester.pumpWidget(
+      ChargingScope(
+        repository: repo,
+        child: MaterialApp(
+          theme: AppTheme.build(),
+          home: ChargingStatusPage(session: _session()),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+
+    expect(tester.widget<BatteryGauge>(find.byType(BatteryGauge)).fill, 1.0);
   });
 }

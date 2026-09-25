@@ -338,47 +338,51 @@ Future<void> showHelpSheet(BuildContext context) {
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (context) => Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Butuh Bantuan?',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: AppColors.title,
-                height: 1.5,
+    // Ditutup lewat tombol "Tutup", bukan gesture kembali perangkat.
+    builder: (context) => PopScope(
+      canPop: false,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Butuh Bantuan?',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.title,
+                  height: 1.5,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Hubungi petugas di lokasi atau call center PLN 123 bila '
-              'pengisian tidak berjalan sebagaimana mestinya.',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w400,
-                color: AppColors.description,
+              const SizedBox(height: 4),
+              const Text(
+                'Hubungi petugas di lokasi atau call center PLN 123 bila '
+                'pengisian tidak berjalan sebagaimana mestinya.',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: AppColors.description,
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: PrimaryButton(
-                label: 'Tutup',
-                trailingAsset: null,
-                onPressed: () => Navigator.of(context).pop(),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: PrimaryButton(
+                  label: 'Tutup',
+                  trailingAsset: null,
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ),

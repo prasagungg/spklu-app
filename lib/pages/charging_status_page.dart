@@ -12,7 +12,7 @@ import '../models/session_check.dart';
 import '../services/api_exception.dart';
 import '../services/response_code.dart';
 import '../theme/app_colors.dart';
-import '../widgets/asset_slot.dart';
+import '../widgets/battery_gauge.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/primary_button.dart';
 import 'charging_finished_page.dart';
@@ -83,6 +83,29 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
   /// Energi tersalur. Selalu angka dari `/progress` bila ada; simulasi
   /// hanya menambal mode offline.
   double get _energyKwh => _progress?.charged ?? _simulatedKwh;
+
+  /// kWh yang dipesan — pembagi kemajuan pengisian.
+  ///
+  /// `orderKwh` dari `ongoing-kwh` yang berwenang; sesi yang dibuka dari
+  /// unit ini punya cadangan dari ordernya sendiri.
+  double get _orderedKwh {
+    final ordered = _progress?.orderKwh ?? 0;
+    if (ordered > 0) return ordered;
+
+    return widget.session.price?.kwh ?? 0;
+  }
+
+  /// Seberapa penuh baterainya: energi tersalur dibagi kWh yang
+  /// dipesan. 1 kWh dari 10 kWh berarti 0.1.
+  ///
+  /// Nol selama kWh pesanan belum diketahui — lebih baik tabung kosong
+  /// daripada tinggi cairan yang mengarang.
+  double get _fillRatio {
+    final ordered = _orderedKwh;
+    if (ordered <= 0) return 0;
+
+    return (_energyKwh / ordered).clamp(0.0, 1.0);
+  }
 
   // Nilai awal sengaja kosong: `POST /list-chargerbox` tidak membawa
   // sesi yang sedang berjalan, jadi angka pertama baru datang dari
@@ -278,10 +301,12 @@ class _ChargingStatusPageState extends State<ChargingStatusPage> {
       ),
       child: Column(
         children: [
-          const Expanded(
-            child: AssetSlot(
-              'assets/images/battery_charging.png',
-              fit: BoxFit.contain,
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: BatteryGauge(fill: _fillRatio),
+              ),
             ),
           ),
           Text(

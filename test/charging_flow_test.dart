@@ -47,6 +47,9 @@ Future<FakeCardReader> pumpFlow(WidgetTester tester) async {
 ///
 /// Tanpa ChargingScope halaman ini menyimulasikan kenaikan kWh sendiri,
 /// jadi cukup untuk menguji perilaku layarnya.
+///
+/// Memakai [settle], bukan pumpAndSettle: riak cairan pada gauge
+/// baterai berputar terus, jadi pohon widgetnya tidak pernah diam.
 Future<void> pumpStatus(WidgetTester tester) async {
   final box = DemoData.chargeBoxes[3];
 
@@ -63,7 +66,7 @@ Future<void> pumpStatus(WidgetTester tester) async {
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  await settle(tester);
 }
 
 void main() {

@@ -83,94 +83,105 @@ class PageScaffold extends StatelessWidget {
     final hasTitleBlock =
         title != null || subtitle != null || headerExtra != null;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: _overlayStyle,
-      child: Scaffold(
-        backgroundColor: backgroundColor,
-        body: Stack(
-          children: [
-            Positioned.fill(
-              child: Opacity(
-                opacity: backgroundOpacity,
-                child: AssetSlot(backgroundAsset, fit: BoxFit.cover),
-              ),
-            ),
-            // Diperbesar dari 127dp desain. Offset kanan dinaikkan agar
-            // tepi kiri ilustrasi tetap bebas dari subjudul — station
-            // tumbuh ke arah luar layar, bukan ke arah teks.
-            if (showStation)
-              Positioned(
-                top: topInset - 4,
-                right: -48,
-                child: const AssetSlot(
-                  'assets/images/station.png',
-                  width: 176,
-                  height: 176,
+    // Tombol dan gesture kembali bawaan perangkat dimatikan di semua
+    // halaman: unit ini kios, dan alurnya punya urutan yang harus
+    // dijaga — konektor yang sudah dikunci perlu dilepas, perintah stop
+    // perlu kode sesi. Satu-satunya jalan berpindah adalah tombol di
+    // dalam aplikasi, yang tahu apa yang harus dibereskan lebih dulu.
+    //
+    // `canPop: false` hanya menahan pop dari sistem; `Navigator.pop`
+    // yang dipanggil tombol aplikasi tetap jalan seperti biasa.
+    return PopScope(
+      canPop: false,
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: _overlayStyle,
+        child: Scaffold(
+          backgroundColor: backgroundColor,
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: Opacity(
+                  opacity: backgroundOpacity,
+                  child: AssetSlot(backgroundAsset, fit: BoxFit.cover),
                 ),
               ),
-            // bottom: false — bilah tombol mengurus inset bawahnya sendiri
-            // supaya background putihnya menembus sampai tepi layar.
-            SafeArea(
-              bottom: false,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _MobileHeader(
-                    action:
-                        headerAction ?? (isHome ? null : const HomeButton()),
+              // Diperbesar dari 127dp desain. Offset kanan dinaikkan agar
+              // tepi kiri ilustrasi tetap bebas dari subjudul — station
+              // tumbuh ke arah luar layar, bukan ke arah teks.
+              if (showStation)
+                Positioned(
+                  top: topInset - 4,
+                  right: -48,
+                  child: const AssetSlot(
+                    'assets/images/station.png',
+                    width: 176,
+                    height: 176,
                   ),
-                  if (hasTitleBlock)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                      child: Column(
-                        crossAxisAlignment: titleAlign == TextAlign.center
-                            ? CrossAxisAlignment.center
-                            : CrossAxisAlignment.start,
-                        children: [
-                          if (title != null)
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    title!,
-                                    textAlign: titleAlign,
-                                    style: AppTheme.pageTitle,
-                                  ),
-                                ),
-                                ?titleTrailing,
-                              ],
-                            ),
-                          if (subtitle != null) ...[
-                            const SizedBox(height: 4),
-                            SizedBox(
-                              width: double.infinity,
-                              child: Text(
-                                subtitle!,
-                                textAlign: titleAlign,
-                                style: AppTheme.pageSubtitle,
-                              ),
-                            ),
-                          ],
-                          if (headerExtra != null) ...[
-                            const SizedBox(height: 8),
-                            headerExtra!,
-                          ],
-                        ],
-                      ),
+                ),
+              // bottom: false — bilah tombol mengurus inset bawahnya sendiri
+              // supaya background putihnya menembus sampai tepi layar.
+              SafeArea(
+                bottom: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _MobileHeader(
+                      action:
+                          headerAction ?? (isHome ? null : const HomeButton()),
                     ),
-                  const SizedBox(height: 16),
-                  // Tanpa bilah tombol, isi halaman sendiri yang harus
-                  // menghormati inset bawah.
-                  Expanded(
-                    child: bottomBar == null
-                        ? SafeArea(top: false, child: child)
-                        : child,
-                  ),
-                  ?bottomBar,
-                ],
+                    if (hasTitleBlock)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        child: Column(
+                          crossAxisAlignment: titleAlign == TextAlign.center
+                              ? CrossAxisAlignment.center
+                              : CrossAxisAlignment.start,
+                          children: [
+                            if (title != null)
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      title!,
+                                      textAlign: titleAlign,
+                                      style: AppTheme.pageTitle,
+                                    ),
+                                  ),
+                                  ?titleTrailing,
+                                ],
+                              ),
+                            if (subtitle != null) ...[
+                              const SizedBox(height: 4),
+                              SizedBox(
+                                width: double.infinity,
+                                child: Text(
+                                  subtitle!,
+                                  textAlign: titleAlign,
+                                  style: AppTheme.pageSubtitle,
+                                ),
+                              ),
+                            ],
+                            if (headerExtra != null) ...[
+                              const SizedBox(height: 8),
+                              headerExtra!,
+                            ],
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    // Tanpa bilah tombol, isi halaman sendiri yang harus
+                    // menghormati inset bawah.
+                    Expanded(
+                      child: bottomBar == null
+                          ? SafeArea(top: false, child: child)
+                          : child,
+                    ),
+                    ?bottomBar,
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

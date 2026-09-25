@@ -63,57 +63,71 @@ class _ApiLogPageState extends State<ApiLogPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.pageBackgroundPlain,
-      appBar: AppBar(
-        title: const Text('Log API'),
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.title,
-        actions: [
-          IconButton(
-            tooltip: 'Hapus riwayat',
-            onPressed: _store.clear,
-            icon: const Icon(Icons.delete_outline),
+    // Sama seperti halaman lain: kembali hanya lewat tombol
+    // di dalam aplikasi, bukan gesture perangkat.
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: AppColors.pageBackgroundPlain,
+        appBar: AppBar(
+          // Panah bawaan AppBar memakai maybePop, yang ikut tertahan
+          // PopScope — jadi tombolnya dipasang sendiri.
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(),
           ),
-        ],
-      ),
-      body: Column(
-        children: [
-          _BaseUrlBar(),
-          _FilterField(controller: _filter, onChanged: (_) => setState(() {})),
-          Expanded(
-            child: ListenableBuilder(
-              listenable: _store,
-              builder: (context, _) {
-                final entries = _visible(_store.entries);
-
-                if (entries.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Text(
-                        _store.isEmpty
-                            ? 'Belum ada panggilan yang tercatat.\n'
-                                  'Riwayat terisi begitu aplikasi menembak '
-                                  'backend.'
-                            : 'Tidak ada yang cocok dengan penyaring.',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: AppColors.description),
-                      ),
-                    ),
-                  );
-                }
-
-                return ListView.separated(
-                  itemCount: entries.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
-                  itemBuilder: (context, index) =>
-                      _EntryTile(entry: entries[index]),
-                );
-              },
+          title: const Text('Log API'),
+          backgroundColor: AppColors.surface,
+          foregroundColor: AppColors.title,
+          actions: [
+            IconButton(
+              tooltip: 'Hapus riwayat',
+              onPressed: _store.clear,
+              icon: const Icon(Icons.delete_outline),
             ),
-          ),
-        ],
+          ],
+        ),
+        body: Column(
+          children: [
+            _BaseUrlBar(),
+            _FilterField(
+              controller: _filter,
+              onChanged: (_) => setState(() {}),
+            ),
+            Expanded(
+              child: ListenableBuilder(
+                listenable: _store,
+                builder: (context, _) {
+                  final entries = _visible(_store.entries);
+
+                  if (entries.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Text(
+                          _store.isEmpty
+                              ? 'Belum ada panggilan yang tercatat.\n'
+                                    'Riwayat terisi begitu aplikasi menembak '
+                                    'backend.'
+                              : 'Tidak ada yang cocok dengan penyaring.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: AppColors.description),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    itemCount: entries.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, index) =>
+                        _EntryTile(entry: entries[index]),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -254,55 +268,64 @@ class _EntryDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.pageBackgroundPlain,
-      appBar: AppBar(
-        title: Text(entry.title),
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.title,
-        actions: [
-          IconButton(
-            tooltip: 'Salin',
-            icon: const Icon(Icons.copy_all_outlined),
-            onPressed: () async {
-              await Clipboard.setData(
-                ClipboardData(text: entry.toShareableText()),
-              );
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Log disalin')));
-            },
+    // Sama seperti halaman lain: kembali hanya lewat tombol
+    // di dalam aplikasi, bukan gesture perangkat.
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: AppColors.pageBackgroundPlain,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(),
           ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _Section(title: 'Alamat', body: entry.url),
-          _Section(
-            title: 'Ringkasan',
-            body:
-                'waktu   : ${entry.timeLabel}\n'
-                'durasi  : ${entry.elapsedLabel}\n'
-                'status  : ${entry.statusLabel}'
-                '${entry.responseCode == null ? '' : '\n'
-                          'kode    : ${entry.responseCode} '
-                          '${entry.responseMessage ?? ''}'}',
-          ),
-          if (entry.error != null)
-            _Section(title: 'Error', body: entry.error!, danger: true),
-          _Section(
-            title: 'Header',
-            body: entry.requestHeaders.entries
-                .map((e) => '${e.key}: ${e.value}')
-                .join('\n'),
-          ),
-          if (entry.requestBody != null)
-            _Section(title: 'Request', body: entry.requestBody!),
-          if (entry.responseBody != null)
-            _Section(title: 'Response', body: entry.responseBody!),
-        ],
+          title: Text(entry.title),
+          backgroundColor: AppColors.surface,
+          foregroundColor: AppColors.title,
+          actions: [
+            IconButton(
+              tooltip: 'Salin',
+              icon: const Icon(Icons.copy_all_outlined),
+              onPressed: () async {
+                await Clipboard.setData(
+                  ClipboardData(text: entry.toShareableText()),
+                );
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Log disalin')));
+              },
+            ),
+          ],
+        ),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _Section(title: 'Alamat', body: entry.url),
+            _Section(
+              title: 'Ringkasan',
+              body:
+                  'waktu   : ${entry.timeLabel}\n'
+                  'durasi  : ${entry.elapsedLabel}\n'
+                  'status  : ${entry.statusLabel}'
+                  '${entry.responseCode == null ? '' : '\n'
+                            'kode    : ${entry.responseCode} '
+                            '${entry.responseMessage ?? ''}'}',
+            ),
+            if (entry.error != null)
+              _Section(title: 'Error', body: entry.error!, danger: true),
+            _Section(
+              title: 'Header',
+              body: entry.requestHeaders.entries
+                  .map((e) => '${e.key}: ${e.value}')
+                  .join('\n'),
+            ),
+            if (entry.requestBody != null)
+              _Section(title: 'Request', body: entry.requestBody!),
+            if (entry.responseBody != null)
+              _Section(title: 'Response', body: entry.responseBody!),
+          ],
+        ),
       ),
     );
   }

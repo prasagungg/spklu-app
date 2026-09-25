@@ -157,4 +157,28 @@ class AppColors {
   static const List<BoxShadow> selectedShadow = [
     BoxShadow(color: Color(0x800271F9), blurRadius: 8),
   ];
+
+  // --- Gauge baterai di layar "Sedang Mengisi" ---
+  // Diambil dari ilustrasi baterai pada desain; isiannya digambar
+  // sendiri supaya tingginya mengikuti energi yang benar-benar
+  // tersalur, sesuatu yang tidak bisa dilakukan gambar tetap.
+
+  /// Kaca tabung, bagian yang belum terisi.
+  static const Color batteryGlass = Color(0xFFE8F6FF);
+
+  /// Garis tepi tabung dan tutupnya.
+  static const Color batteryGlassBorder = Color(0xFFBFE1F7);
+
+  /// Tutup logam di atas tabung.
+  static const Color batteryCap = Color(0xFFCFE6F8);
+
+  /// Cairan hijau, dari permukaan ke dasar.
+  static const LinearGradient batteryLiquidGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xFF7BE47F), Color(0xFF17B85A)],
+  );
+
+  /// Pendar di sekitar permukaan cairan.
+  static const Color batteryLiquidGlow = Color(0x5517B85A);
 }
