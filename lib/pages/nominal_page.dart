@@ -216,6 +216,7 @@ class _NominalPageState extends State<NominalPage> {
       titleTrailing: ExpiryCountdown(
         expiresAt: widget.expiresAt,
         compact: true,
+        onExpired: () => releaseBooking(context),
       ),
       backgroundColor: AppColors.pageBackgroundPlain,
       bottomBar: BottomActionBar(

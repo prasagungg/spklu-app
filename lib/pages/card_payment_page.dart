@@ -10,6 +10,7 @@ import '../services/api_exception.dart';
 import '../services/response_code.dart';
 import '../services/card_reader.dart';
 import '../theme/app_colors.dart';
+import '../widgets/expiry_ticker.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/session_widgets.dart';
@@ -40,13 +41,10 @@ class CardPaymentPage extends StatefulWidget {
   State<CardPaymentPage> createState() => _CardPaymentPageState();
 }
 
-class _CardPaymentPageState extends State<CardPaymentPage> {
-  /// Dipakai hanya bila order tidak membawa batas waktu — sesi yang
-  /// dilanjutkan dari daftar, dan mode offline untuk test.
-  static const _fallbackLimit = Duration(minutes: 10);
-
-  Timer? _ticker;
-  late Duration _remaining = _remainingNow() ?? _fallbackLimit;
+class _CardPaymentPageState extends State<CardPaymentPage>
+    with ExpiryTicker<CardPaymentPage> {
+  @override
+  ChargingSession get expirySession => widget.session;
 
   CardReader? _reader;
   CardReaderStatus? _status;
@@ -64,27 +62,8 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
   void initState() {
     super.initState();
 
-    _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return;
-      if (_remaining.inSeconds <= 0) {
-        timer.cancel();
-        return;
-      }
-      // Sisa waktu dihitung ulang dari batas waktu order, bukan dengan
-      // mengurangi satu detik: hitungannya tetap benar walau timer
-      // tersendat atau layar sempat ditinggalkan.
-      setState(
-        () => _remaining =
-            _remainingNow() ?? _remaining - const Duration(seconds: 1),
-      );
-    });
+    startExpiryTicker();
   }
-
-  /// Sisa waktu menurut `sessionExpiredTime` milik order.
-  ///
-  /// Null bila ordernya tidak membawa batas waktu — pemanggil jatuh ke
-  /// hitungan lokal.
-  Duration? _remainingNow() => widget.session.remainingAt(DateTime.now());
 
   @override
   void didChangeDependencies() {
@@ -97,7 +76,7 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
 
   @override
   void dispose() {
-    _ticker?.cancel();
+    stopExpiryTicker();
     unawaited(_reader?.stop());
     super.dispose();
   }
@@ -197,7 +176,9 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
   }
 
   void _proceed(ChargingSession session) {
-    _ticker?.cancel();
+    // Tahap ini lewat: tenggat yang habis tidak boleh lagi memulangkan
+    // pengguna dari halaman di atas sini.
+    stopExpiryTicker();
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
@@ -236,7 +217,7 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
       // Halaman ini memakai ilustrasi reader sebagai latar penuh.
       backgroundAsset: 'assets/images/bg_payment.png',
       backgroundOpacity: 1,
-      headerExtra: CountdownPill(remaining: _remaining),
+      headerExtra: CountdownPill(remaining: remaining),
       bottomBar: BottomActionBar(
         opaque: false,
         children: [

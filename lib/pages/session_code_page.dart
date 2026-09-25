@@ -56,7 +56,12 @@ class _SessionCodePageState extends State<SessionCodePage> {
     return PageScaffold(
       backgroundColor: AppColors.pageBackgroundPlain,
       headerAction: HomeButton(onTap: () => releaseBooking(context)),
-      headerExtra: ExpiryCountdown(expiresAt: widget.reservation.expiredAt),
+      headerExtra: ExpiryCountdown(
+        expiresAt: widget.reservation.expiredAt,
+        // Tenggat habis sebelum apa pun dibeli: konektornya dilepas
+        // supaya tidak tertahan atas nama pengguna yang sudah pergi.
+        onExpired: () => releaseBooking(context),
+      ),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [

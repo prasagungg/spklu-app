@@ -10,6 +10,7 @@ import '../services/api_exception.dart';
 import '../services/response_code.dart';
 import '../theme/app_colors.dart';
 import '../widgets/asset_slot.dart';
+import '../widgets/expiry_ticker.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/session_widgets.dart';
@@ -40,15 +41,14 @@ class ConnectConnectorPage extends StatefulWidget {
   State<ConnectConnectorPage> createState() => _ConnectConnectorPageState();
 }
 
-class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
-  /// Dipakai hanya bila tagihannya tidak membawa batas waktu — sesi
-  /// yang dilanjutkan dari daftar, dan mode offline untuk test.
-  static const _fallbackLimit = Duration(minutes: 10);
+class _ConnectConnectorPageState extends State<ConnectConnectorPage>
+    with ExpiryTicker<ConnectConnectorPage> {
   static const _simulationDelay = Duration(seconds: 3);
 
-  Timer? _ticker;
+  @override
+  ChargingSession get expirySession => widget.session;
+
   Timer? _detection;
-  late Duration _remaining = _remainingNow() ?? _fallbackLimit;
   bool _connected = false;
   bool _starting = false;
 
@@ -66,28 +66,8 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
   void initState() {
     super.initState();
 
-    _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return;
-      if (_remaining.inSeconds <= 0) {
-        timer.cancel();
-        return;
-      }
-      // Dihitung ulang dari tenggat, bukan dikurangi satu detik, supaya
-      // angkanya tetap benar walau timer tersendat.
-      setState(
-        () => _remaining =
-            _remainingNow() ?? _remaining - const Duration(seconds: 1),
-      );
-    });
+    startExpiryTicker();
   }
-
-  /// Sisa waktu menurut `sessionExpired` pada jawaban
-  /// `POST /transaction/payment-billing`.
-  ///
-  /// Pembayaran yang memperbarui tenggat sesi, jadi hitung mundur di
-  /// sini melanjutkan dari sana — bukan mengulang dari sepuluh menit.
-  /// Null bila sesinya tidak membawa batas waktu.
-  Duration? _remainingNow() => widget.session.remainingAt(DateTime.now());
 
   @override
   void didChangeDependencies() {
@@ -132,7 +112,7 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
 
   @override
   void dispose() {
-    _ticker?.cancel();
+    stopExpiryTicker();
     _detection?.cancel();
     super.dispose();
   }
@@ -184,7 +164,9 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
       if (!mounted) return;
     }
 
-    _ticker?.cancel();
+    // Tahap ini lewat: tenggat yang habis tidak boleh lagi memulangkan
+    // pengguna dari halaman di atas sini.
+    stopExpiryTicker();
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
@@ -209,7 +191,7 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
       title: _connected ? 'Konektor Terhubung' : 'Hubungkan Konektor',
       subtitle: widget.session.breadcrumb,
       backgroundColor: AppColors.pageBackgroundPlain,
-      headerExtra: CountdownPill(remaining: _remaining),
+      headerExtra: CountdownPill(remaining: remaining),
       bottomBar: BottomActionBar(
         opaque: false,
         children: [

@@ -284,6 +284,10 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
           kwh: detail.orderedKwh,
           rpTotal: detail.paidAmount,
           rpPerKwh: detail.pricePerKwh,
+          // Tenggat ordernya dibaca ulang dari `charging/detail`; bila
+          // pemesanannya sudah tidak memegang tenggat, yang dipakai
+          // tenggat dari `manage-sessioncode`.
+          sessionExpiredAt: detail.sessionExpiredAt ?? session.expiresAt,
         ),
       );
     } on Object catch (e) {

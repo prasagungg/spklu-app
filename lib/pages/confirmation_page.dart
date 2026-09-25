@@ -45,6 +45,13 @@ class ConfirmationPage extends StatelessWidget {
     return PageScaffold(
       title: 'Konfirmasi Pengisian',
       subtitle: 'Pastikan detail pengisian sudah sesuai sebelum melanjutkan.',
+      // Ordernya sudah dibuat `push-order` dan punya tenggat; tanpa pil
+      // di sini pengguna tidak tahu waktunya habis, dan penekanan
+      // "Konfirmasi & Bayar" cuma dijawab kode 22 oleh backend.
+      //
+      // Pemesanannya tidak dilepas saat tenggatnya habis: sejak order
+      // ada, nasib konektornya ditentukan order itu.
+      headerExtra: ExpiryCountdown(expiresAt: order.sessionExpiredAt),
       backgroundColor: AppColors.pageBackgroundPlain,
       bottomBar: BottomActionBar(
         children: [

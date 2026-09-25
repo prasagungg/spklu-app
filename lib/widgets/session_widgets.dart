@@ -14,12 +14,17 @@ import 'asset_slot.dart';
 ///
 /// [expiresAt] null berarti backend tidak menyebutkannya; dipakai
 /// [fallback] supaya pilnya tetap ada seperti di desain.
+///
+/// Saat hitungannya mencapai 00:00 pengguna dipulangkan ke halaman awal
+/// — lewat [onExpired] bila halamannya perlu melakukan sesuatu dulu,
+/// seperti melepas pemesanan konektornya.
 class ExpiryCountdown extends StatefulWidget {
   const ExpiryCountdown({
     super.key,
     this.expiresAt,
     this.compact = false,
     this.fallback = const Duration(minutes: 10),
+    this.onExpired,
   });
 
   final DateTime? expiresAt;
@@ -28,6 +33,10 @@ class ExpiryCountdown extends StatefulWidget {
   final bool compact;
 
   final Duration fallback;
+
+  /// Dijalankan sekali saat tenggatnya habis. Null berarti langsung
+  /// pulang ke halaman awal.
+  final VoidCallback? onExpired;
 
   @override
   State<ExpiryCountdown> createState() => _ExpiryCountdownState();
@@ -51,12 +60,41 @@ class _ExpiryCountdownState extends State<ExpiryCountdown> {
 
     _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;
-      if (_remaining.inSeconds <= 0) {
+
+      // Dihitung ulang dari tenggatnya bila ada, supaya angkanya tetap
+      // benar walau timernya tersendat.
+      final next = widget.expiresAt == null
+          ? _remaining - const Duration(seconds: 1)
+          : _initial();
+      if (next.inSeconds <= 0) {
         timer.cancel();
+        setState(() => _remaining = Duration.zero);
+        _expire();
         return;
       }
-      setState(() => _remaining -= const Duration(seconds: 1));
+
+      setState(() => _remaining = next);
     });
+  }
+
+  /// Tenggatnya habis: halaman ini tidak bisa dilanjutkan lagi, jadi
+  /// pengguna dipulangkan.
+  ///
+  /// Hanya halaman yang sedang terlihat yang memulangkan. Pil di halaman
+  /// yang sudah tertutup halaman lain ikut berhenti di 00:00, tetapi
+  /// yang menentukan nasib pengguna adalah hitung mundur di layar
+  /// teratas — kalau tidak, halaman bawah bisa menarik pengguna keluar
+  /// dari tahap yang sudah lebih maju.
+  void _expire() {
+    if (ModalRoute.of(context)?.isCurrent == false) return;
+
+    final onExpired = widget.onExpired;
+    if (onExpired != null) {
+      onExpired();
+      return;
+    }
+
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override

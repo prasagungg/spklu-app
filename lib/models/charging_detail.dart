@@ -46,6 +46,7 @@ class ChargingDetail {
     this.lastSoc,
     this.duration = Duration.zero,
     this.recordedAt,
+    this.sessionExpiredAt,
   });
 
   final String orderId;
@@ -93,6 +94,16 @@ class ChargingDetail {
   /// `tglCatat`.
   final DateTime? recordedAt;
 
+  /// Tenggat order ini, dari `sessionExpiredTime`.
+  ///
+  /// Backend mengisinya dari `order.SessionExpiredAt` — nilai yang sama
+  /// dengan yang dikirim `push-order`, jadi sesi yang dilanjutkan lewat
+  /// Verifikasi Sesi bisa membaca ulang tenggat aslinya di sini.
+  ///
+  /// Null bila pemesanan di belakang sesi ini sudah tidak memegang
+  /// tenggat.
+  final DateTime? sessionExpiredAt;
+
   factory ChargingDetail.fromJson(Map<String, dynamic>? json) {
     // `chargeDuration` dikirim sebagai teks ("0"), sebagian angka
     // lain sebagai null. Keduanya dibaca lewat satu jalan.
@@ -135,6 +146,13 @@ class ChargingDetail {
         final String value => DateTime.tryParse(value),
         _ => null,
       },
+      // Ejaan `sessionExpired` ikut diterima seperti di model lain:
+      // backend memakai dua ejaan di endpoint yang berbeda.
+      sessionExpiredAt:
+          switch (json?['sessionExpiredTime'] ?? json?['sessionExpired']) {
+            final String value => DateTime.tryParse(value),
+            _ => null,
+          },
     );
   }
 

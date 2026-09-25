@@ -15,6 +15,7 @@ class _Stub extends Interceptor {
     this.statusProcess = 3,
     this.orderReadable = true,
     this.sessionExpiredTime,
+    this.detailExpiredTime,
   });
 
   /// Status konektor pada `detail-chargerbox` — menentukan bisa
@@ -32,6 +33,9 @@ class _Stub extends Interceptor {
   /// Tenggat sesi pada jawaban `manage-sessioncode`.
   final String? sessionExpiredTime;
 
+  /// Tenggat yang dijawab `charging/detail`.
+  final String? detailExpiredTime;
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     handler.resolve(
@@ -40,7 +44,9 @@ class _Stub extends Interceptor {
         data: switch (options.path) {
           '/transaction/charging/ongoing-kwh' => ongoingKwhResponse(status: 3),
           '/transaction/charging/detail' =>
-            orderReadable ? chargingDetailResponse() : okResponse,
+            orderReadable
+                ? chargingDetailResponse(sessionExpiredTime: detailExpiredTime)
+                : okResponse,
           // Status sebenarnya datang dari sini, bukan dari daftar.
           '/detail-chargerbox' => chargeBoxDetailResponse(
             connectors: [connectorJson(status: status)],
@@ -75,6 +81,7 @@ Future<void> _tapConnector(
   int statusProcess = 3,
   bool orderReadable = true,
   String? sessionExpiredTime,
+  String? detailExpiredTime,
 }) async {
   final repo = ChargePointRepository(
     client: ApiClient.withDio(
@@ -85,6 +92,7 @@ Future<void> _tapConnector(
             statusProcess: statusProcess,
             orderReadable: orderReadable,
             sessionExpiredTime: sessionExpiredTime,
+            detailExpiredTime: detailExpiredTime,
           ),
         ),
     ),
@@ -241,6 +249,59 @@ void main() {
       expect(find.text('Hubungkan Konektor'), findsOneWidget);
       final pill = tester.widget<CountdownPill>(find.byType(CountdownPill));
       expect(pill.remaining.inSeconds, closeTo(420, 3));
+    });
+
+    /// Halaman Pembayaran pada sesi lanjutan tidak punya jawaban
+    /// `push-order` untuk dibaca; tenggatnya dibaca ulang dari
+    /// `charging/detail`, yang mengirim tenggat order yang sama.
+    testWidgets('Pembayaran memakai sessionExpiredTime dari charging/detail', (
+      tester,
+    ) async {
+      final detail = DateTime.now().toUtc().add(const Duration(minutes: 4));
+
+      await _tapConnector(
+        tester,
+        0,
+        statusProcess: 0,
+        detailExpiredTime: detail.toIso8601String(),
+        // Tenggat manage-sessioncode sengaja dibuat jauh berbeda supaya
+        // terlihat mana yang dipakai.
+        sessionExpiredTime: DateTime.now()
+            .toUtc()
+            .add(const Duration(minutes: 9))
+            .toIso8601String(),
+      );
+      await _verify(tester);
+      expect(find.text('Konfirmasi Pengisian'), findsOneWidget);
+
+      await tester.tap(find.text('Konfirmasi & Bayar'));
+      await settleFrames(tester);
+
+      final pill = tester.widget<CountdownPill>(find.byType(CountdownPill));
+      expect(pill.remaining.inSeconds, closeTo(240, 3));
+    });
+
+    /// `sessionExpiredTime` di `charging/detail` null saat pemesanannya
+    /// sudah tidak memegang tenggat; yang dipakai lalu tenggat dari
+    /// `manage-sessioncode`.
+    testWidgets('Pembayaran jatuh ke tenggat manage-sessioncode', (
+      tester,
+    ) async {
+      final session = DateTime.now().toUtc().add(const Duration(minutes: 6));
+
+      await _tapConnector(
+        tester,
+        0,
+        statusProcess: 0,
+        sessionExpiredTime: session.toIso8601String(),
+      );
+      await _verify(tester);
+
+      await tester.tap(find.text('Konfirmasi & Bayar'));
+      await settleFrames(tester);
+
+      final pill = tester.widget<CountdownPill>(find.byType(CountdownPill));
+      expect(pill.remaining.inSeconds, closeTo(360, 3));
     });
 
     testWidgets('tanpa tenggat jatuh ke cadangan sepuluh menit', (

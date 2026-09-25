@@ -5,6 +5,14 @@
 library;
 
 /// Satu konektor. [id] dikirim backend sebagai teks, seperti aslinya.
+/// Tenggat yang masih hidup, dihitung dari sekarang.
+///
+/// Hitung mundur di aplikasi memulangkan pengguna ke halaman awal begitu
+/// mencapai 00:00, jadi fixture tidak boleh memakai tanggal tetap yang
+/// sudah lewat — halaman yang diuji akan langsung menutup diri.
+String futureExpiry([Duration ahead = const Duration(minutes: 10)]) =>
+    DateTime.now().toUtc().add(ahead).toIso8601String();
+
 Map<String, dynamic> connectorJson({
   String id = '1',
   String chargeBoxId = 'CB-SMR-01',
@@ -113,6 +121,7 @@ Map<String, dynamic> pushOrderResponse({
   String orderId = 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
   String sessionCode = '29',
   String partnerReference = '81067',
+  String? sessionExpiredTime,
 }) => {
   'responseCode': '00',
   'responseMessage': 'Success',
@@ -124,7 +133,7 @@ Map<String, dynamic> pushOrderResponse({
     'connectorId': '1',
     'partnerReference': partnerReference,
     'sessionCode': sessionCode,
-    'sessionExpiredTime': '2026-09-22T04:22:14Z',
+    'sessionExpiredTime': sessionExpiredTime ?? futureExpiry(),
     'kwh': kwh,
     'rpPerKwh': 2466,
     'rpPpj': 740,
@@ -172,7 +181,7 @@ Map<String, dynamic> paymentBillingResponse({
   String orderId = 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
   num totalAmount = 25400,
   String bankLog = '1231408098812345678100500',
-  String sessionExpired = '2026-09-23T09:56:04Z',
+  String? sessionExpired,
 }) {
   final body = inquiryBillingResponse(
     orderId: orderId,
@@ -182,7 +191,7 @@ Map<String, dynamic> paymentBillingResponse({
   data['bankLog'] = bankLog;
   // Pembayaran memperbarui tenggat sesi; inilah sumber hitung mundur di
   // layar Hubungkan Konektor.
-  data['sessionExpired'] = sessionExpired;
+  data['sessionExpired'] = sessionExpired ?? futureExpiry();
 
   return body;
 }
@@ -255,6 +264,10 @@ Map<String, dynamic> transactionDetailResponse({
 /// apa adanya.
 Map<String, dynamic> chargingDetailResponse({
   String orderId = 'YZ00ZG5SP9HUNVRPTZH69Y7POW',
+
+  /// Tenggat order. Null berarti pemesanannya sudah tidak memegang
+  /// tenggat — hitung mundur jatuh ke sumber lain.
+  String? sessionExpiredTime,
   num kwhPesan = 10,
   num kwhPakai = 6.4,
   num rpPesan = 25400,
@@ -270,6 +283,7 @@ Map<String, dynamic> chargingDetailResponse({
     'connectorName': 'Gun 1',
     'connectorId': '1',
     'status': 4,
+    'sessionExpiredTime': ?sessionExpiredTime,
     'kwhPesan': kwhPesan,
     'kwhPakai': kwhPakai,
     'sisaKwh': 3.6,
@@ -320,6 +334,7 @@ Map<String, dynamic> sessionCodeResponse({
 /// [accepted] mengisi field `status`: konektornya bersedia atau tidak.
 Map<String, dynamic> bookingResponse({
   bool accepted = true,
+  String? sessionExpired,
   String reservationId = 'RESV-1',
   String sessionCode = '29',
   String chargeBoxId = 'CB-SMR-01',
@@ -334,7 +349,7 @@ Map<String, dynamic> bookingResponse({
     'connectorId': connectorId,
     // Tahapnya ditetapkan backend sendiri.
     'connectorStatus': 'R0',
-    'sessionExpired': '2026-09-23T09:56:04Z',
+    'sessionExpired': sessionExpired ?? futureExpiry(),
     'reservationId': reservationId,
     'sessionCode': sessionCode,
     'status': accepted,
