@@ -264,17 +264,19 @@ class _CardPaymentPageState extends State<CardPaymentPage> {
               // Kesiapan masih diperiksa — tampilannya sama dengan
               // menunggu kartu, jadi layar tidak berkedip.
               null || CardReaderStatus.ready => WaitingPanel(
-                  label: _inquiring ? 'Memproses Pembayaran' : 'Menunggu Kartu',
-                  soft: true,
-                ),
+                label: _inquiring ? 'Memproses Pembayaran' : 'Menunggu Kartu',
+                soft: true,
+              ),
               CardReaderStatus.disabled => const _ReaderNotice(
-                  text: 'NFC sedang mati. Nyalakan NFC di pengaturan '
-                      'perangkat, lalu tekan Periksa Lagi.',
-                ),
+                text:
+                    'NFC sedang mati. Nyalakan NFC di pengaturan '
+                    'perangkat, lalu tekan Periksa Lagi.',
+              ),
               CardReaderStatus.unsupported => const _ReaderNotice(
-                  text: 'Perangkat ini tidak punya pembaca NFC, jadi kartu '
-                      'e-Money tidak bisa dibaca. Hubungi petugas.',
-                ),
+                text:
+                    'Perangkat ini tidak punya pembaca NFC, jadi kartu '
+                    'e-Money tidak bisa dibaca. Hubungi petugas.',
+              ),
             },
           ),
           const SizedBox(height: 16),

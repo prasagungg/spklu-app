@@ -15,37 +15,37 @@ class StatusChip extends StatelessWidget {
   });
 
   const StatusChip.available({super.key})
-      : label = 'Tersedia',
-        background = AppColors.availableBg,
-        foreground = AppColors.availableFg,
-        fontSize = 12;
+    : label = 'Tersedia',
+      background = AppColors.availableBg,
+      foreground = AppColors.availableFg,
+      fontSize = 12;
 
   const StatusChip.inUse({super.key})
-      : label = 'Sedang Digunakan',
-        background = AppColors.inUseBg,
-        foreground = AppColors.inUseFg,
-        fontSize = 12;
+    : label = 'Sedang Digunakan',
+      background = AppColors.inUseBg,
+      foreground = AppColors.inUseFg,
+      fontSize = 12;
 
   /// Sedang dipesan orang lain, belum sampai pembayaran.
   const StatusChip.reserved({super.key})
-      : label = 'Dipesan',
-        background = AppColors.infoTileBg,
-        foreground = AppColors.description,
-        fontSize = 12;
+    : label = 'Dipesan',
+      background = AppColors.infoTileBg,
+      foreground = AppColors.description,
+      fontSize = 12;
 
   /// Ordernya sudah dibuat, tagihannya belum dibayar.
   const StatusChip.awaitingPayment({super.key})
-      : label = 'Menunggu Pembayaran',
-        background = AppColors.inUseBg,
-        foreground = AppColors.inUseFg,
-        fontSize = 12;
+    : label = 'Menunggu Pembayaran',
+      background = AppColors.inUseBg,
+      foreground = AppColors.inUseFg,
+      fontSize = 12;
 
   /// Di kartu charge box chip ini sedikit lebih kecil (10px).
   const StatusChip.unavailable({super.key})
-      : label = 'Tidak Tersedia',
-        background = AppColors.unavailableBg,
-        foreground = AppColors.unavailableFg,
-        fontSize = 10;
+    : label = 'Tidak Tersedia',
+      background = AppColors.unavailableBg,
+      foreground = AppColors.unavailableFg,
+      fontSize = 10;
 
   final String label;
   final Color background;

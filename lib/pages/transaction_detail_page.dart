@@ -63,7 +63,7 @@ class TransactionDetailPage extends StatelessWidget {
               if (detail.pricePerKwh > 0)
                 (
                   label: 'Tarif per kWh',
-                  value: formatRupiahDecimal(detail.pricePerKwh),
+                  value: formatRupiah(detail.pricePerKwh),
                 ),
             ],
           ),
@@ -77,7 +77,10 @@ class TransactionDetailPage extends StatelessWidget {
               if (detail.cardNumber.isNotEmpty)
                 // Backend sudah menyamarkannya; ditampilkan apa adanya.
                 (label: 'Nomor Kartu', value: detail.cardNumber),
-              (label: 'Total Pemakaian', value: formatRupiah(detail.usageAmount)),
+              (
+                label: 'Total Pemakaian',
+                value: formatRupiah(detail.usageAmount),
+              ),
               if (detail.serviceAmount != 0)
                 (
                   label: 'Biaya Layanan',
@@ -85,7 +88,10 @@ class TransactionDetailPage extends StatelessWidget {
                 ),
               if (detail.idleFee != 0)
                 (label: 'Denda Idle', value: formatRupiah(detail.idleFee)),
-              (label: 'Sisa Pembayaran', value: formatRupiah(detail.refundAmount)),
+              (
+                label: 'Sisa Pembayaran',
+                value: formatRupiah(detail.refundAmount),
+              ),
             ],
             total: (label: 'Pembayaran Awal', amount: detail.paidAmount),
           ),
@@ -107,7 +113,7 @@ class _Card extends StatelessWidget {
   final List<({String label, String value})> rows;
 
   /// Baris yang ditonjolkan di bawah, bila ada.
-  final ({String label, int amount})? total;
+  final ({String label, num amount})? total;
 
   @override
   Widget build(BuildContext context) {
@@ -130,11 +136,7 @@ class _Card extends StatelessWidget {
           const SizedBox(height: 12),
           for (var i = 0; i < rows.length; i++) ...[
             if (i > 0) const SizedBox(height: 12),
-            DetailRow(
-              label: rows[i].label,
-              value: rows[i].value,
-              muted: true,
-            ),
+            DetailRow(label: rows[i].label, value: rows[i].value, muted: true),
           ],
           if (highlight != null) ...[
             const SizedBox(height: 12),

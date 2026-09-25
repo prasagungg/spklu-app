@@ -133,11 +133,7 @@ class _TransactionCodePageState extends State<TransactionCodePage> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
-          SessionDigitBoxes(
-            entered: _entered,
-            length: _length,
-            wrong: _wrong,
-          ),
+          SessionDigitBoxes(entered: _entered, length: _length, wrong: _wrong),
           const SizedBox(height: 16),
           SessionKeypad(onDigit: _press, onErase: _erase),
         ],

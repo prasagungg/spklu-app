@@ -60,28 +60,29 @@ class Order implements PriceBreakdown {
 
   /// Biaya energi — kWh dikali tarif, dihitung backend.
   @override
-  final int rpKwh;
+  final num rpKwh;
 
   @override
-  final int rpPpj;
+  final num rpPpj;
 
   @override
-  final int rpPpn;
+  final num rpPpn;
 
   @override
-  final int rpTotal;
+  final num rpTotal;
 
-  final int rpLayanan;
-  final int rpMaterai;
+  final num rpLayanan;
+  final num rpMaterai;
 
   /// Field `serviceFee`, terpisah dari [rpLayanan] pada payload.
-  final int serviceFee;
+  final num serviceFee;
 
-  final int idleFee;
+  final num idleFee;
 
   factory Order.fromJson(Map<String, dynamic>? json) {
     double number(String key) => (json?[key] as num?)?.toDouble() ?? 0;
-    int rupiah(String key) => (json?[key] as num?)?.round() ?? 0;
+    // Tanpa pembulatan: rupiah dari backend bisa pecahan.
+    num rupiah(String key) => (json?[key] as num?) ?? 0;
 
     // Backend mengeja `chargeboxId` dengan b kecil di endpoint ini,
     // dan pernah memakai `sessionExpiredTime` sebelum menjadi
@@ -117,15 +118,15 @@ class Order implements PriceBreakdown {
   }
 
   @override
-  List<({String label, int amount})> get extraCharges => [
-        for (final row in [
-          (label: 'Biaya Layanan', amount: rpLayanan),
-          (label: 'Biaya Jasa', amount: serviceFee),
-          (label: 'Bea Materai', amount: rpMaterai),
-          (label: 'Denda Idle', amount: idleFee),
-        ])
-          if (row.amount != 0) row,
-      ];
+  List<({String label, num amount})> get extraCharges => [
+    for (final row in [
+      (label: 'Biaya Layanan', amount: rpLayanan),
+      (label: 'Biaya Jasa', amount: serviceFee),
+      (label: 'Bea Materai', amount: rpMaterai),
+      (label: 'Denda Idle', amount: idleFee),
+    ])
+      if (row.amount != 0) row,
+  ];
 
   @override
   String toString() => 'Order($orderId, $kwh kWh, total $rpTotal)';

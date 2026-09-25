@@ -210,6 +210,8 @@ void main() {
       );
       expect((call.data as Map)['amount'], 25161.156);
       expect(find.byType(PaymentSuccessPage), findsOneWidget);
+      // Ditampilkan apa adanya juga — bukan dibulatkan jadi "Rp25.161".
+      expect(find.text('Rp25.161,156'), findsOneWidget);
     });
 
     /// Konektor yang tarifnya belum diatur dihargai nol sampai ke

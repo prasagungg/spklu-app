@@ -10,14 +10,17 @@ abstract interface class PriceBreakdown {
 
   /// Biaya energi. Nol berarti backend tidak mengirimnya, dan barisnya
   /// disembunyikan — aplikasi tidak menghitung sendiri.
-  int get rpKwh;
+  ///
+  /// Seluruh angka rupiah bertipe [num], bukan [int]: backend mengirim
+  /// pecahan dan angkanya ditampilkan apa adanya.
+  num get rpKwh;
 
-  int get rpPpj;
-  int get rpPpn;
-  int get rpTotal;
+  num get rpPpj;
+  num get rpPpn;
+  num get rpTotal;
 
   /// Biaya tambahan yang tidak nol, siap ditampilkan.
-  List<({String label, int amount})> get extraCharges;
+  List<({String label, num amount})> get extraCharges;
 }
 
 /// Rincian harga untuk sejumlah kWh, dari `POST /count-kwh`.
@@ -65,28 +68,29 @@ class KwhPrice implements PriceBreakdown {
 
   /// Pajak penerangan jalan.
   @override
-  final int rpPpj;
+  final num rpPpj;
 
   @override
-  final int rpPpn;
-  final int rpAdmin;
-  final int rpLayanan;
-  final int rpMaterai;
-  final int rpDiskon;
+  final num rpPpn;
+  final num rpAdmin;
+  final num rpLayanan;
+  final num rpMaterai;
+  final num rpDiskon;
 
   /// Jaminan yang ditahan SPKLU.
-  final int rpJaminanSpklu;
+  final num rpJaminanSpklu;
 
   /// Denda bila kendaraan dibiarkan terhubung setelah selesai.
-  final int idleFee;
+  final num idleFee;
 
   /// Yang dibayar pengguna.
   @override
-  final int rpTotal;
+  final num rpTotal;
 
   factory KwhPrice.fromJson(Map<String, dynamic>? json) {
     double number(String key) => (json?[key] as num?)?.toDouble() ?? 0;
-    int rupiah(String key) => (json?[key] as num?)?.round() ?? 0;
+    // Tanpa pembulatan: rupiah dari backend bisa pecahan.
+    num rupiah(String key) => (json?[key] as num?) ?? 0;
 
     return KwhPrice(
       chargeBoxId: json?['chargeBoxId'] as String? ?? '',
@@ -108,7 +112,7 @@ class KwhPrice implements PriceBreakdown {
   /// `POST /count-kwh` tidak mengirim biaya energi sebagai angka
   /// tersendiri, jadi barisnya tidak ditampilkan di tahap perkiraan.
   @override
-  int get rpKwh => 0;
+  num get rpKwh => 0;
 
   /// Baris biaya tambahan yang layak ditampilkan.
   ///
@@ -116,17 +120,17 @@ class KwhPrice implements PriceBreakdown {
   /// deretan "Rp0" hanya menenggelamkan angka yang penting. Yang nol
   /// karena itu disembunyikan.
   @override
-  List<({String label, int amount})> get extraCharges => [
-        for (final row in [
-          (label: 'Biaya Admin', amount: rpAdmin),
-          (label: 'Biaya Layanan', amount: rpLayanan),
-          (label: 'Bea Materai', amount: rpMaterai),
-          (label: 'Jaminan SPKLU', amount: rpJaminanSpklu),
-          (label: 'Denda Idle', amount: idleFee),
-          (label: 'Diskon', amount: -rpDiskon),
-        ])
-          if (row.amount != 0) row,
-      ];
+  List<({String label, num amount})> get extraCharges => [
+    for (final row in [
+      (label: 'Biaya Admin', amount: rpAdmin),
+      (label: 'Biaya Layanan', amount: rpLayanan),
+      (label: 'Bea Materai', amount: rpMaterai),
+      (label: 'Jaminan SPKLU', amount: rpJaminanSpklu),
+      (label: 'Denda Idle', amount: idleFee),
+      (label: 'Diskon', amount: -rpDiskon),
+    ])
+      if (row.amount != 0) row,
+  ];
 
   @override
   String toString() => 'KwhPrice($kwh kWh, total $rpTotal)';

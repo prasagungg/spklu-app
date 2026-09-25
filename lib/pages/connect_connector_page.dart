@@ -126,9 +126,7 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
   void _markPluggedIn() {
     if (!mounted || _connected) return;
     _detection?.cancel();
-    debugPrint(
-      '[FLOW] Konektor terpasang — tombol "Mulai Pengisian" aktif',
-    );
+    debugPrint('[FLOW] Konektor terpasang — tombol "Mulai Pengisian" aktif');
     setState(() => _connected = true);
   }
 
@@ -165,9 +163,7 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage> {
       try {
         // Charge box, konektor, dan kWh-nya sudah melekat pada order,
         // jadi cukup orderId.
-        await scope.repository.startCharging(
-          orderId: widget.session.orderId,
-        );
+        await scope.repository.startCharging(orderId: widget.session.orderId);
         // Controller hanya meneruskan perintah; konfirmasi pengisian
         // benar-benar jalan datang dari ongoing-kwh yang dipantau
         // halaman status.

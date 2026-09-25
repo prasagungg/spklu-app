@@ -92,13 +92,12 @@ class Connector {
   /// [ConnectorStatusCode.isUsable]. Angka `4` dan angka yang tidak
   /// dikenal sama-sama jatuh ke [ConnectorStatus.unavailable].
   static ConnectorStatus mapStatus(int? code) => switch (code) {
-        null || ConnectorStatusCode.available => ConnectorStatus.available,
-        ConnectorStatusCode.reserved => ConnectorStatus.reserved,
-        ConnectorStatusCode.inUse => ConnectorStatus.inUse,
-        ConnectorStatusCode.awaitingPayment =>
-          ConnectorStatus.awaitingPayment,
-        _ => ConnectorStatus.unavailable,
-      };
+    null || ConnectorStatusCode.available => ConnectorStatus.available,
+    ConnectorStatusCode.reserved => ConnectorStatus.reserved,
+    ConnectorStatusCode.inUse => ConnectorStatus.inUse,
+    ConnectorStatusCode.awaitingPayment => ConnectorStatus.awaitingPayment,
+    _ => ConnectorStatus.unavailable,
+  };
 
   /// Tersedia untuk siapa saja.
   bool get isAvailable => status == ConnectorStatus.available;
@@ -122,14 +121,14 @@ class Connector {
   /// Daftar charge box tidak memperlihatkan status sebenarnya, jadi
   /// nilai dari daftar ditimpa begitu jawabannya datang.
   Connector withStatusCode(int? code) => Connector(
-        id: id,
-        status: mapStatus(code),
-        statusCode: code,
-        displayName: displayName,
-        typeConnector: typeConnector,
-        currentType: currentType,
-        estimatedMinutes: estimatedMinutes,
-      );
+    id: id,
+    status: mapStatus(code),
+    statusCode: code,
+    displayName: displayName,
+    typeConnector: typeConnector,
+    currentType: currentType,
+    estimatedMinutes: estimatedMinutes,
+  );
 
   /// Jatuh ke nomor konektor bila backend tidak mengirim namanya.
   String get name => displayName ?? 'Konektor $id';
@@ -147,8 +146,11 @@ class Connector {
     if (daya.isEmpty) return typeLabel.isEmpty ? name : typeLabel;
     if (typeConnector.isEmpty) return daya;
 
-    return [typeConnector, '-', daya, currentType]
-        .where((p) => p.isNotEmpty)
-        .join(' ');
+    return [
+      typeConnector,
+      '-',
+      daya,
+      currentType,
+    ].where((p) => p.isNotEmpty).join(' ');
   }
 }

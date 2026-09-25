@@ -45,14 +45,9 @@ class OcppStatus {
   /// Status yang **tidak dikenal tidak dianggap terpasang**. Menebaknya
   /// akan mengirim perintah start yang pasti ditolak charger.
   static bool isPluggedIn(String status) => switch (status) {
-        preparing ||
-        charging ||
-        suspendedEv ||
-        suspendedEvse ||
-        finishing =>
-          true,
-        _ => false,
-      };
+    preparing || charging || suspendedEv || suspendedEvse || finishing => true,
+    _ => false,
+  };
 
   /// Charger sedang tidak bisa dipakai, dan menunggu lebih lama tidak
   /// akan mengubah apa pun — petugas yang harus turun tangan.

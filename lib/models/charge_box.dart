@@ -77,9 +77,9 @@ class ChargeBox {
       statusCode: BackendStatus.parse(json['status']),
       connectors: rawConnectors is List
           ? rawConnectors
-              .whereType<Map<String, dynamic>>()
-              .map(Connector.fromJson)
-              .toList()
+                .whereType<Map<String, dynamic>>()
+                .map(Connector.fromJson)
+                .toList()
           : const [],
     );
   }
@@ -99,6 +99,5 @@ class ChargeBox {
   /// yang terdokumentasi menggambarkan keadaan sesi pada konektor, dan
   /// memakainya di sini berisiko mematikan kartu yang sebenarnya sedang
   /// melayani pengisian. `isActive` adalah sinyal yang tepat untuk itu.
-  bool get isAvailable =>
-      isActive && connectors.any((c) => c.isSelectable);
+  bool get isAvailable => isActive && connectors.any((c) => c.isSelectable);
 }

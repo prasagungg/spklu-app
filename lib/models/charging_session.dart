@@ -71,18 +71,18 @@ class ChargingSession {
 
   /// Salinan dengan bukti pembayarannya.
   ChargingSession paidWith(BillingInquiry billing) => ChargingSession(
-        chargeBox: chargeBox,
-        connector: connector,
-        sessionCode: sessionCode,
-        reference: reference,
-        createdAt: createdAt,
-        price: price,
-        orderId: orderId,
-        billing: billing,
-        // Pembayaran memperbarui tenggat sesinya; batas waktu order
-        // hanya dipakai selama belum ada yang dibayar.
-        expiresAt: billing.sessionExpiredAt ?? expiresAt,
-      );
+    chargeBox: chargeBox,
+    connector: connector,
+    sessionCode: sessionCode,
+    reference: reference,
+    createdAt: createdAt,
+    price: price,
+    orderId: orderId,
+    billing: billing,
+    // Pembayaran memperbarui tenggat sesinya; batas waktu order
+    // hanya dipakai selama belum ada yang dibayar.
+    expiresAt: billing.sessionExpiredAt ?? expiresAt,
+  );
 
   /// Yang benar-benar dibayar pengguna.
   ///
@@ -90,10 +90,9 @@ class ChargingSession {
   /// `idleFee`, dan `serviceFee` — jadi yang dipakai untuk rincian akhir
   /// adalah angka yang didebit, bukan angka order.
   ///
-  /// Dibulatkan di sini karena ini angka yang **ditampilkan**;
-  /// [BillingInquiry.totalAmount] yang belum dibulatkan tetap dipakai
-  /// apa adanya saat menagih.
-  int? get paidAmount => billing?.totalAmount.round() ?? price?.rpTotal;
+  /// Tidak dibulatkan: angka yang ditampilkan harus sama persis dengan
+  /// yang didebit backend, termasuk desimalnya.
+  num? get paidAmount => billing?.totalAmount ?? price?.rpTotal;
 
   final DateTime createdAt;
 
@@ -149,7 +148,7 @@ class ChargingSession {
   /// melebihi pemakaian sebenarnya.
   ///
   /// Null bila sesi dilanjutkan tanpa data pembelian.
-  int? usageCostFor(double energyKwh) {
+  num? usageCostFor(double energyKwh) {
     final purchase = price;
     final paid = paidAmount;
     if (purchase == null || paid == null || purchase.kwh <= 0) return null;
@@ -159,7 +158,7 @@ class ChargingSession {
   }
 
   /// Sisa yang dikembalikan setelah pengisian dihentikan.
-  int? refundFor(double energyKwh) {
+  num? refundFor(double energyKwh) {
     final paid = paidAmount;
     final usage = usageCostFor(energyKwh);
     if (paid == null || usage == null) return null;

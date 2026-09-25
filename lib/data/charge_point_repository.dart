@@ -25,7 +25,7 @@ const String _successCode = ResponseCode.ok;
 /// Base URL sudah memuat `/api`, jadi path di sini relatif terhadapnya.
 class ChargePointRepository {
   ChargePointRepository({ApiClient? client})
-      : _client = client ?? ApiClient.instance;
+    : _client = client ?? ApiClient.instance;
 
   final ApiClient _client;
 
@@ -268,10 +268,7 @@ class ChargePointRepository {
   }) async {
     final json = await _client.post<Map<String, dynamic>>(
       '/transaction/inquiry-billing',
-      body: {
-        'orderId': orderId,
-        'cardNumber': cardNumber ?? Env.cardNumber,
-      },
+      body: {'orderId': orderId, 'cardNumber': cardNumber ?? Env.cardNumber},
       cancelToken: cancelToken,
     );
 
@@ -389,10 +386,7 @@ class ChargePointRepository {
   }) async {
     final json = await _client.post<Map<String, dynamic>>(
       '/check-status-connector',
-      body: {
-        'chargeBoxId': chargeBoxId,
-        'connectorId': connectorId.toString(),
-      },
+      body: {'chargeBoxId': chargeBoxId, 'connectorId': connectorId.toString()},
       cancelToken: cancelToken,
     );
 
@@ -566,8 +560,8 @@ class ChargePointRepository {
     if (code != _successCode) {
       throw ApiException(
         type: ApiErrorType.badRequest,
-        message: (json['responseMessage'] ?? json['response_message'])
-                as String? ??
+        message:
+            (json['responseMessage'] ?? json['response_message']) as String? ??
             'Backend menolak permintaan (kode $code).',
         responseCode: code,
         data: json,

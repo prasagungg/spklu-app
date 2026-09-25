@@ -102,9 +102,10 @@ class ApiClient {
     }
 
     dio.httpClientAdapter = IOHttpClientAdapter(
-      createHttpClient: () => HttpClient()
-        ..badCertificateCallback = (cert, host, port) =>
-            Host.isPrivateHost(host),
+      createHttpClient: () =>
+          HttpClient()
+            ..badCertificateCallback = (cert, host, port) =>
+                Host.isPrivateHost(host),
     );
     debugPrint(
       '[API] Sertifikat self-signed diterima untuk host lokal ($baseUrl)',

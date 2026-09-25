@@ -204,7 +204,11 @@ class DangerOutlineButton extends StatelessWidget {
 
 /// Bilah tombol bawah berlatar putih (70:2307): padding 16, gap 12.
 class BottomActionBar extends StatelessWidget {
-  const BottomActionBar({super.key, required this.children, this.opaque = true});
+  const BottomActionBar({
+    super.key,
+    required this.children,
+    this.opaque = true,
+  });
 
   final List<Widget> children;
 

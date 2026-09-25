@@ -115,6 +115,7 @@ class ChargingProgress {
   Duration get duration => Duration(seconds: chargeDurationS);
 
   @override
-  String toString() => 'ChargingProgress($orderId, $charged/$orderKwh kWh, '
+  String toString() =>
+      'ChargingProgress($orderId, $charged/$orderKwh kWh, '
       'status $statusCode)';
 }

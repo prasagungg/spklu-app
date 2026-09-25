@@ -65,5 +65,23 @@ void main() {
       expect(formatRupiah(50000), 'Rp50.000');
       expect(formatRupiah(148500), 'Rp148.500');
     });
+
+    test('desimal dari backend ditampilkan apa adanya', () {
+      // Tagihan sungguhan kerap pecahan; membulatkannya membuat angka
+      // di layar berselisih dengan yang didebit.
+      expect(formatRupiah(25161.156), 'Rp25.161,156');
+      expect(formatRupiah(2466.78), 'Rp2.466,78');
+      expect(formatRupiah(1500.5), 'Rp1.500,5');
+    });
+
+    test('nilai bulat tidak ditulis dengan ",0"', () {
+      expect(formatRupiah(50000.0), 'Rp50.000');
+      expect(formatRupiah(0.0), 'Rp0');
+    });
+
+    test('nilai negatif memakai tanda di depan', () {
+      // Baris "Diskon" dikirim sebagai angka negatif.
+      expect(formatRupiah(-5000), '-Rp5.000');
+    });
   });
 }

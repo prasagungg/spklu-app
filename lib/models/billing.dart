@@ -11,9 +11,8 @@ const Map<String, String> emoneyIssuers = {
 };
 
 /// Penerbit untuk [cardNumber], atau null bila prefiksnya tidak dikenal.
-String? issuerOf(String cardNumber) => cardNumber.length < 4
-    ? null
-    : emoneyIssuers[cardNumber.substring(0, 4)];
+String? issuerOf(String cardNumber) =>
+    cardNumber.length < 4 ? null : emoneyIssuers[cardNumber.substring(0, 4)];
 
 /// Tagihan untuk satu order pada satu kartu.
 ///
@@ -51,11 +50,11 @@ class BillingInquiry {
   final String cardNumber;
 
   /// Pokok tagihan, sebelum biaya tambahan.
-  final int amount;
+  final num amount;
 
-  final int fee;
-  final int idleFee;
-  final int serviceFee;
+  final num fee;
+  final num idleFee;
+  final num serviceFee;
 
   /// Yang didebit dari kartu. Inilah nilai yang harus dikirim sebagai
   /// `amount` saat membayar — bukan total order.
@@ -64,9 +63,11 @@ class BillingInquiry {
   /// menagih 25161.156, dan `payment-billing` membandingkan nominal
   /// yang dikirim dengan angka itu persis. Dibulatkan lebih dulu
   /// menjadi 25161, permintaannya dibalas kode `25` "Amount mismatch"
-  /// dan pembayaran tidak pernah bisa selesai. Angka ini karena itu
-  /// bertipe [num] — satu-satunya di kelas ini — sementara yang lain
-  /// hanya ditampilkan dan boleh dibulatkan.
+  /// dan pembayaran tidak pernah bisa selesai.
+  ///
+  /// Seluruh angka rupiah di kelas ini bertipe [num] dengan alasan yang
+  /// sama: yang ditampilkan pun harus sama persis dengan pembukuan
+  /// backend, termasuk desimalnya.
   final num totalAmount;
 
   /// Bukti transaksi dari mesin kartu. Hanya terisi pada jawaban
@@ -83,7 +84,8 @@ class BillingInquiry {
   final DateTime? sessionExpiredAt;
 
   factory BillingInquiry.fromJson(Map<String, dynamic>? json) {
-    int rupiah(String key) => (json?[key] as num?)?.round() ?? 0;
+    // Tanpa pembulatan: rupiah dari backend bisa pecahan.
+    num rupiah(String key) => (json?[key] as num?) ?? 0;
 
     // Backend memakai `sessionExpired` di sini, dan `sessionExpiredTime`
     // pada push-order. Keduanya diterima supaya penyeragaman ejaan di

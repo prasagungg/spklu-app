@@ -16,11 +16,11 @@ class StateView extends StatelessWidget {
   });
 
   const StateView.loading({super.key})
-      : icon = null,
-        title = 'Memuat charge box…',
-        message = 'Mengambil daftar charger yang sedang terhubung.',
-        onRetry = null,
-        retryLabel = '';
+    : icon = null,
+      title = 'Memuat charge box…',
+      message = 'Mengambil daftar charger yang sedang terhubung.',
+      onRetry = null,
+      retryLabel = '';
 
   /// Null menggantinya dengan spinner.
   final IconData? icon;

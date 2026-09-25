@@ -28,8 +28,8 @@ class BackendStatus {
   static const int finished = 4;
 
   static int? parse(dynamic value) => switch (value) {
-        final num n => n.toInt(),
-        final String s => int.tryParse(s),
-        _ => null,
-      };
+    final num n => n.toInt(),
+    final String s => int.tryParse(s),
+    _ => null,
+  };
 }

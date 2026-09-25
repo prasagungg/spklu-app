@@ -53,8 +53,7 @@ class TransactionHistoryPage extends StatefulWidget {
   final List<ChargeBox> chargeBoxes;
 
   @override
-  State<TransactionHistoryPage> createState() =>
-      _TransactionHistoryPageState();
+  State<TransactionHistoryPage> createState() => _TransactionHistoryPageState();
 }
 
 class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
@@ -127,7 +126,8 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
         .firstOrNull;
 
     return (
-      chargeBox: box ??
+      chargeBox:
+          box ??
           ChargeBox(
             // Nomor urut hanya dimiliki charge box di daftar; nol
             // berarti kartunya tidak menampilkan nomor sama sekali.
@@ -138,7 +138,8 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                 : entry.chargeBoxName,
             connectors: const [],
           ),
-      connector: connector ??
+      connector:
+          connector ??
           Connector(
             id: entry.connectorId ?? 0,
             status: ConnectorStatus.unavailable,
@@ -386,8 +387,9 @@ class TransactionHistoryCard extends StatelessWidget {
                             '${connector.name} - '
                             '${connector.describeWith(chargeBox.daya)}',
                             overflow: TextOverflow.ellipsis,
-                            style: AppTheme.cardCaption
-                                .copyWith(color: AppColors.icon),
+                            style: AppTheme.cardCaption.copyWith(
+                              color: AppColors.icon,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           const Divider(

@@ -68,26 +68,27 @@ class TransactionDetail {
   final double remainingKwh;
 
   /// `rpPesan`, `rpPakai`, `rpSisa`.
-  final int paidAmount;
-  final int usageAmount;
-  final int refundAmount;
+  final num paidAmount;
+  final num usageAmount;
+  final num refundAmount;
 
   final double pricePerKwh;
 
   /// `rpLayanan`.
-  final int serviceAmount;
-  final int idleFee;
+  final num serviceAmount;
+  final num idleFee;
 
   final DateTime? recordedAt;
 
   factory TransactionDetail.fromJson(Map<String, dynamic>? json) {
     // Sebagian angkanya dikirim sebagai teks, sebagian lagi null.
     double number(String key) => switch (json?[key]) {
-          final num n => n.toDouble(),
-          final String s => double.tryParse(s) ?? 0,
-          _ => 0,
-        };
-    int rupiah(String key) => number(key).round();
+      final num n => n.toDouble(),
+      final String s => double.tryParse(s) ?? 0,
+      _ => 0,
+    };
+    // Tanpa pembulatan: rupiah dari backend bisa pecahan.
+    num rupiah(String key) => number(key);
 
     // `connectorId` di endpoint ini berupa angka, bukan teks seperti
     // di endpoint lain.
@@ -126,6 +127,7 @@ class TransactionDetail {
   }
 
   @override
-  String toString() => 'TransactionDetail($orderId, $usedKwh/$orderedKwh kWh, '
+  String toString() =>
+      'TransactionDetail($orderId, $usedKwh/$orderedKwh kWh, '
       'bayar $paidAmount)';
 }

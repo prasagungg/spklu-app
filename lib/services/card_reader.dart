@@ -40,7 +40,8 @@ class TappedCard {
   final String cardNumber;
 
   @override
-  String toString() => 'TappedCard($uid [${technologies.join(', ')}]'
+  String toString() =>
+      'TappedCard($uid [${technologies.join(', ')}]'
       '${cardNumber.isEmpty ? '' : ', nomor $cardNumber'})';
 }
 
@@ -173,7 +174,7 @@ class NfcCardReader implements CardReader {
   }
 
   static String _hex(Uint8List bytes) => [
-        for (final byte in bytes)
-          byte.toRadixString(16).padLeft(2, '0').toUpperCase(),
-      ].join();
+    for (final byte in bytes)
+      byte.toRadixString(16).padLeft(2, '0').toUpperCase(),
+  ].join();
 }

@@ -208,7 +208,10 @@ class _NominalPageState extends State<NominalPage> {
     return PageScaffold(
       title: 'Pilih Nominal',
       subtitle: 'Pilih nominal kWh pengisian sesuai kebutuhan.',
-      titleTrailing: ExpiryCountdown(expiresAt: widget.expiresAt, compact: true),
+      titleTrailing: ExpiryCountdown(
+        expiresAt: widget.expiresAt,
+        compact: true,
+      ),
       backgroundColor: AppColors.pageBackgroundPlain,
       bottomBar: BottomActionBar(
         children: [

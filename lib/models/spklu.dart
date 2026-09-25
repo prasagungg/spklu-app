@@ -19,12 +19,12 @@ class Spklu {
 
   /// SPKLU kosong — dipakai saat backend membalas tanpa `data`.
   const Spklu.empty()
-      : id = '',
-        nama = '',
-        alamat = '',
-        daya = '',
-        statusCode = null,
-        chargeBoxes = const [];
+    : id = '',
+      nama = '',
+      alamat = '',
+      daya = '',
+      statusCode = null,
+      chargeBoxes = const [];
 
   /// `idSpklu`, mis. "SPKLU-SMR".
   final String id;
@@ -47,8 +47,9 @@ class Spklu {
   factory Spklu.fromJson(Map<String, dynamic> json) {
     // `chargeBoxs` ejaan sekarang; `chargeBoxes` versi sebelumnya.
     final raw = json['chargeBoxs'] ?? json['chargeBoxes'];
-    final items =
-        raw is List ? raw.whereType<Map<String, dynamic>>().toList() : const [];
+    final items = raw is List
+        ? raw.whereType<Map<String, dynamic>>().toList()
+        : const [];
 
     return Spklu(
       id: json['idSpklu'] as String? ?? '',

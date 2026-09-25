@@ -116,8 +116,8 @@ class PageScaffold extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _MobileHeader(
-                    action: headerAction ??
-                        (isHome ? null : const HomeButton()),
+                    action:
+                        headerAction ?? (isHome ? null : const HomeButton()),
                   ),
                   if (hasTitleBlock)
                     Padding(

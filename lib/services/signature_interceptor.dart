@@ -39,9 +39,9 @@ class SignatureInterceptor extends Interceptor {
     String? clientId,
     String? secretKey,
     DateTime Function()? now,
-  })  : clientId = clientId ?? Env.apiClientId,
-        _secretKey = secretKey ?? Env.apiSecretKey,
-        _now = now ?? DateTime.now;
+  }) : clientId = clientId ?? Env.apiClientId,
+       _secretKey = secretKey ?? Env.apiSecretKey,
+       _now = now ?? DateTime.now;
 
   final String clientId;
   final String _secretKey;
@@ -88,10 +88,8 @@ class SignatureInterceptor extends Interceptor {
   }
 
   /// `2026-09-19T10:23:45Z` — ISO 8601 UTC tanpa pecahan detik.
-  static String formatTimestamp(DateTime time) => time
-      .toUtc()
-      .toIso8601String()
-      .replaceFirst(RegExp(r'\.\d+Z$'), 'Z');
+  static String formatTimestamp(DateTime time) =>
+      time.toUtc().toIso8601String().replaceFirst(RegExp(r'\.\d+Z$'), 'Z');
 
   static String sign({
     required String body,
@@ -101,8 +99,9 @@ class SignatureInterceptor extends Interceptor {
   }) {
     final key = sha1.convert(utf8.encode(secretKey)).toString();
 
-    return Hmac(sha256, utf8.encode(key))
-        .convert(utf8.encode('$body$clientId$timestamp'))
-        .toString();
+    return Hmac(
+      sha256,
+      utf8.encode(key),
+    ).convert(utf8.encode('$body$clientId$timestamp')).toString();
   }
 }

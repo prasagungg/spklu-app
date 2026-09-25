@@ -62,8 +62,8 @@ class Reservation {
       accepted: json?['status'] as bool? ?? false,
       reservationId: json?['reservationId'] as String? ?? '',
       sessionCode: json?['sessionCode'] as String? ?? '',
-      chargeBoxId: (json?['chargeBoxId'] ?? json?['chargeboxId']) as String? ??
-          '',
+      chargeBoxId:
+          (json?['chargeBoxId'] ?? json?['chargeboxId']) as String? ?? '',
       chargeBoxName: name as String? ?? '',
       connectorId: json?['connectorId'] as String? ?? '',
       connectorName: json?['connectorName'] as String? ?? '',
@@ -76,7 +76,8 @@ class Reservation {
   }
 
   @override
-  String toString() => 'Reservation($reservationId, kode $sessionCode, '
+  String toString() =>
+      'Reservation($reservationId, kode $sessionCode, '
       '$connectorStatus, accepted=$accepted)';
 }
 

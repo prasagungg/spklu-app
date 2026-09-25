@@ -17,7 +17,7 @@ import '../services/card_reader.dart';
 /// dan halamannya menjelaskan keadaan itu alih-alih menggantung.
 class CardReaderScope extends InheritedWidget {
   CardReaderScope({super.key, required super.child, CardReader? reader})
-      : reader = reader ?? NfcCardReader();
+    : reader = reader ?? NfcCardReader();
 
   final CardReader reader;
 

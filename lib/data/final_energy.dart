@@ -30,9 +30,7 @@ Future<double> readFinalEnergy({
     await Future<void>.delayed(_delay);
 
     try {
-      final progress = await repository.fetchChargingProgress(
-        orderId: orderId,
-      );
+      final progress = await repository.fetchChargingProgress(orderId: orderId);
 
       latest = progress.charged;
       debugPrint('[FLOW] Bacaan akhir ${attempt + 1}: $progress');

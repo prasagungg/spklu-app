@@ -1,26 +1,36 @@
-/// Format rupiah tanpa paket `intl`: 50000 -> "Rp50.000".
-String formatRupiah(int amount) {
-  final digits = amount.abs().toString();
+/// Format rupiah tanpa paket `intl`, **apa adanya**.
+///
+/// Angka rupiah dari backend tidak selalu bulat: tagihan bisa berbunyi
+/// 25161.156 dan tarif per kWh 2466.78. Desimalnya tidak dibulatkan dan
+/// tidak dipangkas — yang tampil adalah angka yang dikirim backend,
+/// hanya dengan titik sebagai pemisah ribuan dan koma sebagai pemisah
+/// desimal. Angka di layar yang berselisih dengan pembukuan backend
+/// lebih buruk daripada angka yang panjang.
+///
+/// 50000 -> "Rp50.000" | 2466.78 -> "Rp2.466,78"
+/// 25161.156 -> "Rp25.161,156"
+String formatRupiah(num amount) {
+  final value = amount.abs();
+  // Bilangan bulat ditulis tanpa ".0"; pecahan apa adanya, mis.
+  // "25161.156". Rentang rupiah tidak pernah sampai notasi ilmiah.
+  final parts = _plain(value).split('.');
+
+  final digits = parts.first;
   final buffer = StringBuffer();
   for (var i = 0; i < digits.length; i++) {
     if (i > 0 && (digits.length - i) % 3 == 0) buffer.write('.');
     buffer.write(digits[i]);
   }
-  return 'Rp${buffer.toString()}';
+
+  final sign = amount.isNegative ? '-' : '';
+  final decimals = parts.length > 1 ? ',${parts[1]}' : '';
+
+  return '${sign}Rp$buffer$decimals';
 }
 
-/// Tarif pecahan: 2466.78 -> "Rp2.466,78".
-///
-/// Dipakai untuk tarif per kWh, satu-satunya angka rupiah dari backend
-/// yang bukan bilangan bulat.
-String formatRupiahDecimal(double amount) {
-  final whole = formatRupiah(amount.abs().truncate());
-  final cents = ((amount.abs() - amount.abs().truncate()) * 100).round();
-
-  return cents == 0
-      ? whole
-      : '$whole,${cents.toString().padLeft(2, '0')}';
-}
+/// Teks angka tanpa ".0" yang tidak berarti.
+String _plain(num value) =>
+    value == value.roundToDouble() ? value.toStringAsFixed(0) : '$value';
 
 /// Angka kWh tanpa satuan, untuk kartu pilihan yang sempit (204:3717).
 ///
@@ -68,8 +78,18 @@ String formatEnergy(double kwh) {
 
 /// Nama bulan ringkas gaya Indonesia.
 const _monthNames = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-  'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'Mei',
+  'Jun',
+  'Jul',
+  'Agu',
+  'Sep',
+  'Okt',
+  'Nov',
+  'Des',
 ];
 
 /// "21 Sep 2026, 16:42".

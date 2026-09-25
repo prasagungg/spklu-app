@@ -1,4 +1,3 @@
-
 /// Booking konektor yang sedang dipegang unit ini.
 ///
 /// Satu unit melayani satu pengguna dalam satu waktu, jadi cukup satu
@@ -80,18 +79,17 @@ class ActiveBooking {
   /// sesinya sendiri.
   String? orderOn({required String chargeBoxId, required int connectorId}) =>
       isChargingOn(chargeBoxId: chargeBoxId, connectorId: connectorId)
-          ? _orderId
-          : null;
+      ? _orderId
+      : null;
 
   /// Kode sesi yang berlaku untuk konektor ini, bila sesinya dimulai
   /// dari unit ini juga.
   String? sessionCodeOn({
     required String chargeBoxId,
     required int connectorId,
-  }) =>
-      isChargingOn(chargeBoxId: chargeBoxId, connectorId: connectorId)
-          ? _sessionCode
-          : null;
+  }) => isChargingOn(chargeBoxId: chargeBoxId, connectorId: connectorId)
+      ? _sessionCode
+      : null;
 
   /// Melupakan seluruhnya — booking maupun sesi yang sudah jalan.
   void forget() {

@@ -42,7 +42,7 @@ class TransactionHistoryEntry {
   /// pakai [maskedCard].
   final String cardNumber;
 
-  final int totalAmount;
+  final num totalAmount;
   final DateTime? createdAt;
 
   /// Asal transaksinya, bila entrinya menyebutkannya. Kosong pada
@@ -69,7 +69,8 @@ class TransactionHistoryEntry {
       orderId: json['orderId'] as String? ?? '',
       pspId: json['pspId'] as String? ?? '',
       cardNumber: json['cardNumber'] as String? ?? '',
-      totalAmount: (json['totalAmount'] as num?)?.round() ?? 0,
+      // Tanpa pembulatan: rupiah dari backend bisa pecahan.
+      totalAmount: (json['totalAmount'] as num?) ?? 0,
       createdAt: switch (json['createdDate']) {
         final String value => DateTime.tryParse(value),
         _ => null,

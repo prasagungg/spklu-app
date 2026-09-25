@@ -68,19 +68,19 @@ class ChargingDetail {
   final double remainingKwh;
 
   /// `rpPesan` — yang dibayar di awal.
-  final int paidAmount;
+  final num paidAmount;
 
   /// `rpPakai` — nilai energi yang terpakai.
-  final int usageAmount;
+  final num usageAmount;
 
   /// `rpSisa` — yang dikembalikan.
-  final int refundAmount;
+  final num refundAmount;
 
   /// `hargaKwh` — tarif yang berlaku pada transaksi ini.
   final double pricePerKwh;
 
-  final int idleFee;
-  final int serviceFee;
+  final num idleFee;
+  final num serviceFee;
 
   /// Daya baterai kendaraan, dalam persen. Null bila charger tidak
   /// melaporkannya.
@@ -97,16 +97,17 @@ class ChargingDetail {
     // `chargeDuration` dikirim sebagai teks ("0"), sebagian angka
     // lain sebagai null. Keduanya dibaca lewat satu jalan.
     double number(String key) => switch (json?[key]) {
-          final num n => n.toDouble(),
-          final String s => double.tryParse(s) ?? 0,
-          _ => 0,
-        };
+      final num n => n.toDouble(),
+      final String s => double.tryParse(s) ?? 0,
+      _ => 0,
+    };
     double? maybeNumber(String key) => switch (json?[key]) {
-          final num n => n.toDouble(),
-          final String s => double.tryParse(s),
-          _ => null,
-        };
-    int rupiah(String key) => number(key).round();
+      final num n => n.toDouble(),
+      final String s => double.tryParse(s),
+      _ => null,
+    };
+    // Tanpa pembulatan: rupiah dari backend bisa pecahan.
+    num rupiah(String key) => number(key);
 
     return ChargingDetail(
       orderId: json?['orderId'] as String? ?? '',
@@ -138,6 +139,7 @@ class ChargingDetail {
   }
 
   @override
-  String toString() => 'ChargingDetail($orderId, $usedKwh/$orderedKwh kWh, '
+  String toString() =>
+      'ChargingDetail($orderId, $usedKwh/$orderedKwh kWh, '
       'bayar $paidAmount, pakai $usageAmount, sisa $refundAmount)';
 }

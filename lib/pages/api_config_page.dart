@@ -124,7 +124,8 @@ class _ApiConfigPageState extends State<ApiConfigPage> {
   Widget build(BuildContext context) {
     return PageScaffold(
       title: 'Konfigurasi Server',
-      subtitle: 'Masukkan alamat edge controller yang akan dipakai '
+      subtitle:
+          'Masukkan alamat edge controller yang akan dipakai '
           'aplikasi ini.',
       // Dicapai lewat pushReplacement, jadi halaman ini satu-satunya di
       // tumpukan — tidak ada tempat untuk pulang.
@@ -182,9 +183,9 @@ class _AddressField extends StatelessWidget {
   final ValueChanged<String> onSubmitted;
 
   OutlineInputBorder _border(Color color) => OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: color),
-      );
+    borderRadius: BorderRadius.circular(12),
+    borderSide: BorderSide(color: color),
+  );
 
   @override
   Widget build(BuildContext context) {

@@ -26,9 +26,9 @@ class ApiLogPage extends StatefulWidget {
   static const filterKey = Key('log-api-filter');
 
   static Future<void> open(BuildContext context, {ApiLogStore? store}) {
-    return Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => ApiLogPage(store: store)),
-    );
+    return Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => ApiLogPage(store: store)));
   }
 
   @override
@@ -80,10 +80,7 @@ class _ApiLogPageState extends State<ApiLogPage> {
       body: Column(
         children: [
           _BaseUrlBar(),
-          _FilterField(
-            controller: _filter,
-            onChanged: (_) => setState(() {}),
-          ),
+          _FilterField(controller: _filter, onChanged: (_) => setState(() {})),
           Expanded(
             child: ListenableBuilder(
               listenable: _store,
@@ -97,8 +94,8 @@ class _ApiLogPageState extends State<ApiLogPage> {
                       child: Text(
                         _store.isEmpty
                             ? 'Belum ada panggilan yang tercatat.\n'
-                                'Riwayat terisi begitu aplikasi menembak '
-                                'backend.'
+                                  'Riwayat terisi begitu aplikasi menembak '
+                                  'backend.'
                             : 'Tidak ada yang cocok dengan penyaring.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: AppColors.description),
@@ -163,10 +160,7 @@ class _FilterField extends StatelessWidget {
         decoration: InputDecoration(
           isDense: true,
           hintText: 'Saring: path, method, status, kode…',
-          hintStyle: const TextStyle(
-            fontSize: 13,
-            color: AppColors.mutedLabel,
-          ),
+          hintStyle: const TextStyle(fontSize: 13, color: AppColors.mutedLabel),
           prefixIcon: const Icon(Icons.search, size: 18),
           prefixIconConstraints: const BoxConstraints(minWidth: 36),
           filled: true,
@@ -227,9 +221,9 @@ class _StatusBadge extends StatelessWidget {
     final (background, foreground) = switch (entry) {
       _ when entry.isPending => (AppColors.infoTileBg, AppColors.description),
       _ when entry.isFailure => (
-          AppColors.unavailableBg,
-          AppColors.unavailableFg,
-        ),
+        AppColors.unavailableBg,
+        AppColors.unavailableFg,
+      ),
       _ => (AppColors.availableBg, AppColors.availableFg),
     };
 
@@ -275,9 +269,9 @@ class _EntryDetailPage extends StatelessWidget {
                 ClipboardData(text: entry.toShareableText()),
               );
               if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Log disalin')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Log disalin')));
             },
           ),
         ],
@@ -288,12 +282,13 @@ class _EntryDetailPage extends StatelessWidget {
           _Section(title: 'Alamat', body: entry.url),
           _Section(
             title: 'Ringkasan',
-            body: 'waktu   : ${entry.timeLabel}\n'
+            body:
+                'waktu   : ${entry.timeLabel}\n'
                 'durasi  : ${entry.elapsedLabel}\n'
                 'status  : ${entry.statusLabel}'
                 '${entry.responseCode == null ? '' : '\n'
-                    'kode    : ${entry.responseCode} '
-                    '${entry.responseMessage ?? ''}'}',
+                          'kode    : ${entry.responseCode} '
+                          '${entry.responseMessage ?? ''}'}',
           ),
           if (entry.error != null)
             _Section(title: 'Error', body: entry.error!, danger: true),

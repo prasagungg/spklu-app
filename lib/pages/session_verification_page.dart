@@ -243,8 +243,8 @@ class _DigitBox extends StatelessWidget {
     final borderColor = wrong
         ? AppColors.unavailableFg
         : digit != null || active
-            ? AppColors.pinActiveBorder
-            : AppColors.borderAlt;
+        ? AppColors.pinActiveBorder
+        : AppColors.borderAlt;
 
     return Container(
       width: 84,
@@ -303,7 +303,9 @@ class SessionKeypad extends StatelessWidget {
             children: [
               for (var i = 0; i < row.length; i++) ...[
                 if (i > 0) const SizedBox(width: 12),
-                Expanded(child: _KeyButton(digit: row[i], onTap: onDigit)),
+                Expanded(
+                  child: _KeyButton(digit: row[i], onTap: onDigit),
+                ),
               ],
             ],
           ),
@@ -314,7 +316,9 @@ class SessionKeypad extends StatelessWidget {
             // Slot kosong di kiri, mengikuti desain.
             const Expanded(child: SizedBox(height: 52)),
             const SizedBox(width: 12),
-            Expanded(child: _KeyButton(digit: '0', onTap: onDigit)),
+            Expanded(
+              child: _KeyButton(digit: '0', onTap: onDigit),
+            ),
             const SizedBox(width: 12),
             Expanded(child: _EraseButton(onTap: onErase)),
           ],

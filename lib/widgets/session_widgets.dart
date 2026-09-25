@@ -78,8 +78,14 @@ class CountdownPill extends StatelessWidget {
   final Duration remaining;
 
   String get _formatted {
-    final minutes = remaining.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = remaining.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final minutes = remaining.inMinutes
+        .remainder(60)
+        .toString()
+        .padLeft(2, '0');
+    final seconds = remaining.inSeconds
+        .remainder(60)
+        .toString()
+        .padLeft(2, '0');
     return '$minutes:$seconds';
   }
 
@@ -134,8 +140,14 @@ class CompactCountdownPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final minutes = remaining.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = remaining.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final minutes = remaining.inMinutes
+        .remainder(60)
+        .toString()
+        .padLeft(2, '0');
+    final seconds = remaining.inSeconds
+        .remainder(60)
+        .toString()
+        .padLeft(2, '0');
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -413,10 +425,7 @@ class HintStrip extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           const Positioned.fill(
-            child: AssetSlot(
-              'assets/images/hint_strip.png',
-              fit: BoxFit.cover,
-            ),
+            child: AssetSlot('assets/images/hint_strip.png', fit: BoxFit.cover),
           ),
           Text(
             text,

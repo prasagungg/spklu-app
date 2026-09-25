@@ -48,7 +48,7 @@ class DetailRow extends StatelessWidget {
 class TotalRow extends StatelessWidget {
   const TotalRow({super.key, required this.amount, this.solid = false});
 
-  final int amount;
+  final num amount;
 
   /// Varian latar solid #D8EBFD di halaman konfirmasi (73:2732).
   final bool solid;
@@ -106,10 +106,7 @@ class CostRows extends StatelessWidget {
       children: [
         DetailRow(label: 'Total kWh dibeli', value: formatKwh(price.kwh)),
         const SizedBox(height: 12),
-        DetailRow(
-          label: 'Tarif per kWh',
-          value: formatRupiahDecimal(price.rpPerKwh),
-        ),
+        DetailRow(label: 'Tarif per kWh', value: formatRupiah(price.rpPerKwh)),
         // Hanya order yang mengirim biaya energi sebagai angka
         // tersendiri; pada tahap perkiraan barisnya tidak ada.
         if (price.rpKwh != 0) ...[

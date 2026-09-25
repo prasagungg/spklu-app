@@ -161,8 +161,8 @@ class ApiLogStore extends ChangeNotifier {
 /// ditandatangani.
 class ApiLogRecorder extends Interceptor {
   ApiLogRecorder({ApiLogStore? store, DateTime Function()? now})
-      : _store = store ?? ApiLogStore.instance,
-        _now = now ?? DateTime.now;
+    : _store = store ?? ApiLogStore.instance,
+      _now = now ?? DateTime.now;
 
   /// Body dipotong supaya response panjang tidak menahan memori.
   static const int maxBodyChars = 20000;

@@ -82,29 +82,28 @@ Future<_Stub> _pump(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets(
-    'jawaban polling yang telat tidak menggusur layar verifikasi',
-    (tester) async {
-      final stub = await _pump(tester);
+  testWidgets('jawaban polling yang telat tidak menggusur layar verifikasi', (
+    tester,
+  ) async {
+    final stub = await _pump(tester);
 
-      // Polling pertama berangkat dan tertahan di stub.
-      await tester.pump(const Duration(seconds: 1));
+    // Polling pertama berangkat dan tertahan di stub.
+    await tester.pump(const Duration(seconds: 1));
 
-      await tester.tap(find.text('Akhiri Pengisian'));
-      await settleFrames(tester);
-      expect(find.text('Verifikasi Sesi'), findsOneWidget);
+    await tester.tap(find.text('Akhiri Pengisian'));
+    await settleFrames(tester);
+    expect(find.text('Verifikasi Sesi'), findsOneWidget);
 
-      // Jawaban "selesai" baru tiba sekarang — sesudah pengguna masuk
-      // alur mengakhiri sesi.
-      stub.gate.complete();
-      await settleFrames(tester);
+    // Jawaban "selesai" baru tiba sekarang — sesudah pengguna masuk
+    // alur mengakhiri sesi.
+    stub.gate.complete();
+    await settleFrames(tester);
 
-      // Halaman verifikasi harus tetap berdiri, dan rincian akhir belum
-      // boleh muncul.
-      expect(find.text('Verifikasi Sesi'), findsOneWidget);
-      expect(find.byType(ChargingFinishedPage), findsNothing);
-    },
-  );
+    // Halaman verifikasi harus tetap berdiri, dan rincian akhir belum
+    // boleh muncul.
+    expect(find.text('Verifikasi Sesi'), findsOneWidget);
+    expect(find.byType(ChargingFinishedPage), findsNothing);
+  });
 
   testWidgets('rincian akhir hanya dibuka sekali', (tester) async {
     final stub = await _pump(tester);

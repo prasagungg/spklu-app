@@ -28,19 +28,17 @@ import 'dart:typed_data';
 ///
 /// Kartu yang mendukungnya menyebutkan sendiri AID aplikasinya, jadi
 /// daftar AID tidak perlu ditebak.
-final Uint8List ppseName = Uint8List.fromList(
-  '2PAY.SYS.DDF01'.codeUnits,
-);
+final Uint8List ppseName = Uint8List.fromList('2PAY.SYS.DDF01'.codeUnits);
 
 /// `00 A4 04 00 Lc <nama> 00` — SELECT berdasarkan nama aplikasi.
 Uint8List selectApdu(Uint8List name) => Uint8List.fromList([
-      0x00, 0xA4, 0x04, 0x00, name.length, ...name, 0x00, //
-    ]);
+  0x00, 0xA4, 0x04, 0x00, name.length, ...name, 0x00, //
+]);
 
 /// `00 B2 <record> <(sfi<<3)|4> 00` — READ RECORD.
 Uint8List readRecordApdu(int sfi, int record) => Uint8List.fromList([
-      0x00, 0xB2, record, (sfi << 3) | 4, 0x00, //
-    ]);
+  0x00, 0xB2, record, (sfi << 3) | 4, 0x00, //
+]);
 
 /// Kartu menjawab dengan SW1 SW2 di dua byte terakhir; "9000" sukses.
 bool isSuccess(Uint8List response) =>
@@ -49,8 +47,9 @@ bool isSuccess(Uint8List response) =>
     response[response.length - 1] == 0x00;
 
 /// Isi data jawaban, tanpa dua byte status di ujungnya.
-Uint8List payloadOf(Uint8List response) =>
-    response.length <= 2 ? Uint8List(0) : response.sublist(0, response.length - 2);
+Uint8List payloadOf(Uint8List response) => response.length <= 2
+    ? Uint8List(0)
+    : response.sublist(0, response.length - 2);
 
 /// Mencari nilai [tag] di dalam struktur BER-TLV, termasuk di dalam
 /// tag bersusun (constructed).
@@ -196,6 +195,7 @@ typedef Transceive = Future<Uint8List> Function(Uint8List apdu);
 /// punya aplikasi EMV, atau menyimpan nomornya di tempat yang terkunci.
 Future<String> readCardNumber(
   Transceive transceive, {
+
   /// Berapa banyak record yang dicoba per aplikasi. Nomor kartu
   /// hampir selalu ada di record pertama SFI 1 atau 2; batas ini
   /// menjaga tap tetap terasa seketika.

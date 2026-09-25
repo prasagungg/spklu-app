@@ -188,10 +188,9 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
     Reservation? reservation;
 
     if (!connector.isAvailable) {
-      final expected = ChargingScope.maybeOf(context)?.booking.sessionCodeOn(
-            chargeBoxId: box.id,
-            connectorId: connector.id,
-          );
+      final expected = ChargingScope.maybeOf(
+        context,
+      )?.booking.sessionCodeOn(chargeBoxId: box.id, connectorId: connector.id);
 
       final check = await Navigator.of(context).push<SessionCheck>(
         MaterialPageRoute<SessionCheck>(
@@ -225,21 +224,20 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
       // Kode sesinya ditunjukkan dulu — pengguna memerlukannya untuk
       // kembali ke sesi ini. "Dipesan" berarti pemesanan sudah ada
       // tetapi belum dibeli, jadi jalurnya sama.
-      ConnectorStatus.available || ConnectorStatus.reserved =>
-        SessionCodePage(
-          chargeBox: box,
-          connector: connector,
-          reservation: reservation,
-        ),
+      ConnectorStatus.available || ConnectorStatus.reserved => SessionCodePage(
+        chargeBox: box,
+        connector: connector,
+        reservation: reservation,
+      ),
       // Ordernya sudah dibuat tetapi belum dibayar: sesinya dilanjutkan
       // di halaman pembayaran, dan nominalnya ditanyakan ulang lewat
       // inquiry begitu kartu ditempelkan.
       ConnectorStatus.awaitingPayment => CardPaymentPage(
-          session: _resume(box, connector, verifiedOrderId),
-        ),
+        session: _resume(box, connector, verifiedOrderId),
+      ),
       ConnectorStatus.inUse => ChargingStatusPage(
-          session: _resume(box, connector, verifiedOrderId),
-        ),
+        session: _resume(box, connector, verifiedOrderId),
+      ),
       // Status tak dikenal tidak bisa ditekan, jadi cabang ini tak
       // terpakai.
       ConnectorStatus.unavailable => null,
@@ -251,9 +249,9 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
       'menuju ${destination.runtimeType}',
     );
 
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => destination),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => destination));
     // Pemuatan ulang ditangani didPopNext saat rute di atas ditutup.
   }
 
@@ -307,7 +305,9 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
 
   void _complain(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   /// Sesi tanpa data pembelian — aplikasi tidak tahu berapa yang sudah
@@ -326,10 +326,9 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
     Connector connector,
     String verifiedOrderId,
   ) {
-    final remembered = ChargingScope.maybeOf(context)?.booking.orderOn(
-          chargeBoxId: box.id,
-          connectorId: connector.id,
-        );
+    final remembered = ChargingScope.maybeOf(
+      context,
+    )?.booking.orderOn(chargeBoxId: box.id, connectorId: connector.id);
 
     return ChargingSession.resumed(
       chargeBox: box,
@@ -353,9 +352,7 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
   void _openHistory() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => TransactionHistoryPage(
-          chargeBoxes: _boxes ?? const [],
-        ),
+        builder: (_) => TransactionHistoryPage(chargeBoxes: _boxes ?? const []),
       ),
     );
   }
@@ -414,7 +411,8 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
       return StateView(
         icon: Icons.ev_station_outlined,
         title: 'Belum ada charge box',
-        message: 'Tidak ada charge box yang terdaftar di lokasi ini. '
+        message:
+            'Tidak ada charge box yang terdaftar di lokasi ini. '
             'Tarik ke bawah untuk memuat ulang.',
         onRetry: _load,
       );
