@@ -13,10 +13,17 @@ import 'fixtures.dart';
 /// Menjawab kedua endpoint master; daftarnya bisa dibuat kosong dan
 /// penyimpanannya bisa dibuat ditolak.
 class _Stub extends Interceptor {
-  _Stub({this.empty = false, this.rejectSave = false});
+  _Stub({
+    this.empty = false,
+    this.rejectSave = false,
+    this.idEdgeController = 'EC-00001-1',
+  });
 
   final bool empty;
   final bool rejectSave;
+
+  /// Kosong meniru backend yang tidak menyebutkan `idEdgeController`.
+  final String idEdgeController;
   final List<RequestOptions> requests = [];
 
   List<RequestOptions> to(String path) =>
@@ -50,6 +57,7 @@ class _Stub extends Interceptor {
         statusCode: 200,
         data: switch (options.path) {
           '/master/list-chargerbox' => masterListResponse(
+            idEdgeController: idEdgeController,
             chargeBoxes: empty ? [] : null,
           ),
           _ => okResponse,
@@ -63,13 +71,18 @@ Future<_Stub> _openSettings(
   WidgetTester tester, {
   bool empty = false,
   bool rejectSave = false,
+  String idEdgeController = 'EC-00001-1',
 }) async {
   // Layar kios tinggi; ukuran bawaan test terlalu pendek untuk dua
   // kartu yang isian kredensialnya terbuka.
   await tester.binding.setSurfaceSize(const Size(800, 1600));
   addTearDown(() => tester.binding.setSurfaceSize(null));
 
-  final stub = _Stub(empty: empty, rejectSave: rejectSave);
+  final stub = _Stub(
+    empty: empty,
+    rejectSave: rejectSave,
+    idEdgeController: idEdgeController,
+  );
   final repo = ChargePointRepository(
     client: ApiClient.withDio(Dio()..interceptors.add(stub)),
   );
@@ -111,6 +124,11 @@ Future<void> _fill(WidgetTester tester, String label, String value) async {
   await tester.pumpAndSettle();
 }
 
+/// TextField berlabel [label] pada kartu yang sedang terbuka.
+TextField _fieldNamed(WidgetTester tester, String label) => tester.widget(
+  find.ancestor(of: find.text(label), matching: find.byType(TextField)).first,
+);
+
 void main() {
   testWidgets('kode SPKLU dikirim ke /master/list-chargerbox', (tester) async {
     final stub = await _openSettings(tester);
@@ -135,13 +153,54 @@ void main() {
     expect(find.text('Tidak ada charge box untuk kode itu.'), findsOneWidget);
   });
 
+  group('ID Edge Controller', () {
+    /// Nilainya diketahui backend, jadi petugas tidak perlu — dan tidak
+    /// boleh — mengetiknya sendiri.
+    testWidgets('terisi dari response dan tidak bisa diubah', (tester) async {
+      await _openSettings(tester);
+      await _sendCode(tester, 'SPKLU-SMR');
+      await _check(tester, 0);
+
+      final field = _fieldNamed(tester, 'ID Edge Controller');
+      expect(field.controller?.text, 'EC-00001-1');
+      expect(field.readOnly, isTrue);
+
+      // Yang terkunci menolak ketikan, bukan hanya terlihat abu-abu.
+      await _fill(tester, 'ID Edge Controller', 'EC-DIKETIK-TANGAN');
+      expect(
+        _fieldNamed(tester, 'ID Edge Controller').controller?.text,
+        'EC-00001-1',
+      );
+    });
+
+    /// Tanpa jalan keluar ini, backend yang tidak menyebutkan
+    /// `idEdgeController` membuat charge box tidak akan pernah bisa
+    /// didaftarkan dari layar ini.
+    testWidgets('bisa diisi bila backend tidak menyebutkannya', (tester) async {
+      final stub = await _openSettings(tester, idEdgeController: '');
+      await _sendCode(tester, 'SPKLU-SMR');
+      await _check(tester, 0);
+
+      expect(_fieldNamed(tester, 'ID Edge Controller').readOnly, isFalse);
+
+      await _fill(tester, 'ID Edge Controller', 'EC-MANUAL-9');
+      await _fill(tester, 'Password', 'rahasia');
+      await tester.tap(find.text('Simpan Info Charge Box'));
+      await tester.pumpAndSettle();
+
+      final save = stub.to('/master/set-chargerbox-evtap').single;
+      expect((save.data as Map)['idEdgeController'], 'EC-MANUAL-9');
+    });
+  });
+
   group('menyimpan charge box yang dicentang', () {
     testWidgets('satu permintaan untuk tiap yang dicentang', (tester) async {
       final stub = await _openSettings(tester);
       await _sendCode(tester, 'SPKLU-SMR');
 
       await _check(tester, 0);
-      await _fill(tester, 'ID Edge Controller', 'EC-00001-1');
+      // ID Edge Controller tidak diisi di sini: nilainya sudah datang
+      // dari jawaban `/master/list-chargerbox`.
       await _fill(tester, 'Password', 'station-dev-only');
       await _check(tester, 1);
 

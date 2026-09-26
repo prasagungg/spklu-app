@@ -461,6 +461,7 @@ const okResponse = {'responseCode': '00', 'responseMessage': 'Success'};
 /// keterangan lokasinya.
 Map<String, dynamic> masterListResponse({
   String idSpklu = 'SPKLU-SMR',
+  String idEdgeController = 'EC-00001-1',
   List<Map<String, dynamic>>? chargeBoxes,
 }) => {
   'responseCode': '00',
@@ -469,6 +470,7 @@ Map<String, dynamic> masterListResponse({
     'idSpklu': idSpklu,
     'namaSpklu': 'PLN Charging Station Sisingamangaraja',
     'alamatSpklu': 'Jl. Sisingamangaraja No. 1',
+    if (idEdgeController.isNotEmpty) 'idEdgeController': idEdgeController,
     'chargeBoxs':
         chargeBoxes ??
         [

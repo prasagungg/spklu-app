@@ -32,7 +32,8 @@ class MasterChargeBoxPage extends StatefulWidget {
 
 class _MasterChargeBoxPageState extends State<MasterChargeBoxPage> {
   late final List<_Entry> _entries = [
-    for (final box in widget.spklu.chargeBoxes) _Entry(box),
+    for (final box in widget.spklu.chargeBoxes)
+      _Entry(box, widget.spklu.edgeControllerId),
   ];
 
   bool _saving = false;
@@ -161,9 +162,9 @@ class _MasterChargeBoxPageState extends State<MasterChargeBoxPage> {
 
 /// Keadaan satu kartu: pilihan, isian, dan hasil pengirimannya.
 class _Entry {
-  _Entry(this.box)
+  _Entry(this.box, String edgeControllerId)
     : username = TextEditingController(text: box.id),
-      edgeController = TextEditingController(),
+      edgeController = TextEditingController(text: edgeControllerId),
       password = TextEditingController();
 
   final ChargeBox box;
@@ -259,11 +260,17 @@ class _ChargeBoxCard extends StatelessWidget {
           ),
           if (entry.selected) ...[
             const SizedBox(height: 12),
+            // Nilainya datang dari `idEdgeController` pada jawaban
+            // `/master/list-chargerbox`, jadi dikunci supaya petugas
+            // tidak bisa mengubahnya. Dibiarkan bisa diisi hanya bila
+            // backend tidak menyebutkannya — tanpa itu charge box tidak
+            // akan pernah bisa didaftarkan dari layar ini.
             _Field(
               label: 'ID Edge Controller',
               hint: 'EC-00001-1',
               controller: entry.edgeController,
               enabled: enabled,
+              readOnly: entry.edgeController.text.isNotEmpty,
               onChanged: onChanged,
             ),
             const SizedBox(height: 8),
@@ -350,6 +357,7 @@ class _Field extends StatelessWidget {
     required this.enabled,
     required this.onChanged,
     this.obscure = false,
+    this.readOnly = false,
   });
 
   final String label;
@@ -359,16 +367,23 @@ class _Field extends StatelessWidget {
   final VoidCallback onChanged;
   final bool obscure;
 
+  /// Isian yang nilainya ditentukan backend. Memakai `readOnly`, bukan
+  /// `enabled: false`, supaya teksnya tetap terbaca jelas — petugas
+  /// perlu memeriksa nilainya, hanya tidak boleh mengubahnya.
+  final bool readOnly;
+
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       enabled: enabled,
+      readOnly: readOnly,
       obscureText: obscure,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
         isDense: true,
+        filled: readOnly,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
       onChanged: (_) => onChanged(),

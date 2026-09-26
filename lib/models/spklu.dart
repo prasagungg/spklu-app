@@ -14,6 +14,7 @@ class Spklu {
     this.nama = '',
     this.alamat = '',
     this.daya = '',
+    this.edgeControllerId = '',
     this.statusCode,
   });
 
@@ -23,6 +24,7 @@ class Spklu {
       nama = '',
       alamat = '',
       daya = '',
+      edgeControllerId = '',
       statusCode = null,
       chargeBoxes = const [];
 
@@ -38,6 +40,12 @@ class Spklu {
   /// `dayaSpklu`, mis. "200 kW". Kosong sejak daya pindah ke tiap
   /// charge box.
   final String daya;
+
+  /// `idEdgeController`, mis. "EC-00001-2" — unit yang melayani SPKLU
+  /// ini. Dipakai halaman Charge Box CSMS sebagai isian yang sudah
+  /// terkunci, supaya petugas tidak mengetik ulang nilai yang sudah
+  /// diketahui backend.
+  final String edgeControllerId;
 
   /// Angka `status` apa adanya dari backend.
   final int? statusCode;
@@ -56,6 +64,7 @@ class Spklu {
       nama: json['namaSpklu'] as String? ?? '',
       alamat: json['alamatSpklu'] as String? ?? '',
       daya: json['dayaSpklu'] as String? ?? '',
+      edgeControllerId: json['idEdgeController'] as String? ?? '',
       statusCode: BackendStatus.parse(json['status']),
       chargeBoxes: [
         for (var i = 0; i < items.length; i++)
