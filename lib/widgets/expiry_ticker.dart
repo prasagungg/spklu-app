@@ -41,12 +41,21 @@ mixin ExpiryTicker<T extends StatefulWidget> on State<T> {
       if (next.inSeconds <= 0) {
         timer.cancel();
         setState(() => _remaining = Duration.zero);
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        unawaited(handleExpiry());
         return;
       }
 
       setState(() => _remaining = next);
     });
+  }
+
+  /// Apa yang terjadi saat tenggatnya habis.
+  ///
+  /// Bawaannya langsung pulang. Halaman setelah pembayaran menimpanya
+  /// untuk menunjukkan rincian sesinya lebih dulu — uang yang sudah
+  /// terdebit tidak boleh hilang tanpa penjelasan.
+  Future<void> handleExpiry() async {
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   /// Menghentikan detaknya.

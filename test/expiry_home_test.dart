@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dio/dio.dart';
 import 'package:kossotrik/data/card_reader_scope.dart';
+import 'package:kossotrik/data/charge_point_repository.dart';
+import 'package:kossotrik/data/charging_scope.dart';
+import 'package:kossotrik/services/api_client.dart';
 import 'package:kossotrik/data/demo_data.dart';
 import 'package:kossotrik/models/charging_session.dart';
 import 'package:kossotrik/models/order.dart';
@@ -11,17 +15,36 @@ import 'package:kossotrik/theme/app_theme.dart';
 import 'package:kossotrik/widgets/session_widgets.dart';
 
 import 'fake_card_reader.dart';
+import 'fixtures.dart';
+
+/// Menjawab `charging/detail` dengan sesi yang belum terpakai sama
+/// sekali: nol kWh dan seluruh bayarannya kembali.
+class _DetailStub extends Interceptor {
+  final List<String> paths = [];
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    paths.add(options.path);
+    handler.resolve(
+      Response<Map<String, dynamic>>(
+        requestOptions: options,
+        statusCode: 200,
+        data: chargingDetailResponse(kwhPakai: 0, rpPakai: 0, rpSisa: 25400),
+      ),
+    );
+  }
+}
 
 /// Sesi yang tenggatnya sudah lewat: hitung mundurnya mulai dari 00:00,
 /// jadi detak pertama sudah menemukannya kedaluwarsa.
-ChargingSession _expiredSession() {
+ChargingSession _expiredSession({String orderId = ''}) {
   final box = DemoData.chargeBoxes[3];
 
   return ChargingSession.fromOrder(
     chargeBox: box,
     connector: box.connectors.first,
     order: Order(
-      orderId: 'ORDER-1',
+      orderId: orderId,
       sessionCode: '29',
       partnerReference: '81067',
       kwh: 19.5,
@@ -34,20 +57,27 @@ ChargingSession _expiredSession() {
 
 /// Halaman awal tiruan yang mendorong [page] di atasnya, supaya
 /// kepulangan ke rute pertama bisa dilihat.
-Future<void> _open(WidgetTester tester, Widget page) async {
+Future<void> _open(
+  WidgetTester tester,
+  Widget page, {
+  ChargePointRepository? repository,
+}) async {
   await tester.pumpWidget(
     CardReaderScope(
       reader: FakeCardReader(),
-      child: MaterialApp(
-        theme: AppTheme.build(),
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: Center(
-              child: TextButton(
-                onPressed: () => Navigator.of(
-                  context,
-                ).push(MaterialPageRoute<void>(builder: (_) => page)),
-                child: const Text('Pilih Charge Box'),
+      child: ChargingScope(
+        repository: repository,
+        child: MaterialApp(
+          theme: AppTheme.build(),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: TextButton(
+                  onPressed: () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute<void>(builder: (_) => page)),
+                  child: const Text('Pilih Charge Box'),
+                ),
               ),
             ),
           ),
@@ -107,13 +137,48 @@ void main() {
       expect(find.text('Pilih Charge Box'), findsOneWidget);
     });
 
-    testWidgets('dari Hubungkan Konektor', (tester) async {
+    /// Tahap ini hanya dicapai setelah pembayaran, jadi pengguna tidak
+    /// dipulangkan diam-diam: uangnya sudah terdebit dan ia berhak tahu
+    /// rinciannya lebih dulu.
+    testWidgets('dari Hubungkan Konektor lewat rincian sesinya', (
+      tester,
+    ) async {
       await _open(tester, ConnectConnectorPage(session: _expiredSession()));
       expect(find.text('Hubungkan Konektor'), findsOneWidget);
 
       await _tick(tester);
 
+      expect(find.text('Waktu Sesi Habis'), findsOneWidget);
+      // Kabelnya tidak pernah terpasang: nol kWh, seluruh bayarannya
+      // menjadi sisa.
+      expect(find.text('0 kWh'), findsOneWidget);
+      expect(find.text('Rp50.000'), findsNWidgets(2));
+      expect(find.text('Pilih Charge Box'), findsNothing);
+
+      await tester.tap(find.text('Kembali ke Halaman Awal'));
+      await _tick(tester);
+
       expect(find.text('Pilih Charge Box'), findsOneWidget);
+    });
+
+    /// Angkanya milik backend, bukan hitungan aplikasi.
+    testWidgets('rinciannya diambil dari charging/detail', (tester) async {
+      final stub = _DetailStub();
+      await _open(
+        tester,
+        ConnectConnectorPage(session: _expiredSession(orderId: 'ORDER-1')),
+        repository: ChargePointRepository(
+          client: ApiClient.withDio(Dio()..interceptors.add(stub)),
+        ),
+      );
+
+      await _tick(tester);
+
+      expect(stub.paths, contains('/transaction/charging/detail'));
+      expect(find.text('Waktu Sesi Habis'), findsOneWidget);
+      // rpPesan 25400, rpPakai 0, rpSisa 25400 dari stub.
+      expect(find.text('Rp25.400'), findsNWidgets(2));
+      expect(find.text('Rp0'), findsOneWidget);
     });
 
     testWidgets('dari pil hitung mundur biasa', (tester) async {

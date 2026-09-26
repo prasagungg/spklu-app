@@ -13,6 +13,7 @@ import '../widgets/asset_slot.dart';
 import '../widgets/expiry_ticker.dart';
 import '../widgets/help_dialog.dart';
 import '../widgets/page_scaffold.dart';
+import '../widgets/session_expired_dialog.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/session_widgets.dart';
 import 'charging_started_page.dart';
@@ -47,6 +48,17 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage>
 
   @override
   ChargingSession get expirySession => widget.session;
+
+  /// Tahap ini hanya dicapai setelah pembayaran berhasil, jadi tenggat
+  /// yang habis di sini berarti uang sudah terdebit tanpa pengisian.
+  /// Rinciannya ditunjukkan dulu, baru pengguna dipulangkan.
+  @override
+  Future<void> handleExpiry() async {
+    await showSessionExpiredDialog(context, session: widget.session);
+    if (!mounted) return;
+
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
 
   Timer? _detection;
   bool _connected = false;
