@@ -11,10 +11,10 @@ import '../services/response_code.dart';
 import '../theme/app_colors.dart';
 import '../widgets/asset_slot.dart';
 import '../widgets/expiry_ticker.dart';
+import '../widgets/help_dialog.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/session_widgets.dart';
-import 'card_payment_page.dart';
 import 'charging_started_page.dart';
 
 /// Frame Figma 73:3470 "Hubungkan Konektor" dan 73:3597 "Konektor
@@ -205,7 +205,7 @@ class _ConnectConnectorPageState extends State<ConnectConnectorPage>
           SecondaryButton(
             label: 'Bantuan',
             trailingAsset: 'assets/icons/ic_support.svg',
-            onPressed: () => showHelpSheet(context),
+            onPressed: () => showHelpDialog(context),
           ),
         ],
       ),

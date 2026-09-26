@@ -7,9 +7,9 @@ import '../services/api_exception.dart';
 import '../services/response_code.dart';
 import '../theme/app_colors.dart';
 import '../widgets/asset_slot.dart';
+import '../widgets/help_dialog.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/primary_button.dart';
-import 'card_payment_page.dart';
 
 /// Frame Figma 73:4752 — "Verifikasi Sesi".
 ///
@@ -176,7 +176,7 @@ class _SessionVerificationPageState extends State<SessionVerificationPage> {
               Expanded(
                 child: SecondaryButton(
                   label: 'Bantuan',
-                  onPressed: () => showHelpSheet(context),
+                  onPressed: () => showHelpDialog(context),
                 ),
               ),
             ],

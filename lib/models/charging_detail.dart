@@ -148,11 +148,11 @@ class ChargingDetail {
       },
       // Ejaan `sessionExpired` ikut diterima seperti di model lain:
       // backend memakai dua ejaan di endpoint yang berbeda.
-      sessionExpiredAt:
-          switch (json?['sessionExpiredTime'] ?? json?['sessionExpired']) {
-            final String value => DateTime.tryParse(value),
-            _ => null,
-          },
+      sessionExpiredAt: switch (json?['sessionExpiredTime'] ??
+          json?['sessionExpired']) {
+        final String value => DateTime.tryParse(value),
+        _ => null,
+      },
     );
   }
 

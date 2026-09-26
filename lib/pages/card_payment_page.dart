@@ -12,6 +12,7 @@ import '../services/card_reader.dart';
 import '../theme/app_colors.dart';
 import '../widgets/cancel_transaction.dart';
 import '../widgets/expiry_ticker.dart';
+import '../widgets/help_dialog.dart';
 import '../widgets/page_scaffold.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/session_widgets.dart';
@@ -212,7 +213,7 @@ class _CardPaymentPageState extends State<CardPaymentPage>
     final help = SecondaryButton(
       label: 'Bantuan',
       trailingAsset: 'assets/icons/ic_support.svg',
-      onPressed: () => showHelpSheet(context),
+      onPressed: () => showHelpDialog(context),
     );
     // Selama hitung mundurnya masih berjalan pemesanannya berstatus
     // PENDING_PAYMENT, jadi masih bisa dibatalkan. Dimatikan saat
@@ -326,63 +327,6 @@ class _ReaderNotice extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Frame Figma 73:2935 — "Bantuan", ditampilkan sebagai bottom sheet.
-Future<void> showHelpSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: Colors.transparent,
-    isScrollControlled: true,
-    // Ditutup lewat tombol "Tutup", bukan gesture kembali perangkat.
-    builder: (context) => PopScope(
-      canPop: false,
-      child: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Butuh Bantuan?',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.title,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Hubungi petugas di lokasi atau call center PLN 123 bila '
-                'pengisian tidak berjalan sebagaimana mestinya.',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w400,
-                  color: AppColors.description,
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: PrimaryButton(
-                  label: 'Tutup',
-                  trailingAsset: null,
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
 }
 
 /// Menerjemahkan kegagalan `POST /transaction/inquiry-billing` jadi

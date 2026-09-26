@@ -37,6 +37,7 @@ dependencies:
   shared_preferences: ^2.5.5
   nfc_manager: ^4.2.1
   crypto: ^3.0.7
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

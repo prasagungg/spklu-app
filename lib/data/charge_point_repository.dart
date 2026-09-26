@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../config/env.dart';
 import '../models/auth_type.dart';
+import '../models/help_contact.dart';
 import '../models/charge_box.dart';
 import '../models/connector_check.dart';
 import '../models/billing.dart';
@@ -545,6 +546,19 @@ class ChargePointRepository {
     );
 
     return ChargingDetail.fromJson(_unwrap(json));
+  }
+
+  /// `GET /evtap/bantuan`
+  ///
+  /// Kontak bantuan yang ditampilkan modal "Butuh Bantuan?". Backend
+  /// membalas ketiga fieldnya kosong bila belum diatur.
+  Future<HelpContact> fetchHelpContact({CancelToken? cancelToken}) async {
+    final json = await _client.get<Map<String, dynamic>>(
+      '/evtap/bantuan',
+      cancelToken: cancelToken,
+    );
+
+    return HelpContact.fromJson(_unwrap(json));
   }
 
   /// `POST /master/list-chargerbox`

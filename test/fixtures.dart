@@ -477,3 +477,14 @@ Map<String, dynamic> masterListResponse({
         ],
   },
 };
+
+/// Amplop `GET /evtap/bantuan`.
+Map<String, dynamic> bantuanResponse({
+  String email = 'bantuan@pln.co.id',
+  String hotline = '123',
+  String whatsapp = '+62 851 2345 6789',
+}) => {
+  'responseCode': '00',
+  'responseMessage': 'Success',
+  'data': {'email': email, 'hotline': hotline, 'whatsapp': whatsapp},
+};
