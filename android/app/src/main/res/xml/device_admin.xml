@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Kosong dengan sengaja. Device owner sudah memberi hak lock task;
+     tidak ada kebijakan tambahan yang dipakai aplikasi ini. -->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies/>
+</device-admin>
