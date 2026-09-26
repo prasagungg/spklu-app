@@ -36,8 +36,14 @@ class _Stub extends Interceptor {
   /// Tenggat yang dijawab `charging/detail`.
   final String? detailExpiredTime;
 
+  final List<RequestOptions> requests = [];
+
+  List<RequestOptions> to(String path) =>
+      requests.where((r) => r.path == path).toList();
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    requests.add(options);
     handler.resolve(
       Response<Map<String, dynamic>>(
         requestOptions: options,
@@ -64,6 +70,7 @@ class _Stub extends Interceptor {
           '/transaction/push-order' => pushOrderResponse(),
           '/transaction/inquiry-billing' => inquiryBillingResponse(),
           '/transaction/payment-billing' => paymentBillingResponse(),
+          '/cancelled-connector' => cancellationResponse(),
           _ => listResponse([
             chargeBoxJson(nama: 'CB-SMR-01', connectors: [connectorJson()]),
           ]),
@@ -75,7 +82,7 @@ class _Stub extends Interceptor {
 }
 
 /// Membuka bottom sheet lalu menekan konektor satu-satunya.
-Future<void> _tapConnector(
+Future<_Stub> _tapConnector(
   WidgetTester tester,
   int status, {
   int statusProcess = 3,
@@ -83,19 +90,15 @@ Future<void> _tapConnector(
   String? sessionExpiredTime,
   String? detailExpiredTime,
 }) async {
+  final stub = _Stub(
+    status,
+    statusProcess: statusProcess,
+    orderReadable: orderReadable,
+    sessionExpiredTime: sessionExpiredTime,
+    detailExpiredTime: detailExpiredTime,
+  );
   final repo = ChargePointRepository(
-    client: ApiClient.withDio(
-      Dio()
-        ..interceptors.add(
-          _Stub(
-            status,
-            statusProcess: statusProcess,
-            orderReadable: orderReadable,
-            sessionExpiredTime: sessionExpiredTime,
-            detailExpiredTime: detailExpiredTime,
-          ),
-        ),
-    ),
+    client: ApiClient.withDio(Dio()..interceptors.add(stub)),
   );
 
   await tester.pumpWidget(SPKLUApp(repository: repo));
@@ -110,6 +113,8 @@ Future<void> _tapConnector(
 
   await tester.tap(find.text('Gun 1'));
   await settleFrames(tester);
+
+  return stub;
 }
 
 /// Konektor yang sudah diklaim menuntut kode sesi dulu; kodenya
@@ -150,11 +155,39 @@ void main() {
       expect(find.text('Konfirmasi Pengisian'), findsOneWidget);
     });
 
-    testWidgets('0 pemesanan membuka Konfirmasi Pengisian', (tester) async {
+    /// Tahap 0 berarti konektornya baru dipesan dan ordernya belum ada
+    /// — keadaan yang tertinggal bila aplikasi ditutup tepat setelah
+    /// konektor dipilih. Pengguna dikembalikan ke langkah yang memang
+    /// mengikuti pemesanan, bukan ke konfirmasi yang tidak punya order.
+    testWidgets('0 pemesanan membuka Kode Sesi', (tester) async {
       await _tapConnector(tester, 0, statusProcess: 0);
       await _verify(tester);
 
-      expect(find.text('Konfirmasi Pengisian'), findsOneWidget);
+      expect(find.text('Kode Sesi'), findsOneWidget);
+      // Kode dan tenggatnya yang lama, bukan pemesanan baru.
+      expect(find.text('29'), findsOneWidget);
+      expect(find.text('Lanjutkan'), findsOneWidget);
+    });
+
+    /// Ingatan pemesanan hilang saat aplikasi ditutup. Halaman Kode
+    /// Sesi yang dilanjutkan memasangnya kembali dari
+    /// `manage-sessioncode`, jadi pembatalannya benar-benar terkirim —
+    /// tanpa itu konektornya tertahan sampai tenggatnya lewat.
+    testWidgets('pemesanan yang dilanjutkan masih bisa dibatalkan', (
+      tester,
+    ) async {
+      final stub = await _tapConnector(tester, 0, statusProcess: 0);
+      await _verify(tester);
+      expect(find.text('Kode Sesi'), findsOneWidget);
+
+      await tester.tap(find.text('Batalkan Transaksi'));
+      await settleFrames(tester);
+      await tester.tap(find.text('Batalkan'));
+      await settleFrames(tester);
+
+      final cancel = stub.to('/cancelled-connector').single;
+      expect((cancel.data as Map)['reservationId'], 'RESV-9');
+      expect(find.text('Pilih Charge Box'), findsOneWidget);
     });
 
     testWidgets('2 membuka Hubungkan Konektor', (tester) async {
@@ -182,7 +215,7 @@ void main() {
     /// Tanpa rincian order yang bisa dibaca, konfirmasi tidak punya
     /// angka untuk ditampilkan — pengguna diantar ke pembayaran.
     testWidgets('tanpa rincian order jatuh ke Pembayaran', (tester) async {
-      await _tapConnector(tester, 0, statusProcess: 0, orderReadable: false);
+      await _tapConnector(tester, 0, statusProcess: 1, orderReadable: false);
       await _verify(tester);
 
       expect(find.text('Pembayaran'), findsOneWidget);
@@ -262,7 +295,7 @@ void main() {
       await _tapConnector(
         tester,
         0,
-        statusProcess: 0,
+        statusProcess: 1,
         detailExpiredTime: detail.toIso8601String(),
         // Tenggat manage-sessioncode sengaja dibuat jauh berbeda supaya
         // terlihat mana yang dipakai.
@@ -292,7 +325,7 @@ void main() {
       await _tapConnector(
         tester,
         0,
-        statusProcess: 0,
+        statusProcess: 1,
         sessionExpiredTime: session.toIso8601String(),
       );
       await _verify(tester);

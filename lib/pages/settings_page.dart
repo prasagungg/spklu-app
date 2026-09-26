@@ -5,9 +5,12 @@ import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/asset_slot.dart';
 import '../widgets/page_scaffold.dart';
+import '../data/charging_scope.dart';
 import '../widgets/password_dialog.dart';
+import '../widgets/spklu_code_dialog.dart';
 import '../widgets/status_chip.dart';
 import 'api_config_page.dart';
+import 'master_charge_box_page.dart';
 
 /// Meminta password, lalu membuka halaman Pengaturan bila cocok.
 ///
@@ -31,6 +34,9 @@ Future<void> openSettings(BuildContext context) async {
 class SettingsPage extends StatelessWidget {
   /// Key kartu menuju Konfigurasi Server, dipakai test.
   static const serverKey = Key('buka-konfigurasi-server');
+
+  /// Key kartu "Input Kode SPKLU", dipakai test.
+  static const spkluCodeKey = Key('buka-kode-spklu');
 
   const SettingsPage({super.key});
 
@@ -56,9 +62,11 @@ class SettingsPage extends StatelessWidget {
                   subtitle: 'Periksa keadaan SAM Card yang terpasang',
                 ),
                 _SettingsTile(
+                  key: SettingsPage.spkluCodeKey,
                   icon: Icons.dialpad,
                   title: 'Input Kode SPKLU',
                   subtitle: 'Masukkan kode SPKLU untuk menghubungkan perangkat',
+                  onTap: _openSpkluCode,
                 ),
                 _SettingsTile(
                   icon: Icons.point_of_sale,
@@ -85,6 +93,29 @@ class SettingsPage extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Menanyakan kode SPKLU, lalu membuka daftar charge box CSMS-nya.
+///
+/// Tanpa repository — mode offline untuk test — kartunya berperilaku
+/// seperti kartu yang belum punya tujuan: tidak ada yang bisa ditanya.
+Future<void> _openSpkluCode(BuildContext context) async {
+  final repository = ChargingScope.maybeOf(context)?.repository;
+  if (repository == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Server belum dikonfigurasi.')),
+    );
+    return;
+  }
+
+  final spklu = await showSpkluCodeDialog(context, repository);
+  if (spklu == null || !context.mounted) return;
+
+  await Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => MasterChargeBoxPage(spklu: spklu, repository: repository),
+    ),
+  );
 }
 
 /// Satu baris menu: ikon berlatar lembut, judul, keterangan, chevron.

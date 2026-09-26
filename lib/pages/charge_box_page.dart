@@ -217,11 +217,17 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
   ///
   /// | `statusProcess` | Tahap | Halaman |
   /// |---|---|---|
-  /// | 0 | pemesanan | Konfirmasi Pengisian |
+  /// | 0 | pemesanan | Kode Sesi |
   /// | 1 | belum bayar | Konfirmasi Pengisian |
   /// | 2 | hubungkan konektor | Hubungkan Konektor |
   /// | 3 | proses pengisian | Sedang Mengisi |
   /// | 4 | pengisian selesai | Pengisian Selesai |
+  ///
+  /// Tahap 0 berarti konektornya baru dipesan dan ordernya belum ada —
+  /// keadaan yang tertinggal bila aplikasi ditutup tepat setelah
+  /// konektor dipilih. Pengguna dikembalikan ke halaman Kode Sesi,
+  /// langkah yang memang mengikuti pemesanan, bukan ke konfirmasi yang
+  /// tidak punya order untuk ditampilkan.
   ///
   /// Order yang belum dibayar dikembalikan ke konfirmasi, bukan langsung
   /// ke pembaca kartu: pengguna perlu melihat lagi apa yang akan
@@ -238,6 +244,7 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
     final session = _resume(box, connector, check);
 
     return switch (check.statusProcess) {
+      BackendStatus.booked => _sessionCodeFor(box, connector, check),
       BackendStatus.awaitingConnector => ConnectConnectorPage(session: session),
       BackendStatus.charging => ChargingStatusPage(session: session),
       // Angka energinya diambil halaman itu sendiri lewat
@@ -246,9 +253,46 @@ class _ChargeBoxPageState extends State<ChargeBoxPage> with RouteAware {
         session: session,
         energyKwh: 0,
       ),
-      // 0 pemesanan, 1 belum bayar, dan angka yang tidak dikenal.
+      // 1 belum bayar, dan angka yang tidak dikenal.
       _ => await _confirmationFor(box, connector, session),
     };
+  }
+
+  /// Halaman Kode Sesi untuk pemesanan yang masih tertahan backend.
+  ///
+  /// Pemesanannya diingat ulang di sini. Tanpa itu "Batalkan Transaksi"
+  /// dan tombol Home pada halaman itu tidak akan mengirim
+  /// `cancelled-connector` — ingatan aplikasi hilang saat ditutup —
+  /// sehingga konektornya tetap tertahan sampai tenggatnya lewat.
+  Widget _sessionCodeFor(
+    ChargeBox box,
+    Connector connector,
+    SessionCheck check,
+  ) {
+    ChargingScope.maybeOf(context)?.booking.hold(
+      chargeBoxId: box.id,
+      connectorId: connector.id,
+      reservationId: check.reservationId,
+      sessionCode: check.sessionCode,
+    );
+
+    return SessionCodePage(
+      chargeBox: box,
+      connector: connector,
+      // Dibangun ulang dari jawaban `manage-sessioncode`: kode sesinya
+      // tetap yang lama dan hitung mundurnya melanjutkan tenggat
+      // pemesanan yang sama, bukan mulai dari nol lagi.
+      reservation: Reservation(
+        accepted: true,
+        reservationId: check.reservationId,
+        sessionCode: check.sessionCode,
+        chargeBoxId: box.id,
+        chargeBoxName: check.chargeBoxName,
+        connectorId: check.connectorId,
+        connectorName: check.connectorName,
+        expiredAt: check.sessionExpiredAt,
+      ),
+    );
   }
 
   /// Halaman konfirmasi untuk sesi yang ordernya sudah dibuat tetapi

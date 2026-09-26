@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../config/env.dart';
+import '../models/auth_type.dart';
 import '../models/charge_box.dart';
 import '../models/connector_check.dart';
 import '../models/billing.dart';
@@ -544,6 +545,68 @@ class ChargePointRepository {
     );
 
     return ChargingDetail.fromJson(_unwrap(json));
+  }
+
+  /// `POST /master/list-chargerbox`
+  ///
+  /// Charge box yang terdaftar di CSMS untuk satu kode SPKLU — dipakai
+  /// halaman Pengaturan untuk mendaftarkan charger ke unit ini, bukan
+  /// alur pengisian.
+  ///
+  /// Bentuk jawabannya sama persis dengan `/list-chargerbox` milik
+  /// pembaca, jadi diuraikan model yang sama.
+  ///
+  /// Backend masih menjawabnya dengan data contoh selama integrasi CSMS
+  /// belum siap.
+  Future<Spklu> fetchMasterSpklu({
+    required String idSpklu,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/master/list-chargerbox',
+      body: {'idSpklu': idSpklu},
+      cancelToken: cancelToken,
+    );
+    final data = _unwrap(json);
+
+    return data == null ? const Spklu.empty() : Spklu.fromJson(data);
+  }
+
+  /// `POST /master/set-chargerbox-evtap`
+  ///
+  /// Mendaftarkan satu charge box ke edge controller ini. Dipanggil
+  /// sekali untuk tiap charge box yang dicentang petugas.
+  ///
+  /// `idEdgeController` dan `idSpklu` boleh kosong — backend memakai
+  /// konfigurasinya sendiri. `username`/`password` hanya dikirim bila
+  /// [authType] bukan `NONE`, karena backend menolaknya kosong untuk
+  /// dua jenis auth lainnya.
+  Future<void> setChargeBoxEvtap({
+    required String chargeBoxId,
+    required String authType,
+    String idEdgeController = '',
+    String idSpklu = '',
+    String username = '',
+    String password = '',
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/master/set-chargerbox-evtap',
+      body: {
+        if (idEdgeController.isNotEmpty) 'idEdgeController': idEdgeController,
+        if (idSpklu.isNotEmpty) 'idSpklu': idSpklu,
+        'chargerBoxId': chargeBoxId,
+        'authType': authType,
+        if (authType != AuthType.none) ...{
+          'username': username,
+          'password': password,
+        },
+      },
+      cancelToken: cancelToken,
+    );
+
+    // Jawabannya tidak membawa data; yang penting amplopnya "00".
+    _unwrap(json);
   }
 
   /// Memeriksa amplop response dan mengembalikan isi `data`.

@@ -314,6 +314,7 @@ Map<String, dynamic> sessionCodeResponse({
   int statusProcess = 3,
   String chargeBoxId = 'CB-SMR-01',
   String connectorId = '1',
+  String reservationId = 'RESV-9',
 }) => {
   'responseCode': '00',
   'responseMessage': 'Success',
@@ -324,6 +325,7 @@ Map<String, dynamic> sessionCodeResponse({
     'connectorName': 'Gun $connectorId',
     'connectorId': connectorId,
     'sessionCode': sessionCode,
+    'reservationId': reservationId,
     'statusProcess': statusProcess,
     'sessionExpiredTime': ?sessionExpiredTime,
   },
@@ -452,3 +454,26 @@ Map<String, dynamic> historyEntryJson({
 
 /// Balasan sukses tanpa isi, untuk `/start` dan `/stop`.
 const okResponse = {'responseCode': '00', 'responseMessage': 'Success'};
+
+/// Amplop `POST /master/list-chargerbox`.
+///
+/// Bentuknya sama dengan `/list-chargerbox` milik pembaca, ditambah
+/// keterangan lokasinya.
+Map<String, dynamic> masterListResponse({
+  String idSpklu = 'SPKLU-SMR',
+  List<Map<String, dynamic>>? chargeBoxes,
+}) => {
+  'responseCode': '00',
+  'responseMessage': 'Success',
+  'data': {
+    'idSpklu': idSpklu,
+    'namaSpklu': 'PLN Charging Station Sisingamangaraja',
+    'alamatSpklu': 'Jl. Sisingamangaraja No. 1',
+    'chargeBoxs':
+        chargeBoxes ??
+        [
+          chargeBoxJson(id: 'CB-SMR-01', nama: 'Kempower Satellite 200 kW'),
+          chargeBoxJson(id: 'CB-SMR-02', nama: 'Delta Ultra Fast 150 kW'),
+        ],
+  },
+};
