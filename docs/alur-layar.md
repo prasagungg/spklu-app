@@ -103,18 +103,56 @@ Ini bagian yang paling mudah salah baca.
 | Pemicu | Layar | Yang terjadi |
 |---|---|---|
 | Konektor ditekan | Daftar Konektor | `POST /booked-connector` memesan konektor dan memberi kode sesinya. `status: false` → alur berhenti di sini. |
-| Menunggu di Hubungkan Konektor | Hubungkan Konektor | `POST /check-status-connector` tiap detik sampai status OCPP-nya `Preparing` — tanda kabel sudah tercolok. |
+| Halaman Hubungkan Konektor dibuka | Hubungkan Konektor | `POST /check-status-connector` langsung, lalu tiap detik sampai status OCPP-nya `Preparing` — tanda kabel sudah tercolok. Hasil pemeriksaan **pertama** menentukan halamannya menunggu pengguna atau berjalan sendiri. |
 | Pilihan kWh ditekan | Pilih Nominal | `POST /count-kwh` menghitung harganya. |
 | "Lanjutkan" | Kode Sesi | **Tidak** mengirim apa pun. Hanya pindah ke Pilih Nominal. |
 | "Lanjutkan" | Pilih Nominal | `POST /transaction/push-order` membuat ordernya, dengan `reservationId` dari pemesanan. |
 | Kartu ditempelkan | Pembayaran Kartu | `inquiry-billing` menanyakan tagihan, lalu `payment-billing` membayarnya. Keduanya berhasil → pindah ke Pembayaran Berhasil; gagal di salah satunya → tetap di sini dan kartu bisa ditempelkan ulang. Tagihan bernilai nol — tanda tarif konektornya belum diatur — dihentikan sebelum dibayar. |
 | "Mulai Pengisian" | Pembayaran Berhasil | **Tidak** mengirim apa pun. Hanya pindah ke Hubungkan Konektor. |
-| "Mulai Pengisian" | Hubungkan Konektor | `POST /transaction/charging/start`, lalu pindah ke Sedang Mengisi. |
+| "Mulai Pengisian" | Hubungkan Konektor | `POST /transaction/charging/start`, lalu pindah ke Pengisian Dimulai. |
+| Pemeriksaan pertama sudah `Preparing` | Hubungkan Konektor | Layar menahan diri 2–3 detik sambil mengabarkan konektornya terdeteksi, lalu `POST /transaction/charging/start` dikirim **tanpa ditekan siapa pun**; tombol Mulai Pengisian dan Bantuan tidak ditampilkan. |
 | Kembali ke daftar sebelum pengisian jalan | mana pun di alur pembelian | `POST /cancelled-connector` melepas pemesanannya. |
 | "Ya, Akhiri Pengisian" | Akhiri Pengisian? | `POST /transaction/charging/stop`, baca energi akhir lewat `ongoing-kwh`, lalu Pengisian Selesai. |
 
 `/start` sengaja dikirim dari **Hubungkan Konektor**, bukan lebih awal,
 supaya perintahnya berangkat sesudah kabel terpasang.
+
+### Kabel yang sudah terpasang sebelum halaman dibuka
+
+Sebagian pengguna memasang konektornya lebih dulu, lalu baru membayar.
+Bagi mereka, layar yang menyuruh "Pasang konektor ke kendaraan Anda"
+dan tombol yang harus ditekan hanyalah dua penghalang untuk sesuatu yang
+sudah selesai.
+
+Karena itu hasil pemeriksaan **pertama** memutuskan mode halamannya:
+
+| Pemeriksaan pertama | Mode | Yang dilihat pengguna |
+|---|---|---|
+| Kabel belum terpasang | biasa | Hubungkan Konektor, polling tiap detik, tombol menyala saat terdeteksi, pengguna menekannya |
+| Kabel sudah terpasang | otomatis | Konektor Terhubung tanpa tombol: 2–3 detik panel "Pengisian akan dimulai otomatis", lalu panel tunggu "Memulai pengisian…" saat `/start` terbang, lanjut ke Pengisian Dimulai |
+
+Yang dinilai hanya pemeriksaan pertama. Kabel yang dicolokkan *sambil*
+menunggu di halaman ini tetap mendapat alur biasa — tombolnya menyala
+dan penggunanya yang menekan.
+
+Mode otomatis yang gagal mengirim `/start` kembali ke mode biasa:
+tombolnya muncul beserta alasan kegagalannya. Layar tunggu tanpa tombol
+yang tidak akan pernah selesai jauh lebih buruk daripada satu tombol
+yang perlu ditekan dua kali.
+
+Mode offline — tanpa `ChargingScope`, dipakai demo dan test — tidak
+punya backend untuk ditanya, jadi selalu mode biasa.
+
+Jedanya tidak untuk menunggu charger siap; charger tidak peduli kapan
+perintahnya datang. Jeda itu untuk penggunanya: tanpanya layar Konektor
+Terhubung cuma berkelebat, dan yang tersisa hanyalah kesan aplikasi
+melompat sendiri tanpa penjelasan.
+
+Rentang 2–3 detiknya dipusatkan di `lib/data/waiting_pause.dart` dan
+dipakai dua layar tunggu yang berurutan — "Konektor Terhubung" di mode
+otomatis dan "Pengisian Dimulai" — supaya keduanya terasa sama panjang.
+Test mematoknya lewat `test/flutter_test_config.dart`; dua jeda acak
+berurutan membuat hasilnya bergantung pada angka yang keluar.
 
 Halaman itu memanggil `POST /check-status-connector` tiap detik dan
 menunggu status OCPP konektornya menjadi `Preparing` — istilah untuk

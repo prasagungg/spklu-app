@@ -187,16 +187,11 @@ void main() {
 
     await tester.tap(find.text('Mulai Pengisian'));
     await _settle(tester);
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pump();
-    await tester.tap(find.text('Mulai Pengisian').last);
-    for (var i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
-    await tester.pump(const Duration(milliseconds: 600));
+    // Kabelnya sudah terpasang sejak halaman dibuka, jadi perintah
+    // start berangkat sendiri setelah jeda acaknya habis.
+    await pumpUntil(tester, find.text('Pengisian Dimulai'));
 
     expect(recorder.bookings, 1, reason: 'tidak ada pemesanan tambahan');
-    expect(find.text('Pengisian Dimulai'), findsOneWidget);
   });
 
   group('pembatalan saat alur ditinggalkan', () {
@@ -397,14 +392,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
       await tester.tap(find.text('Mulai Pengisian'));
       await _settle(tester);
-      await tester.pump(const Duration(seconds: 3));
-      await tester.pump();
-      await tester.tap(find.text('Mulai Pengisian').last);
-      for (var i = 0; i < 5; i++) {
-        await tester.pump(const Duration(milliseconds: 50));
-      }
-      await tester.pump(const Duration(milliseconds: 600));
-      expect(find.text('Pengisian Dimulai'), findsOneWidget);
+      // Kabelnya sudah terpasang sejak halaman dibuka, jadi perintah
+      // start berangkat sendiri setelah jeda acaknya habis.
+      await pumpUntil(tester, find.text('Pengisian Dimulai'));
 
       await tester.tap(find.byType(HomeButton).first);
       await tester.pumpAndSettle();
@@ -496,13 +486,9 @@ void main() {
 
     await tester.tap(find.text('Mulai Pengisian'));
     await _settle(tester);
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pump();
-    await tester.tap(find.text('Mulai Pengisian').last);
-    for (var i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
-    await tester.pump(const Duration(milliseconds: 600));
+    // Kabelnya sudah terpasang sejak halaman dibuka, jadi perintah
+    // start berangkat sendiri setelah jeda acaknya habis.
+    await pumpUntil(tester, find.text('Pengisian Dimulai'));
 
     await reopenChargingSession(tester);
 

@@ -86,15 +86,21 @@ void main() {
   testWidgets('menekan Mulai Pengisian benar-benar mengirim POST /start', (
     tester,
   ) async {
+    // Pemeriksaan pertama melaporkan kabelnya belum terpasang, supaya
+    // halaman Hubungkan Konektor benar-benar menunggu dan tombolnyalah
+    // yang mengirim /start. Kabel yang sudah terpasang sejak halaman
+    // dibuka membuat halaman itu berjalan sendiri — diuji di
+    // connector_detection_poll_test.
+    var checks = 0;
     final recorder = _Recorder(
       (path) => switch (path) {
         '/list-chargerbox' => _list(),
         '/booked-connector' => bookingResponse(),
         '/detail-chargerbox' => chargeBoxDetailResponse(),
         '/manage-sessioncode' => sessionCodeResponse(),
-        // Kabelnya dianggap sudah terpasang; penungguannya
-        // diuji tersendiri di connector_detection_poll_test.
-        '/check-status-connector' => connectorStatusResponse(),
+        '/check-status-connector' => connectorStatusResponse(
+          status: checks++ == 0 ? 'Available' : 'Preparing',
+        ),
         '/list-kwh' => kwhOptionsResponse(),
         '/count-kwh' => countKwhResponse(),
         '/transaction/push-order' => pushOrderResponse(),
@@ -254,18 +260,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     // Jeda deteksi habis dan tombolnya aktif.
-    await tester.pump(const Duration(seconds: 3));
-    for (var i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
-    expect(find.text('Konektor Terhubung'), findsOneWidget);
-
-    await tester.tap(find.text('Mulai Pengisian').last);
-    // POST /start async, lalu transisi rute.
-    for (var i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
-    await tester.pump(const Duration(milliseconds: 600));
+    // Kabelnya sudah terpasang sejak halaman dibuka, jadi perintah
+    // start berangkat sendiri setelah jeda acaknya habis.
+    await pumpUntil(tester, find.text('Pengisian Dimulai'));
 
     await reopenChargingSession(tester);
     expect(find.text('Sedang Mengisi'), findsOneWidget);
@@ -375,15 +372,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    await tester.pump(const Duration(seconds: 3));
-    for (var i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
-    await tester.tap(find.text('Mulai Pengisian').last);
-    for (var i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
-    await tester.pump(const Duration(milliseconds: 600));
+    // Kabelnya sudah terpasang sejak halaman dibuka, jadi perintah
+    // start berangkat sendiri setelah jeda acaknya habis.
+    await pumpUntil(tester, find.text('Pengisian Dimulai'));
 
     await reopenChargingSession(tester);
     expect(find.text('Sedang Mengisi'), findsOneWidget);

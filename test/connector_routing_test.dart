@@ -64,7 +64,12 @@ class _Stub extends Interceptor {
           ),
           // Kabelnya dianggap sudah terpasang; penungguannya
           // diuji tersendiri di connector_detection_poll_test.
-          '/check-status-connector' => connectorStatusResponse(),
+          // Sesi yang dilanjutkan dari daftar belum tentu kabelnya
+          // terpasang; "Available" menahan halaman Hubungkan Konektor di
+          // tempat, yang memang jadi pokok test di berkas ini.
+          '/check-status-connector' => connectorStatusResponse(
+            status: 'Available',
+          ),
           '/list-kwh' => kwhOptionsResponse(),
           '/count-kwh' => countKwhResponse(),
           '/transaction/push-order' => pushOrderResponse(),

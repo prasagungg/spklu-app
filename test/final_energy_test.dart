@@ -91,14 +91,9 @@ Future<void> _runUntilCharging(WidgetTester tester, _Stub stub) async {
   await tester.tap(find.text('Mulai Pengisian'));
   await _settle(tester);
 
-  // Jeda deteksi konektor.
-  await tester.pump(const Duration(seconds: 3));
-  await tester.pump();
-  await tester.tap(find.text('Mulai Pengisian').last);
-  for (var i = 0; i < 5; i++) {
-    await tester.pump(const Duration(milliseconds: 50));
-  }
-  await tester.pump(const Duration(milliseconds: 600));
+  // Kabelnya sudah terpasang sejak halaman dibuka, jadi perintah start
+  // berangkat sendiri setelah jeda acaknya habis.
+  await pumpUntil(tester, find.text('Pengisian Dimulai'));
 
   await reopenChargingSession(tester);
   expect(find.text('Sedang Mengisi'), findsOneWidget);
@@ -192,16 +187,9 @@ void main() {
     await tester.tap(find.text('Mulai Pengisian'));
     await _settle(tester);
 
-    // Jeda deteksi konektor.
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pump();
-    await tester.tap(find.text('Mulai Pengisian').last);
-    // /start berjalan async, jadi perlu beberapa pump agar futurenya
-    // sempat selesai sebelum transisi halaman dihitung.
-    for (var i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
-    await tester.pump(const Duration(milliseconds: 600));
+    // Kabelnya sudah terpasang sejak halaman dibuka, jadi perintah
+    // start berangkat sendiri setelah jeda acaknya habis.
+    await pumpUntil(tester, find.text('Pengisian Dimulai'));
 
     // Kode sesi dari push-order ditunjukkan dulu; pemantauan dibuka
     // dengan kode itu dari daftar charge box.

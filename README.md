@@ -1,3 +1,4 @@
+
 # kossotrik
 
 Aplikasi kontrol SPKLU: pilih charge box, bayar, lalu pantau pengisian
@@ -7,12 +8,12 @@ Aplikasi ini berbicara ke sebuah **edge controller OCPP 1.6** lewat REST.
 Controller itu yang meneruskan perintah ke charger; aplikasi hanya
 meminta dan menampilkan. Target platformnya Android.
 
-| | |
-|---|---|
-| Framework | Flutter (Dart SDK `^3.11.5`) |
-| Dependensi | `dio`, `flutter_svg`, `shared_preferences`, `nfc_manager`, `crypto` |
-| Bahasa antarmuka | Indonesia |
-| Sumber desain | Figma "SPKLU Offline Mode" |
+|                  |                                                                               |
+| ---------------- | ----------------------------------------------------------------------------- |
+| Framework        | Flutter (Dart SDK`^3.11.5`)                                                 |
+| Dependensi       | `dio`, `flutter_svg`, `shared_preferences`, `nfc_manager`, `crypto` |
+| Bahasa antarmuka | Indonesia                                                                     |
+| Sumber desain    | Figma "SPKLU Offline Mode"                                                    |
 
 ## Jalankan
 
@@ -67,13 +68,13 @@ dengan `--dart-define=SPKLU_DEBUG_PANEL=true`. Rinciannya di
 
 ## Dokumentasi
 
-| Dokumen | Isi |
-|---|---|
-| [Arsitektur](docs/arsitektur.md) | Lapisan, aliran data, dan keputusan desain yang menahan bug |
-| [Alur layar](docs/alur-layar.md) | Urutan halaman, percabangan status konektor, navigasi |
-| [API backend](docs/api-backend.md) | Endpoint, amplop response, kode error, contoh payload |
-| [Konfigurasi](docs/konfigurasi.md) | Alamat server, `--dart-define`, HTTP dan sertifikat |
-| [Pengujian](docs/pengujian.md) | Peta berkas test dan cara menulis test baru |
+| Dokumen                           | Isi                                                         |
+| --------------------------------- | ----------------------------------------------------------- |
+| [Arsitektur](docs/arsitektur.md)   | Lapisan, aliran data, dan keputusan desain yang menahan bug |
+| [Alur layar](docs/alur-layar.md)   | Urutan halaman, percabangan status konektor, navigasi       |
+| [API backend](docs/api-backend.md) | Endpoint, amplop response, kode error, contoh payload       |
+| [Konfigurasi](docs/konfigurasi.md) | Alamat server,`--dart-define`, HTTP dan sertifikat        |
+| [Pengujian](docs/pengujian.md)     | Peta berkas test dan cara menulis test baru                 |
 
 ## Aset dan branding
 

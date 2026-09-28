@@ -2,6 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kossotrik/widgets/page_scaffold.dart';
 
+/// Memajukan waktu langkah kecil sampai [finder] muncul, lalu berhenti.
+///
+/// Dipakai melintasi layar tunggu yang menahan diri selama durasi acak.
+/// Memompa durasi tetap yang "cukup panjang" tidak bisa dipakai di sana:
+/// angka yang cukup untuk jeda terpanjang akan melewati layar tunggu
+/// berikutnya, dan test jadi lolos atau gagal tergantung angka acaknya.
+Future<void> pumpUntil(
+  WidgetTester tester,
+  Finder finder, {
+  Duration step = const Duration(milliseconds: 100),
+  Duration timeout = const Duration(seconds: 10),
+}) async {
+  final steps = timeout.inMicroseconds ~/ step.inMicroseconds;
+
+  for (var i = 0; i < steps && finder.evaluate().isEmpty; i++) {
+    await tester.pump(step);
+  }
+
+  expect(finder, findsOneWidget, reason: 'tidak muncul dalam $timeout');
+
+  // Finder-nya cocok di tengah transisi rute, dan selama transisi
+  // berlangsung halaman yang ditinggalkan masih ada di pohon widget —
+  // `find.byType(...).first` bisa mengenai tombol miliknya, lalu
+  // pumpAndSettle sesudahnya tidak pernah selesai. Transisi rute
+  // Material 300 ms, jadi 400 ms memastikannya tuntas dan tetap jauh di
+  // bawah jeda layar tunggu berikutnya.
+  await tester.pump(const Duration(milliseconds: 400));
+}
+
 /// Memajukan halaman yang punya timer berulang, yang membuat
 /// pumpAndSettle tidak pernah selesai.
 Future<void> settleFrames(WidgetTester tester) async {

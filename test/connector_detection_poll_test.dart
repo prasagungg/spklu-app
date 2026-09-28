@@ -12,17 +12,50 @@ import 'package:kossotrik/widgets/primary_button.dart';
 import 'package:kossotrik/widgets/session_widgets.dart';
 
 import 'fixtures.dart';
+import 'flow_helpers.dart';
 
 /// Melaporkan status OCPP yang bisa diubah test di tengah jalan.
 class _Stub extends Interceptor {
-  _Stub(this.status);
+  _Stub(this.status, {this.startOutcome = _Start.ok});
 
   String status;
+
+  /// Bagaimana `/transaction/charging/start` dijawab. [_Start.hang]
+  /// membuat futurenya menggantung, supaya layar tunggu mode otomatis
+  /// bisa diperiksa sebelum halamannya berpindah.
+  final _Start startOutcome;
+
   final List<RequestOptions> requests = [];
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     requests.add(options);
+
+    if (options.path == '/transaction/charging/start') {
+      switch (startOutcome) {
+        case _Start.hang:
+          return;
+        case _Start.reject:
+          handler.reject(
+            DioException.badResponse(
+              statusCode: 400,
+              requestOptions: options,
+              response: Response<Map<String, dynamic>>(
+                requestOptions: options,
+                statusCode: 400,
+                data: {
+                  'responseCode': '14',
+                  'responseMessage': 'Charge point offline',
+                },
+              ),
+            ),
+          );
+          return;
+        case _Start.ok:
+          break;
+      }
+    }
+
     handler.resolve(
       Response<Map<String, dynamic>>(
         requestOptions: options,
@@ -36,7 +69,13 @@ class _Stub extends Interceptor {
 
   List<RequestOptions> get checks =>
       requests.where((r) => r.path == '/check-status-connector').toList();
+
+  List<RequestOptions> get starts =>
+      requests.where((r) => r.path == '/transaction/charging/start').toList();
 }
+
+/// Jawaban yang disiapkan untuk `/transaction/charging/start`.
+enum _Start { ok, reject, hang }
 
 ChargingSession _session() {
   final box = ChargeBox.fromJson(chargeBoxJson(), number: 1);
@@ -51,8 +90,12 @@ ChargingSession _session() {
   );
 }
 
-Future<_Stub> _pump(WidgetTester tester, {String status = 'Available'}) async {
-  final stub = _Stub(status);
+Future<_Stub> _pump(
+  WidgetTester tester, {
+  String status = 'Available',
+  _Start startOutcome = _Start.ok,
+}) async {
+  final stub = _Stub(status, startOutcome: startOutcome);
   final repo = ChargePointRepository(
     client: ApiClient.withDio(Dio()..interceptors.add(stub)),
   );
@@ -79,6 +122,13 @@ PrimaryButton _startButton(WidgetTester tester) => tester.widget<PrimaryButton>(
 Future<void> _tick(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 1));
   await tester.pump();
+}
+
+/// Melewati jeda mode otomatis, seberapa pun panjangnya.
+Future<void> _passAutoPause(WidgetTester tester) async {
+  for (var i = 0; i < 14; i++) {
+    await tester.pump(const Duration(milliseconds: 500));
+  }
 }
 
 void main() {
@@ -155,11 +205,15 @@ void main() {
   testWidgets('status sesudah Preparing juga berarti kabelnya terpasang', (
     tester,
   ) async {
-    await _pump(tester, status: 'SuspendedEV');
+    final stub = await _pump(
+      tester,
+      status: 'SuspendedEV',
+      startOutcome: _Start.hang,
+    );
 
-    await _tick(tester);
+    await _passAutoPause(tester);
 
-    expect(_startButton(tester).onPressed, isNotNull);
+    expect(stub.starts, hasLength(1));
   });
 
   /// Charger yang rusak tidak akan pernah melaporkan "Preparing".
@@ -171,6 +225,89 @@ void main() {
 
     expect(find.textContaining('tidak bisa dipakai (Faulted)'), findsOneWidget);
     expect(_startButton(tester).onPressed, isNull);
+  });
+
+  group('kabel yang sudah terpasang sejak halaman dibuka', () {
+    /// Menyuruh memasang kabel yang sudah terpasang hanya membuat orang
+    /// berdiri di depan tombol yang tidak ada gunanya ditekan.
+    /// Jeda terpendeknya satu detik, jadi setengah detik pertama masih
+    /// pasti berada di dalamnya.
+    testWidgets('menahan diri dulu dan mengabarkan konektornya', (
+      tester,
+    ) async {
+      final stub = await _pump(tester, status: 'Preparing');
+
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.text('Konektor Terhubung'), findsOneWidget);
+      expect(
+        find.textContaining('Pengisian akan dimulai otomatis'),
+        findsOneWidget,
+      );
+      expect(stub.starts, isEmpty, reason: '/start menunggu jedanya habis');
+      // Tidak ada yang perlu ditekan, termasuk Bantuan — yang di sini
+      // hanya menawarkan pertolongan untuk masalah yang tidak ada.
+      expect(
+        find.widgetWithText(PrimaryButton, 'Mulai Pengisian'),
+        findsNothing,
+      );
+      expect(find.text('Bantuan'), findsNothing);
+    });
+
+    testWidgets('memulai pengisian sendiri, tanpa tombol', (tester) async {
+      final stub = await _pump(
+        tester,
+        status: 'Preparing',
+        startOutcome: _Start.hang,
+      );
+
+      await _passAutoPause(tester);
+
+      expect(stub.starts, hasLength(1), reason: '/start harus berangkat');
+      expect(find.text('Konektor Terhubung'), findsOneWidget);
+      expect(find.text('Memulai pengisian…'), findsOneWidget);
+      expect(
+        find.widgetWithText(PrimaryButton, 'Mulai Pengisian'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('lanjut ke Pengisian Dimulai tanpa ditekan', (tester) async {
+      await _pump(tester, status: 'Preparing');
+
+      await pumpUntil(tester, find.text('Pengisian Dimulai'));
+    });
+
+    /// Mode otomatis tidak punya tombol. Kegagalan yang tidak
+    /// mengembalikan tombolnya akan menahan pengguna di layar tunggu
+    /// yang tidak akan pernah selesai.
+    testWidgets('start yang gagal memunculkan tombolnya kembali', (
+      tester,
+    ) async {
+      await _pump(tester, status: 'Preparing', startOutcome: _Start.reject);
+
+      await _passAutoPause(tester);
+
+      expect(find.text('Konektor Terhubung'), findsOneWidget);
+      expect(find.text('Memulai pengisian…'), findsNothing);
+      expect(_startButton(tester).onPressed, isNotNull);
+      expect(find.text('Bantuan'), findsOneWidget);
+      expect(find.byType(SnackBar), findsOneWidget);
+    });
+
+    /// Kabel yang dicolokkan *sambil* menunggu di halaman ini bukan
+    /// urusan mode otomatis — pengguna yang menekan tombolnya.
+    testWidgets('dicolok saat menunggu tetap menunggu tombol', (tester) async {
+      final stub = await _pump(tester);
+
+      await _tick(tester);
+      stub.status = 'Preparing';
+      await _tick(tester);
+
+      expect(find.text('Konektor Terhubung'), findsOneWidget);
+      expect(_startButton(tester).onPressed, isNotNull);
+      expect(stub.starts, isEmpty, reason: '/start menunggu tombol ditekan');
+    });
   });
 
   testWidgets('hitung mundur dibaca dari sessionExpired tagihan', (

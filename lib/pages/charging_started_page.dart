@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../data/waiting_pause.dart';
 import '../models/charging_session.dart';
 import '../theme/app_colors.dart';
 import '../widgets/asset_slot.dart';
@@ -18,7 +18,7 @@ import 'charging_status_page.dart';
 /// Charger butuh beberapa detik sebelum melaporkan kWh pertamanya —
 /// controller hanya meneruskan perintah start, jadi `ongoing-kwh` masih
 /// menjawab nol sesaat. Halaman ini mengisi jeda itu: ia menahan
-/// pengguna [_minWait]–[_maxWait] detik sambil menunjukkan kode sesi,
+/// pengguna selama [waitingPause] sambil menunjukkan kode sesi,
 /// baru kemudian membuka `ChargingStatusPage`.
 ///
 /// **Ini layar tunggu, jadi tidak ada tombol aksi.** Satu-satunya jalan
@@ -29,9 +29,9 @@ class ChargingStartedPage extends StatefulWidget {
 
   final ChargingSession session;
 
-  /// Lama menahan sebelum pindah. Kosong berarti diacak
-  /// [_minWait]–[_maxWait] detik; diisi hanya oleh test supaya
-  /// hasilnya tidak bergantung pada angka acak.
+  /// Lama menahan sebelum pindah. Kosong berarti [waitingPause];
+  /// diisi hanya oleh test supaya hasilnya tidak bergantung pada angka
+  /// acak.
   final Duration? waitFor;
 
   @override
@@ -39,9 +39,6 @@ class ChargingStartedPage extends StatefulWidget {
 }
 
 class _ChargingStartedPageState extends State<ChargingStartedPage> {
-  static const _minWait = 2;
-  static const _maxWait = 4;
-
   Timer? _advance;
 
   ChargingSession get session => widget.session;
@@ -50,9 +47,7 @@ class _ChargingStartedPageState extends State<ChargingStartedPage> {
   void initState() {
     super.initState();
 
-    final wait =
-        widget.waitFor ??
-        Duration(seconds: _minWait + Random().nextInt(_maxWait - _minWait + 1));
+    final wait = widget.waitFor ?? waitingPause();
     debugPrint('[FLOW] Pengisian Dimulai menahan ${wait.inSeconds} detik');
 
     _advance = Timer(wait, _openStatus);

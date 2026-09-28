@@ -218,7 +218,7 @@ void main() {
             order: DemoData.orderFor(DemoData.priceFor(10)),
             now: DateTime(2026, 9, 16, 18, 40, 39),
           ),
-          // Produksi mengacak 2-4 detik; test menentukannya supaya
+          // Produksi mengacak 2-3 detik; test menentukannya supaya
           // hasilnya tidak bergantung pada angka acak.
           waitFor: const Duration(seconds: 3),
         ),
