@@ -6,6 +6,7 @@ import 'package:kossotrik/models/charging_session.dart';
 import 'package:kossotrik/pages/charge_box_page.dart';
 import 'package:kossotrik/pages/charging_started_page.dart';
 import 'package:kossotrik/pages/charging_status_page.dart';
+import 'package:kossotrik/pages/connect_connector_page.dart';
 import 'package:kossotrik/theme/app_theme.dart';
 import 'package:kossotrik/widgets/page_scaffold.dart';
 import 'package:kossotrik/widgets/primary_button.dart';
@@ -132,22 +133,18 @@ void main() {
     await tester.tap(find.text('Mulai Pengisian'));
     await settle(tester);
 
-    // 7. Hubungkan Konektor — tombol utama nonaktif saat menunggu.
+    // 7. Hubungkan Konektor — menunggu kabelnya dipasang.
     expect(find.text('Hubungkan Konektor'), findsOneWidget);
     expect(find.text('Menunggu konektor terdeteksi...'), findsOneWidget);
 
     // 8. Setelah jeda deteksi, berubah jadi Konektor Terhubung.
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pump();
-    expect(find.text('Konektor Terhubung'), findsOneWidget);
+    await pumpUntil(tester, find.text('Konektor Terhubung'));
     expect(find.textContaining('Konektor berhasil terdeteksi'), findsOneWidget);
 
-    await tester.tap(find.text('Mulai Pengisian'));
-    await settle(tester);
-
     // 9. Kode sesi dari order ditunjukkan — inilah yang diperlukan
-    // pengguna untuk kembali mengakhiri sesinya.
-    expect(find.text('Pengisian Dimulai'), findsOneWidget);
+    // pengguna untuk kembali mengakhiri sesinya. Tidak ada tombol yang
+    // perlu ditekan: halaman itu mengirim /start sendiri.
+    await pumpUntil(tester, find.text('Pengisian Dimulai'));
     expect(find.text('Simpan Kode Sesi Anda'), findsOneWidget);
     expect(find.text('00'), findsOneWidget);
 
@@ -274,7 +271,7 @@ void main() {
     expect(find.textContaining('kWh'), findsOneWidget);
   });
 
-  testWidgets('tombol Mulai Pengisian nonaktif sebelum konektor terdeteksi', (
+  testWidgets('layar konektor berjalan sendiri tanpa tombol Mulai', (
     tester,
   ) async {
     final reader = await pumpFlow(tester);
@@ -301,20 +298,24 @@ void main() {
     await tester.tap(find.text('Mulai Pengisian'));
     await settle(tester);
 
-    // Selama menunggu, tombol utama tidak punya handler sama sekali.
-    // Dipakai .last karena rute yang ditinggalkan masih ada di pohon
-    // widget selama animasi transisi.
-    PrimaryButton startButton() => tester.widget<PrimaryButton>(
-      find.widgetWithText(PrimaryButton, 'Mulai Pengisian').last,
+    // Selama menunggu kabel, yang tersisa cuma Bantuan — tidak ada
+    // tombol utama yang menunggu ditekan.
+    expect(find.text('Hubungkan Konektor'), findsOneWidget);
+    expect(find.text('Bantuan'), findsOneWidget);
+    // Dibatasi ke halamannya sendiri: rute yang ditinggalkan — dan
+    // tombol "Mulai Pengisian" miliknya — masih ada di pohon widget
+    // selama animasi transisi.
+    expect(
+      find.descendant(
+        of: find.byType(ConnectConnectorPage),
+        matching: find.widgetWithText(PrimaryButton, 'Mulai Pengisian'),
+      ),
+      findsNothing,
     );
 
-    expect(find.text('Hubungkan Konektor'), findsOneWidget);
-    expect(startButton().onPressed, isNull);
-
-    // Setelah konektor terdeteksi, tombol itu aktif kembali.
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pump();
-    expect(startButton().onPressed, isNotNull);
+    // Setelah konektor terdeteksi, bilah tombolnya hilang sama sekali.
+    await pumpUntil(tester, find.text('Konektor Terhubung'));
+    expect(find.text('Bantuan'), findsNothing);
   });
 
   testWidgets('setiap halaman selain halaman awal punya tombol Home', (
@@ -362,10 +363,7 @@ void main() {
     await settle(tester);
     await expectHome('Hubungkan Konektor');
 
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pump();
-    await tester.tap(find.text('Mulai Pengisian'));
-    await settle(tester);
+    await pumpUntil(tester, find.text('Pengisian Dimulai'));
     await expectHome('Pengisian Dimulai');
   });
 

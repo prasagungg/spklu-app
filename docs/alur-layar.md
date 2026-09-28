@@ -103,55 +103,66 @@ Ini bagian yang paling mudah salah baca.
 | Pemicu | Layar | Yang terjadi |
 |---|---|---|
 | Konektor ditekan | Daftar Konektor | `POST /booked-connector` memesan konektor dan memberi kode sesinya. `status: false` → alur berhenti di sini. |
-| Halaman Hubungkan Konektor dibuka | Hubungkan Konektor | `POST /check-status-connector` langsung, lalu tiap detik sampai status OCPP-nya `Preparing` — tanda kabel sudah tercolok. Hasil pemeriksaan **pertama** menentukan halamannya menunggu pengguna atau berjalan sendiri. |
+| Halaman Hubungkan Konektor dibuka | Hubungkan Konektor | `POST /check-status-connector` langsung, lalu tiap detik sampai status OCPP-nya `Preparing` — tanda kabel sudah tercolok. |
 | Pilihan kWh ditekan | Pilih Nominal | `POST /count-kwh` menghitung harganya. |
 | "Lanjutkan" | Kode Sesi | **Tidak** mengirim apa pun. Hanya pindah ke Pilih Nominal. |
 | "Lanjutkan" | Pilih Nominal | `POST /transaction/push-order` membuat ordernya, dengan `reservationId` dari pemesanan. |
 | Kartu ditempelkan | Pembayaran Kartu | `inquiry-billing` menanyakan tagihan, lalu `payment-billing` membayarnya. Keduanya berhasil → pindah ke Pembayaran Berhasil; gagal di salah satunya → tetap di sini dan kartu bisa ditempelkan ulang. Tagihan bernilai nol — tanda tarif konektornya belum diatur — dihentikan sebelum dibayar. |
 | "Mulai Pengisian" | Pembayaran Berhasil | **Tidak** mengirim apa pun. Hanya pindah ke Hubungkan Konektor. |
-| "Mulai Pengisian" | Hubungkan Konektor | `POST /transaction/charging/start`, lalu pindah ke Pengisian Dimulai. |
-| Pemeriksaan pertama sudah `Preparing` | Hubungkan Konektor | Layar menahan diri 2–3 detik sambil mengabarkan konektornya terdeteksi, lalu `POST /transaction/charging/start` dikirim **tanpa ditekan siapa pun**; tombol Mulai Pengisian dan Bantuan tidak ditampilkan. |
+| Konektor terdeteksi | Konektor Terhubung | Layar menahan diri 2–4 detik sambil mengabarkan konektornya terdeteksi, lalu `POST /transaction/charging/start` dikirim **tanpa ditekan siapa pun** — halaman ini tidak punya tombol Mulai Pengisian sama sekali. |
 | Kembali ke daftar sebelum pengisian jalan | mana pun di alur pembelian | `POST /cancelled-connector` melepas pemesanannya. |
 | "Ya, Akhiri Pengisian" | Akhiri Pengisian? | `POST /transaction/charging/stop`, baca energi akhir lewat `ongoing-kwh`, lalu Pengisian Selesai. |
 
 `/start` sengaja dikirim dari **Hubungkan Konektor**, bukan lebih awal,
 supaya perintahnya berangkat sesudah kabel terpasang.
 
-### Kabel yang sudah terpasang sebelum halaman dibuka
+### Halaman yang berjalan sendiri
 
-Sebagian pengguna memasang konektornya lebih dulu, lalu baru membayar.
-Bagi mereka, layar yang menyuruh "Pasang konektor ke kendaraan Anda"
-dan tombol yang harus ditekan hanyalah dua penghalang untuk sesuatu yang
-sudah selesai.
+Layar konektor tidak punya tombol "Mulai Pengisian". Kabel yang sudah
+terpasang tidak menyisakan keputusan apa pun untuk pengguna, dan tombol
+yang hanya punya satu jawaban benar lebih baik ditekan aplikasi.
 
-Karena itu hasil pemeriksaan **pertama** memutuskan mode halamannya:
+Perpindahan ke "Konektor Terhubung" menunggu **dua syarat sekaligus**:
+kabelnya terdeteksi, dan layar "Hubungkan Konektor" sudah tampil selama
+satu jeda acak. Satu aturan itu menutupi ketiga keadaannya:
 
-| Pemeriksaan pertama | Mode | Yang dilihat pengguna |
+| Keadaan | Yang menahan | Yang dilihat pengguna |
 |---|---|---|
-| Kabel belum terpasang | biasa | Hubungkan Konektor, polling tiap detik, tombol menyala saat terdeteksi, pengguna menekannya |
-| Kabel sudah terpasang | otomatis | Konektor Terhubung tanpa tombol: 2–3 detik panel "Pengisian akan dimulai otomatis", lalu panel tunggu "Memulai pengisian…" saat `/start` terbang, lanjut ke Pengisian Dimulai |
+| Kabel belum tercolok | deteksinya | Hubungkan Konektor, loading terus sampai kabelnya masuk |
+| Tercolok sambil menunggu | yang belakangan selesai | seperti di atas, lalu pindah |
+| Sudah tercolok sejak halaman dibuka | jedanya | Hubungkan Konektor 2–4 detik dulu, baru pindah |
 
-Yang dinilai hanya pemeriksaan pertama. Kabel yang dicolokkan *sambil*
-menunggu di halaman ini tetap mendapat alur biasa — tombolnya menyala
-dan penggunanya yang menekan.
+Baris ketiga itulah alasan syarat keduanya ada. Tanpa jeda tampil
+minimum, kabel yang sudah terpasang membuat layar pertamanya berkelebat
+selama satu round trip, dan yang tersisa di ingatan pengguna hanyalah
+aplikasi yang melompat sendiri tanpa penjelasan.
 
-Mode otomatis yang gagal mengirim `/start` kembali ke mode biasa:
-tombolnya muncul beserta alasan kegagalannya. Layar tunggu tanpa tombol
-yang tidak akan pernah selesai jauh lebih buruk daripada satu tombol
-yang perlu ditekan dua kali.
+Sesudah pindah, "Konektor Terhubung" menahan diri satu jeda lagi sebelum
+`/start` berangkat — bukan supaya charger siap, charger tidak peduli
+kapan perintahnya datang, melainkan supaya pengguna sempat membaca bahwa
+konektornya memang sudah terdeteksi.
+
+Dua tombol tersisa, dan keduanya hanya muncul saat tangan pengguna
+benar-benar diperlukan:
+
+- **Bantuan**, hanya selama menunggu kabel dipasang — di situlah orang
+  berdiri kebingungan dengan kabel di tangan. Begitu terhubung ia ikut
+  hilang; tidak ada masalah yang perlu dibantu di sana.
+- **Coba Lagi**, hanya ketika `/start` ditolak charger. Tanpa tombol
+  alur normal, kegagalan tidak punya jalan keluar sama sekali. Tidak
+  diulang sendiri: charger yang menolak sekali biasanya menolak lagi,
+  dan mengulanginya tiap beberapa detik hanya menghujani perangkat yang
+  sedang bermasalah.
 
 Mode offline — tanpa `ChargingScope`, dipakai demo dan test — tidak
-punya backend untuk ditanya, jadi selalu mode biasa.
+punya backend untuk ditanya, jadi kabelnya dianggap terpasang setelah
+jeda simulasi tiga detik.
 
-Jedanya tidak untuk menunggu charger siap; charger tidak peduli kapan
-perintahnya datang. Jeda itu untuk penggunanya: tanpanya layar Konektor
-Terhubung cuma berkelebat, dan yang tersisa hanyalah kesan aplikasi
-melompat sendiri tanpa penjelasan.
-
-Rentang 2–3 detiknya dipusatkan di `lib/data/waiting_pause.dart` dan
-dipakai dua layar tunggu yang berurutan — "Konektor Terhubung" di mode
-otomatis dan "Pengisian Dimulai" — supaya keduanya terasa sama panjang.
-Test mematoknya lewat `test/flutter_test_config.dart`; dua jeda acak
+Rentang jeda acaknya dipusatkan di `lib/data/waiting_pause.dart` dan
+dipakai tiga layar tunggu berurutan — "Hubungkan Konektor", "Konektor
+Terhubung", dan "Pengisian Dimulai" — supaya ketiganya terasa sama
+panjang. Test mematoknya lewat `test/flutter_test_config.dart`; jeda
+acak berurutan membuat hasilnya bergantung pada angka yang keluar.
 berurutan membuat hasilnya bergantung pada angka yang keluar.
 
 Halaman itu memanggil `POST /check-status-connector` tiap detik dan

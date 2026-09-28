@@ -158,17 +158,12 @@ void main() {
     expect(find.text('Hubungkan Konektor'), findsOneWidget);
     expect(recorder.to('/transaction/charging/start'), isEmpty);
 
-    // Sebelum jeda deteksi habis, tombolnya belum aktif dan perintah
-    // start belum terkirim.
+    // Kabelnya sudah terpasang, tapi layar pertamanya tidak dilewati:
+    // /start baru berangkat setelah dua jedanya habis, tanpa ditekan.
+    await pumpUntil(tester, find.text('Konektor Terhubung'));
     expect(recorder.to('/transaction/charging/start'), isEmpty);
 
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pump();
-    expect(find.text('Konektor Terhubung'), findsOneWidget);
-
-    await tester.tap(find.text('Mulai Pengisian'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await pumpUntil(tester, find.text('Pengisian Dimulai'));
 
     final starts = recorder.to('/transaction/charging/start');
     expect(starts, hasLength(1), reason: 'perintah start harus terkirim');
