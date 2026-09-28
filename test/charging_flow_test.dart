@@ -192,8 +192,17 @@ void main() {
     await endCharging(tester);
     await settle(tester);
     expect(find.text('Pengisian Selesai'), findsOneWidget);
+    expect(find.text('kWh Pesan'), findsOneWidget);
     expect(find.text('Energi Tersalur'), findsOneWidget);
+    expect(find.text('Sisa kWh'), findsOneWidget);
     expect(find.text('Sisa Pembayaran'), findsOneWidget);
+
+    // Rinciannya lebih panjang daripada layar test, jadi pesan penutup
+    // di bawahnya baru dibangun setelah digulir ke sana.
+    await tester.scrollUntilVisible(
+      find.text('Lepas dan kembalikan konektor ke tempatnya'),
+      100,
+    );
     expect(
       find.text('Lepas dan kembalikan konektor ke tempatnya'),
       findsOneWidget,

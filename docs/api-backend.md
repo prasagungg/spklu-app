@@ -997,14 +997,35 @@ Rincian akhir satu order — sumber angka halaman "Pengisian Selesai".
 }
 ```
 
-Empat angka yang dipakai layar penutup:
+Enam angka yang dipakai layar penutup, dua deret yang sejajar — pesan,
+pakai, sisa — sekali dalam kWh dan sekali dalam rupiah:
 
 | Field | Ditampilkan sebagai |
 |---|---|
+| `kwhPesan` | kWh Pesan |
 | `kwhPakai` | Energi Tersalur |
+| `sisaKwh` | Sisa kWh |
 | `rpPesan` | Pembayaran Awal |
 | `rpPakai` | Total Pemakaian |
 | `rpSisa` | Sisa Pembayaran |
+| `orderId` | No Order |
+
+Nomor dan penerbit kartu **tidak** ada di response ini, jadi layar
+penutup menanyakan `POST /transaction/detail-history-transaction`
+sekaligus dan memakai `cardNumber` serta `pspId` dari sana — nomornya
+sudah disamarkan backend. Cadangannya tagihan `inquiry-billing` yang
+dipegang sesi, yang hanya ada bila kartunya memang ditempelkan di unit
+ini.
+
+Sebaliknya, **angkanya tidak pernah** diambil dari riwayat: `sisaKwh` dan
+`rpSisa` di sana dikirim null pada transaksi yang tidak selesai, dan null
+terurai menjadi nol yang tidak bisa dibedakan dari nol sungguhan. Ketika
+endpoint ini tidak menjawab, yang dipakai adalah bacaan terakhir layar
+pemantauan.
+
+`sisaKwh` diambil apa adanya, tidak dihitung ulang dari `kwhPesan -
+kwhPakai`. Selisih yang dihitung aplikasi tidak selalu sama angkanya,
+dan alasannya sama dengan alasan baris rupiahnya diambil mentah.
 
 Sebelumnya ketiga angka rupiah itu **dihitung aplikasi** dari nominal
 yang dibayar dan energi yang tersalur, dengan pembulatan ke bawah per
