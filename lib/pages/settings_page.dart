@@ -6,19 +6,20 @@ import '../theme/app_theme.dart';
 import '../widgets/asset_slot.dart';
 import '../widgets/page_scaffold.dart';
 import '../data/charging_scope.dart';
-import '../widgets/password_dialog.dart';
+import '../widgets/login_dialog.dart';
 import '../widgets/spklu_code_dialog.dart';
 import '../widgets/status_chip.dart';
 import 'api_config_page.dart';
 import 'master_charge_box_page.dart';
 
-/// Meminta password, lalu membuka halaman Pengaturan bila cocok.
+/// Meminta kredensial edge controller, lalu membuka halaman Pengaturan
+/// bila backend menerimanya lewat `POST /login`.
 ///
 /// Dipanggil dari lima ketukan pada logo di header — lihat
-/// `PageScaffold`. Salah password tidak membuka apa pun dan tidak
-/// meninggalkan jejak di layar.
+/// `PageScaffold`. Kredensial yang ditolak tidak membuka apa pun dan
+/// tidak meninggalkan jejak di layar.
 Future<void> openSettings(BuildContext context) async {
-  if (!await showPasswordDialog(context)) return;
+  if (!await showLoginDialog(context)) return;
   if (!context.mounted) return;
 
   await Navigator.of(

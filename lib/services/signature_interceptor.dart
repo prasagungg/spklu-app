@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 
-import '../config/env.dart';
+import '../config/api_config.dart';
 
 /// Menandatangani setiap request dengan header `client-id`, `timestamp`,
 /// dan `signature`.
@@ -39,12 +39,20 @@ class SignatureInterceptor extends Interceptor {
     String? clientId,
     String? secretKey,
     DateTime Function()? now,
-  }) : clientId = clientId ?? Env.apiClientId,
-       _secretKey = secretKey ?? Env.apiSecretKey,
+  }) : _clientId = clientId,
+       _fixedSecretKey = secretKey,
        _now = now ?? DateTime.now;
 
-  final String clientId;
-  final String _secretKey;
+  /// Nilai tetap yang disuntik test. Kosong berarti dibaca dari
+  /// [ApiConfig] **tiap request**, bukan sekali saat interceptor dibuat:
+  /// operator bisa mengganti kredensialnya di halaman Konfigurasi Server
+  /// tanpa aplikasi dimulai ulang, dan interceptor yang sama harus ikut
+  /// memakai yang baru.
+  final String? _clientId;
+  final String? _fixedSecretKey;
+
+  String get clientId => _clientId ?? ApiConfig.clientId;
+  String get _secretKey => _fixedSecretKey ?? ApiConfig.secretKey;
 
   /// Disuntik di test supaya tanda tangannya bisa dibandingkan dengan
   /// nilai yang sudah diketahui.

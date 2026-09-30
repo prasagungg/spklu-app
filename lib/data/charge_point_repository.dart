@@ -246,6 +246,32 @@ class ChargePointRepository {
     return TransactionDetail.fromJson(_unwrap(json));
   }
 
+  /// `POST /login`
+  ///
+  /// Gerbang halaman Pengaturan. Kredensialnya milik edge controller —
+  /// username berupa id controller, mis. `EC-00001-2`.
+  ///
+  /// ```json
+  /// { "username": "EC-00001-2", "password": "EV@2026_EC-00001-2" }
+  /// ```
+  ///
+  /// Jawabannya tidak membawa data yang dipakai aplikasi; yang penting
+  /// amplopnya "00". Selain itu [ApiException] dilempar dengan pesan
+  /// dari backend, dan halaman Pengaturan tidak terbuka.
+  Future<void> login({
+    required String username,
+    required String password,
+    CancelToken? cancelToken,
+  }) async {
+    final json = await _client.post<Map<String, dynamic>>(
+      '/login',
+      body: {'username': username, 'password': password},
+      cancelToken: cancelToken,
+    );
+
+    _unwrap(json);
+  }
+
   /// `POST /transaction/inquiry-billing`
   ///
   /// Menanyakan tagihan satu order untuk kartu tertentu, sebelum

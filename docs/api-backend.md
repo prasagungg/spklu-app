@@ -521,6 +521,24 @@ Kode `16` diterjemahkan jadi arahan yang bisa ditindaklanjuti — "Masih
 ada pesanan yang belum selesai di konektor ini" — bukan pesan mentah
 backend.
 
+## `POST /login`
+
+Gerbang halaman **Pengaturan**. Kredensialnya milik edge controller —
+username berupa id controller.
+
+```json
+{ "username": "EC-00001-2", "password": "EV@2026_EC-00001-2" }
+```
+
+Jawabannya tidak membawa data yang dipakai aplikasi; yang menentukan
+hanya amplopnya. `responseCode` **"00"** membuka halaman Pengaturan;
+apa pun selain itu menahan modalnya tetap terbuka dan menampilkan
+`responseMessage` apa adanya — alasannya datang dari backend, bukan
+tebakan aplikasi.
+
+Ditandatangani seperti endpoint lain: header `client-id`, `timestamp`,
+dan `signature`.
+
 ## `POST /transaction/inquiry-billing`
 
 Menanyakan tagihan satu order untuk kartu tertentu, sebelum didebit.

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:kossotrik/data/waiting_pause.dart';
 
 /// Dijalankan `flutter_test` sekali untuk setiap berkas test di folder
@@ -19,5 +20,11 @@ import 'package:kossotrik/data/waiting_pause.dart';
 /// diam-diam ketinggalan dan kembali bergantung pada angka acak.
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   waitingPause = () => const Duration(seconds: 4);
+
+  // Penyimpanan aman diganti yang berjalan di memori. Tanpa ini setiap
+  // pembacaan menembak method channel yang tidak ada implementasinya di
+  // lingkungan test, dan panggilannya menggantung sampai timeout —
+  // satu test halaman Konfigurasi Server sempat memakan dua menit.
+  FlutterSecureStorage.setMockInitialValues({});
   await testMain();
 }

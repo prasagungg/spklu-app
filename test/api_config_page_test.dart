@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kossotrik/services/signature_interceptor.dart';
 import 'package:kossotrik/widgets/page_scaffold.dart';
 import 'package:kossotrik/pages/settings_page.dart';
 import 'package:kossotrik/config/api_config.dart';
@@ -23,9 +25,14 @@ class _Stub extends Interceptor {
   final bool fail;
   final List<String> baseUrls = [];
 
+  /// Header `client-id` yang benar-benar terkirim, untuk memastikan
+  /// kredensial yang baru diketik yang dipakai — bukan yang lama.
+  final List<String> clientIds = [];
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     baseUrls.add(options.baseUrl);
+    clientIds.add('${options.headers['client-id']}');
 
     if (fail) {
       handler.reject(
@@ -49,7 +56,9 @@ class _Stub extends Interceptor {
 
 /// Membangun halaman konfigurasi di atas scope yang memakai [stub].
 Future<void> _pumpPage(WidgetTester tester, _Stub stub) async {
-  final dio = Dio()..interceptors.add(stub);
+  final dio = Dio()
+    ..interceptors.add(SignatureInterceptor())
+    ..interceptors.add(stub);
 
   await tester.pumpWidget(
     ChargingScope(
@@ -63,8 +72,134 @@ Future<void> _pumpPage(WidgetTester tester, _Stub stub) async {
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
-    // Tiap test mulai dari alamat bawaan, bukan sisa test sebelumnya.
-    ApiConfig.apply(Env.apiBaseUrl);
+    FlutterSecureStorage.setMockInitialValues({});
+    // Tiap test mulai dari nilai bawaan, bukan sisa test sebelumnya.
+    ApiConfig.apply(
+      baseUrl: Env.apiBaseUrl,
+      clientId: Env.apiClientId,
+      secretKey: Env.apiSecretKey,
+    );
+  });
+
+  group('kredensial penandatangan', () {
+    /// Kredensialnya dulu ikut tertanam saat build. Sekarang operator
+    /// bisa merotasinya di lapangan tanpa APK dibangun ulang.
+    testWidgets('isian awalnya memakai yang sedang dipakai', (tester) async {
+      ApiConfig.apply(clientId: 'edge-lapangan', secretKey: 'rahasia-lama');
+      await _pumpPage(tester, _Stub());
+
+      expect(
+        tester
+            .widget<TextField>(find.byKey(ApiConfigPage.clientIdKey))
+            .controller
+            ?.text,
+        'edge-lapangan',
+      );
+      expect(
+        tester
+            .widget<TextField>(find.byKey(ApiConfigPage.secretKey))
+            .controller
+            ?.text,
+        'rahasia-lama',
+      );
+    });
+
+    /// Layar kios ini berdiri di tempat umum.
+    testWidgets('secret key tersamar sampai diminta terlihat', (tester) async {
+      await _pumpPage(tester, _Stub());
+
+      TextField secret() =>
+          tester.widget<TextField>(find.byKey(ApiConfigPage.secretKey));
+
+      expect(secret().obscureText, isTrue);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(ApiConfigPage.clientIdKey))
+            .obscureText,
+        isFalse,
+        reason: 'client-id bukan rahasia',
+      );
+
+      final eye = find.byIcon(Icons.visibility_outlined);
+      await tester.ensureVisible(eye);
+      await tester.pumpAndSettle();
+      await tester.tap(eye);
+      await tester.pump();
+
+      expect(secret().obscureText, isFalse);
+    });
+
+    /// Tanda tangan dari kredensial kosong pasti ditolak backend, dan
+    /// gagalnya baru ketahuan di halaman berikutnya.
+    testWidgets('tidak bisa lanjut dengan kredensial kosong', (tester) async {
+      await _pumpPage(tester, _Stub());
+
+      PrimaryButton connect() => tester.widget<PrimaryButton>(
+        find.widgetWithText(PrimaryButton, 'Hubungkan'),
+      );
+      expect(connect().onPressed, isNotNull);
+
+      await tester.enterText(find.byKey(ApiConfigPage.secretKey), '');
+      await tester.pump();
+      expect(connect().onPressed, isNull);
+
+      await tester.enterText(find.byKey(ApiConfigPage.secretKey), 'rahasia');
+      await tester.enterText(find.byKey(ApiConfigPage.clientIdKey), '');
+      await tester.pump();
+      expect(connect().onPressed, isNull);
+    });
+
+    /// Kredensial yang baru diketik harus sudah dipakai oleh uji
+    /// koneksinya sendiri — kalau tidak, yang diuji kredensial lama.
+    testWidgets('yang diketik langsung menandatangani request', (tester) async {
+      final stub = _Stub();
+      await _pumpPage(tester, stub);
+
+      await tester.enterText(
+        find.byKey(ApiConfigPage.fieldKey),
+        '10.0.2.2:8080',
+      );
+      await tester.enterText(
+        find.byKey(ApiConfigPage.clientIdKey),
+        'edge-baru',
+      );
+      await tester.enterText(
+        find.byKey(ApiConfigPage.secretKey),
+        'rahasia-baru',
+      );
+      await tester.pump();
+      await tester.tap(find.text('Hubungkan'));
+      await tester.pumpAndSettle();
+
+      expect(ApiConfig.clientId, 'edge-baru');
+      expect(ApiConfig.secretKey, 'rahasia-baru');
+      // Halaman berikutnya memuat daftarnya lagi, jadi bisa lebih dari
+      // satu request — yang penting semuanya memakai kredensial baru.
+      expect(stub.clientIds, isNotEmpty);
+      expect(stub.clientIds.every((id) => id == 'edge-baru'), isTrue);
+    });
+
+    /// Tersimpan terenkripsi, dan terbaca lagi setelah aplikasi ditutup.
+    testWidgets('diingat dan dipulihkan setelah restart', (tester) async {
+      await _pumpPage(tester, _Stub());
+
+      await tester.enterText(find.byKey(ApiConfigPage.clientIdKey), 'edge-pln');
+      await tester.enterText(
+        find.byKey(ApiConfigPage.secretKey),
+        'kunci-lapangan',
+      );
+      await tester.pump();
+      await tester.tap(find.text('Lanjut Tanpa Uji'));
+      await tester.pumpAndSettle();
+
+      // Aplikasi dimulai ulang: nilainya kembali ke bawaan build, lalu
+      // dipulihkan dari penyimpanan.
+      ApiConfig.apply(clientId: Env.apiClientId, secretKey: Env.apiSecretKey);
+      await ApiConfig.restore();
+
+      expect(ApiConfig.clientId, 'edge-pln');
+      expect(ApiConfig.secretKey, 'kunci-lapangan');
+    });
   });
 
   testWidgets('isian awal memakai alamat yang sedang dipakai', (tester) async {
@@ -125,7 +260,7 @@ void main() {
 
     // Meniru aplikasi dibuka lagi: nilai di memori dikembalikan ke
     // bawaan, lalu dibaca ulang dari penyimpanan.
-    ApiConfig.apply(Env.apiBaseUrl);
+    ApiConfig.apply(baseUrl: Env.apiBaseUrl);
     expect(await ApiConfig.restore(), 'http://192.168.4.21:9000');
   });
 

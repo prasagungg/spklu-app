@@ -58,6 +58,43 @@ Dua aturannya:
   path relatif yang sudah berawalan `/`, jadi garis miring di ujung
   hanya menghasilkan `//`.
 
+## Kredensial penandatangan
+
+`client-id` dan secret key juga diatur di halaman **Konfigurasi Server**,
+di bawah kolom alamat. Keduanya menandatangani setiap request — lihat
+[api-backend.md](api-backend.md) — dan bisa dirotasi tanpa APK dibangun
+ulang.
+
+`SPKLU_CLIENT_ID` dan `SPKLU_SECRET_KEY` sekarang hanya **isian awal**
+untuk perangkat yang belum pernah dikonfigurasi, persis seperti
+`SPKLU_API_BASE_URL`.
+
+### Di mana disimpan
+
+| Nilai | Penyimpanan | Alasan |
+|---|---|---|
+| Alamat server | `SharedPreferences` | alamat jaringan, bukan rahasia |
+| Client ID | `flutter_secure_storage` | separuh pasangan kredensial |
+| Secret key | `flutter_secure_storage` | kunci HMAC tiap request |
+
+Secret key **tidak** ditulis ke `SharedPreferences` maupun berkas JSON:
+keduanya menyimpan teks polos yang bisa dibaca siapa pun yang memegang
+perangkat, dan tablet ini berdiri di tempat umum.
+`flutter_secure_storage` mengenkripsinya AES-GCM dengan kunci yang
+dijaga Keystore perangkat.
+
+Alamat server sengaja tetap di `SharedPreferences`: perangkat yang sudah
+dipasang di lapangan menyimpan alamatnya di sana, dan memindahkannya
+akan menghapus alamat itu pada pembaruan pertama.
+
+Kolom secret key disamarkan, dengan ikon mata untuk memeriksa ketikan.
+Uji koneksi ("Hubungkan") memakai kredensial yang baru diketik, jadi
+tanda tangan yang salah ketahuan di halaman itu juga — bukan nanti di
+halaman daftar charge box.
+
+Di test, penyimpanan amannya diganti versi memori lewat
+`test/flutter_test_config.dart`.
+
 ## HTTP polosan
 
 Alamat `http://` bekerja apa adanya. `android:usesCleartextTraffic="true"`

@@ -142,13 +142,16 @@ class Env {
 
   static bool get hasAuthorization => apiAuthorization.isNotEmpty;
 
-  /// Password halaman Pengaturan — layar petugas yang dibuka dengan
-  /// menekan logo lima kali.
+  /// Password cadangan halaman Pengaturan, **hanya untuk mode tanpa
+  /// backend** — demo dan test.
   ///
-  /// Masih nilai tetap; timpa lewat
-  /// `--dart-define=SPKLU_SETTINGS_PASSWORD=…` bila unit di lapangan
-  /// perlu password sendiri. Ini gerbang operasional, bukan pengaman
-  /// data: siapa pun yang memegang APK bisa membacanya.
+  /// Gerbang sungguhannya `POST /login` dengan kredensial edge
+  /// controller; lihat `showLoginDialog`. Produksi selalu punya
+  /// `ChargingScope`, jadi nilai ini tidak pernah terpakai di perangkat
+  /// sungguhan — dan memang tidak boleh diandalkan sebagai pengaman:
+  /// siapa pun yang memegang APK bisa membacanya.
+  ///
+  /// Timpa lewat `--dart-define=SPKLU_SETTINGS_PASSWORD=…`.
   static const String settingsPassword = String.fromEnvironment(
     'SPKLU_SETTINGS_PASSWORD',
     defaultValue: '5PKLU+2026',
